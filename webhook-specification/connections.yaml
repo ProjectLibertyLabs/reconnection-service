@@ -1,0 +1,74 @@
+openapi: 3.0.3
+info:
+  title: Graph Reconnection Service
+  description: |-
+    This is a sample Reconnection Service endpoint profile based on the OpenAPI 3.0 specification.
+  version: 1.0.0
+servers:
+  - url: https://localhost/api/v1.0.0
+tags:
+  - name: connections
+    description: Social graph connections webhook
+    externalDocs:
+      description: Find out more
+      url: http://swagger.io
+paths:
+  /connections/{DSNPId}:
+    get:
+      tags:
+        - connections
+      summary: Get social connections for a user by their DSNPId
+      description: Returns social connections for a user
+      operationId: getConnectionsByDSNPId
+      parameters:
+        - name: DSNPId
+          in: path
+          description: DSNPId of the user's social connections to return
+          required: true
+          schema:
+            type: integer
+            format: int64  # Represents a 64-bit integer
+            minimum: 0     # Ensures the integer is non-negative
+            maximum: 18446744073709551615  # Maximum value of a u64
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connections'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Connections'
+        '400':
+          description: Invalid DSNPId supplied
+        '404':
+          description: DSNPId not found
+      security:
+        - api_key: []
+        - connections_auth:
+            - read:connections
+components:
+  schemas:
+    Connections:
+      type: object
+      properties:
+        DSNPIds:
+          type: array
+          items:
+            format: int64
+          example: [10, 12, 154]
+      xml:
+        name: connection
+  securitySchemes:
+    connections_auth:
+      type: oauth2
+      flows:
+        implicit:
+          authorizationUrl: https://localhost/oauth/authorize
+          scopes:
+            read:connections: read a user's connections
+    api_key:
+      type: apiKey
+      name: api_key
+      in: header
