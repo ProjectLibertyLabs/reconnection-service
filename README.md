@@ -35,7 +35,7 @@ Note left of P:Initial state:<br/>Alice <-MeWe-> Bob<br/>Alice <-MeWe-> Charlie<
   F->>-S: Provide Bob's DSNP Graph
   S->S: Decrypt Bob's Graph
   S->>F: Update & re-encrypt Bob's Graph as appropriate (Alice added)
-  Note left of P:State:<br/>Alice -MeWe> Bob<br/>Bob -DSNP> Alice<br/>Alice <-MeWe-> Charlie<br/>Bob <-MeWe->Charlie
+  Note left of P:State:<br/>Alice -MeWe> Bob<br/>Bob -DSNP> Alice<br/>Alice <-MeWe-> Charlie<br/>Bob <-MeWe-> Charlie
   loop Bob's connections (just Alice here)
   S->>+P: Request MeWe's DSNP graph for Alice
   P->>-S: Provide Alice's encryption keypair<br/>and connection list
