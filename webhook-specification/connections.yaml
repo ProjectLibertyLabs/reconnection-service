@@ -64,39 +64,43 @@ components:
         graphKeypair:
           $ref: '#/components/schemas/GraphKeyPair'
     Connections:
-      type: object
-      properties:
-        DSNPId:
-          type: integer
-          format: int64
-          example: 1024
-        privacy:
-          type: string
-          example: "Public"
-          enum:
-            - Public
-            - Private
-        connectionType:
-          type: string
-          example: "Follow"
-          enum:
-            - Follow
-            - Friendship
+      type: array
+      items:
+        type: object
+        properties:
+          DSNPId:
+            type: integer
+            format: int64
+            example: 1024
+          privacy:
+            type: string
+            example: "Public"
+            enum:
+              - Public
+              - Private
+          connectionType:
+            type: string
+            example: "Follow"
+            enum:
+              - Follow
+              - Friendship
       xml:
         name: connections
     Followers:
-      type: object
-      properties:
-        DSNPId:
-          type: integer
-          format: int64
-          example: 2048
-        privacy:
-          type: string
-          example: "Public"
-          enum:
-            - Public
-            - Private
+      type: array
+      items:
+        type: object
+        properties:
+          DSNPId:
+            type: integer
+            format: int64
+            example: 2048
+          privacy:
+            type: string
+            example: "Public"
+            enum:
+              - Public
+              - Private
     GraphKeyPair:
       type: object
       properties:
