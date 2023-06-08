@@ -44,7 +44,7 @@ Note left of P:Initial state:<br/>Alice <-MeWe-> Bob<br/>Alice <-MeWe-> Charlie<
   S->S: Decrypt Alice's Graph
   S->>F: Update & re-encrypt Alice's Graph (Bob added)
   end
-  Note left of P:State:<br/>Alice <-DSNP-> Bob<br/>Alice <-MeWe-> Charlie<br/>Bob <-MeWe->Charlie
+  Note left of P:State:<br/>Alice <-DSNP-> Bob<br/>Alice <-MeWe-> Charlie<br/>Bob <-MeWe-> Charlie
   Note over P:Charlie delegates Graph permission to Provider
   P->>F: Add Graph schema permission delegation to Provider for Charlie
   F->>S: (Service sees delegation event during chain scan)
