@@ -28,7 +28,7 @@ paths:
           schema:
             type: integer
             format: int64  # Represents a 64-bit integer
-            minimum: 0     # Ensures the integer is non-negative
+            minimum: 1     # Ensures the integer is non-negative
             maximum: 18446744073709551615  # Maximum value of a u64
       responses:
         '200':
@@ -36,10 +36,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Connections'
+                $ref: '#/components/schemas/ConnectionsApiResponse'
             application/xml:
               schema:
-                $ref: '#/components/schemas/Connections'
+                $ref: '#/components/schemas/ConnectionsApiResponse'
         '400':
           description: Invalid DSNPId supplied
         '404':
@@ -50,16 +50,64 @@ paths:
             - read:connections
 components:
   schemas:
+    ConnectionsApiResponse:
+      type: object
+      properties:
+        DSNPId:
+          type: integer
+          format: int64
+          example: 10
+        connections:
+          $ref: '#/components/schemas/Connections'
+        followers:
+          $ref: '#/components/schemas/Followers'
+        graphKeypair:
+          $ref: '#/components/schemas/GraphKeyPair'
     Connections:
       type: object
       properties:
-        DSNPIds:
-          type: array
-          items:
-            format: int64
-          example: [10, 12, 154]
+        DSNPId:
+          type: integer
+          format: int64
+          example: 1024
+        privacy:
+          type: string
+          example: "Public"
+          enum:
+            - Public
+            - Private
+        connectionType:
+          type: string
+          example: "Follow"
+          enum:
+            - Follow
+            - Friendship
       xml:
-        name: connection
+        name: connections
+    Followers:
+      type: object
+      properties:
+        DSNPId:
+          type: integer
+          format: int64
+          example: 2048
+        privacy:
+          type: string
+          example: "Public"
+          enum:
+            - Public
+            - Private
+    GraphKeyPair:
+      type: object
+      properties:
+        publicKey:
+         type: string
+         example: "0xe5be9a5092b81bca64be81d212e7f2f9eba183bb7a90954f7b76361f6edb5c0a"
+        privateKey:
+         type: string
+         example: "0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+      xml:
+        name: graph key pair
   securitySchemes:
     connections_auth:
       type: oauth2
