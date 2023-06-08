@@ -64,5 +64,5 @@ Note left of P:Initial state:<br/>Alice <-MeWe-> Bob<br/>Alice <-MeWe-> Charlie<
   S->S: Decrypt <connection>'s Graph
   S->>F: Update & re-encrypt <connection>'s Graph (Charlie added)
   end
-  Note left of P:State:<br/>Alice <-DSNP-> Bob<br/>Alice <-DSNP-> Charlie<br/>Bob <-DSNP->Charlie
+  Note left of P:State:<br/>Alice <-DSNP-> Bob<br/>Alice <-DSNP-> Charlie<br/>Bob <-DSNP-> Charlie
 ```
