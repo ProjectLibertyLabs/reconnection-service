@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  reconnection-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env.docker.dev
+    ports:
+      - 6379:6379
+    volumes:
+    - .:/app

@@ -5,9 +5,10 @@
   "main": "main.js",
   "scripts": {
     "build": "npx tsc",
-    "start": "node dist/src/main.ts",
+    "start": "node dist/main.js",
     "start:dev": "set -a ; source .env.dev ; ts-node-dev -r tsconfig-paths/register src/main.ts",
     "docker-build": "docker build -t reconnection-service .",
+    "docker-build:dev": "docker-compose -f docker-compose.dev.yaml build",
     "docker-run:dev": "docker-compose -f docker-compose.dev.yaml up -d ; docker-compose -f docker-compose.dev.yaml logs -f reconnection-service",
     "clean": "rm -Rf dist",
     "lint": "tsc --noEmit --pretty && eslint \"**/*.ts\" --fix"

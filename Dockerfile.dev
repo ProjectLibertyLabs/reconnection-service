@@ -1,0 +1,20 @@
+# Start with a base image containing the NodeJS app
+FROM node:18-alpine3.17
+
+# Install Redis on top of the base image
+RUN apk add --update --no-cache redis
+EXPOSE 6379
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+
+# Build / Copy the rest of the application files to the container and build
+COPY . .
+RUN npm run build
+
+# Start Redis service
+CMD ["redis-server"]
+
+# Start the application
+CMD [ "npm", "start" ]
