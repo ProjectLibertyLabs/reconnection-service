@@ -1,14 +1,22 @@
-function startReconnectionService(): void {
+import { NestFactory } from '@nestjs/core';
+import { Logger, ValidationPipe } from '@nestjs/common';
+import { ReconnectionServiceModule } from './reconnection-service.module';
 
-    // Throwaway code that serves as a placeholder
-    console.log("Starting Reconnection Service...");
+const logger = new Logger('main');
 
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
-    process.stdin.on('data', () => {
-        console.log("Key press detected. Stopping Reconnection Service...");
-        process.exit(0);
-    });
+async function bootstrap() {
+  const app = await NestFactory.create(ReconnectionServiceModule, {
+    logger: process.env.DEBUG ? ['error', 'warn', 'log', 'debug'] : ['error', 'warn', 'log']
+  });
+
+  try {
+    app.enableShutdownHooks();
+    app.useGlobalPipes(new ValidationPipe());
+    await app.listen(3000);
+  } catch (e) {
+    logger.error(e);
+    await app.close();
+  }
 }
 
-startReconnectionService();
+bootstrap().catch((e) => { logger.error(e); });

@@ -1,13 +1,57 @@
 {
     "env": {
-        "commonjs": true,
+        "browser": true,
         "es2021": true
     },
-    "extends": "standard-with-typescript",
-    "parserOptions": {
-        "ecmaVersion": "latest",
-        "project": "./tsconfig.json"
+    "extends": [
+    "airbnb-base",
+    "airbnb-typescript/base",
+    "plugin:@typescript-eslint/recommended",
+    "prettier",
+    "plugin:import/errors",
+    "plugin:import/warnings",
+    "plugin:import/typescript"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": "./tsconfig.json"
+  },
+  "plugins": ["@typescript-eslint", "prettier", "import"],
+  "settings": {
+   "import/extensions": [
+      "error",
+      "ignorePackages",
+      {
+        "js": "never",
+        "jsx": "never",
+        "ts": "never",
+        "tsx": "never"
+      }
+   ],
+    "import/parsers": {
+      "@typescript-eslint/parser": [".ts", ".tsx"]
     },
-    "rules": {
+    "import/resolver": {
+      "typescript": {
+        "directory": "./tsconfig.json"
+      },
+      "node": {
+        "extensions": [".js", ".jsx", ".ts", ".tsx"]
+      }
+    },
+    "react": {
+        "version": "999.99.99"
     }
+  },
+  "rules": {
+    "@typescript-eslint/indent": [2, 2],
+    "no-console": "off",
+    "import/no-unresolved": [2, { "commonjs": true, "amd": true }],
+    "import/named": 2,
+    "import/namespace": 2,
+    "import/default": 2,
+    "import/export": 2,
+    "import/prefer-default-export": "off",
+    "semi": ["error", "always"]
+  }
 }
