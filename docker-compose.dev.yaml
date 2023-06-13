@@ -11,3 +11,20 @@ services:
       - 6379:6379
     volumes:
     - .:/app
+    networks:
+      - reconnection-service-network-dev
+
+  redis:
+    image: redis:latest
+    ports:
+      - 6379:6379
+    networks:
+      - reconnection-service-network-dev
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+
+networks:
+  reconnection-service-network-dev:

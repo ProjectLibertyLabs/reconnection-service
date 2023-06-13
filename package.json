@@ -9,6 +9,7 @@
     "start:dev": "set -a ; source .env.dev ; ts-node-dev -r tsconfig-paths/register src/main.ts",
     "docker-build": "docker build -t reconnection-service .",
     "docker-build:dev": "docker-compose -f docker-compose.dev.yaml build",
+    "docker-run": "docker build -t reconnection-service-deploy . ; docker run -p 6379:6379 --env-file .env.dev reconnection-service-deploy",
     "docker-run:dev": "docker-compose -f docker-compose.dev.yaml up -d ; docker-compose -f docker-compose.dev.yaml logs -f reconnection-service",
     "clean": "rm -Rf dist",
     "lint": "tsc --noEmit --pretty && eslint \"**/*.ts\" --fix"
