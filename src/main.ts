@@ -6,7 +6,9 @@ const logger = new Logger('main');
 
 async function bootstrap() {
   const app = await NestFactory.create(ReconnectionServiceModule, {
-    logger: process.env.DEBUG ? ['error', 'warn', 'log', 'debug'] : ['error', 'warn', 'log']
+    logger: process.env.DEBUG
+      ? ['error', 'warn', 'log', 'debug']
+      : ['error', 'warn', 'log'],
   });
 
   try {
@@ -19,4 +21,6 @@ async function bootstrap() {
   }
 }
 
-bootstrap().catch((e) => { logger.error(e); });
+bootstrap().catch((e) => {
+  logger.error(e);
+});

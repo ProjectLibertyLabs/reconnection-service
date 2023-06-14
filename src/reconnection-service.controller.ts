@@ -14,6 +14,5 @@ export class ReconnectionServiceController {
 
   // eslint-disable-next-line class-methods-use-this
   @Get('health')
-  health() {
-  }
+  health() {}
 }
