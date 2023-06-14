@@ -16,6 +16,7 @@ from node:18-alpine3.17 as base
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package*.json ./
+EXPOSE 3000
 
 from node:18-alpine3.17 as singleton
 
@@ -24,7 +25,7 @@ COPY --from=base . .
 
 # Install Redis on top of the base image
 RUN apk add --no-cache redis
-EXPOSE 6379
+EXPOSE 3000
 
 # Start Redis service
 CMD ["redis-server"]
