@@ -4,11 +4,11 @@ services:
   reconnection-service:
     build:
       context: .
-      dockerfile: Dockerfile.dev
+      dockerfile: dev.Dockerfile
     env_file:
       - .env.docker.dev
     volumes:
-    - .:/app
+    - ./:/app
     networks:
       - reconnection-service-network-dev
 
