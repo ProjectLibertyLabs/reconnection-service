@@ -1,4 +1,4 @@
-{
+module.exports = {
     "env": {
         "browser": true,
         "es2021": true
@@ -11,7 +11,8 @@
   "parserOptions": {
     "project": "./tsconfig.json",
     "sourceType": "module"
-  },
+    },
+  "ignorePatterns": [".eslintrc.js"],
   "settings": {
    "import/extensions": [
       "error",
