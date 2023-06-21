@@ -30,21 +30,20 @@ paths:
             format: int64  # Represents a 64-bit integer
             minimum: 1     # Ensures the integer is non-negative
             maximum: 18446744073709551615  # Maximum value of a u64
-        - name: pageNumber
+        - name: pagination
           in: query
-          description: Page number
+          description: Pagination parameters
           required: false
           schema:
-            type: integer
-            minimum: 1
-        - name: pageSize
-          in: query
-          description: Number of connections per page
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
+            type: object
+            properties:
+              pageNumber:
+                type: integer
+                minimum: 1
+              pageSize:
+                type: integer
+                minimum: 1
+                maximum: 100
       responses:
         '200':
           description: successful operation
@@ -83,39 +82,42 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Connection'
-        pageNumber:
-          type: integer
-        pageSize:
-          type: integer
-        total:
-          type: integer
+        pagination:
+          type: object
+          properties:
+            pageNumber:
+              type: integer
+            pageSize:
+              type: integer
+            pageCount:
+              type: integer
       xml:
         name: connections
       example:
         data:
           - DSNPId: 1024
-            privacy: "Public"
+            privacyType: "Public"
             direction: "connectionTo"
             connectionType: "Follow"
           - DSNPId: 2048
-            privacy: "Private"
+            privacyType: "Private"
             direction: "bidirectional"
             connectionType: "Friendship"
           - DSNPId: 3072
-            privacy: "Public"
+            privacyType: "Public"
             direction: "connectionFrom"
             connectionType: "Follow"
-        pageNumber: 1
-        pageSize: 10
-        pageCount: 100
-        totalConnections: 3
+        pagination:
+          pageNumber: 1
+          pageSize: 10
+          pageCount: 100
     Connection:
       type: object
       properties:
         DSNPId:
           type: integer
           format: int64
-        privacy:
+        privacyType:
           type: string
           enum:
             - Public
