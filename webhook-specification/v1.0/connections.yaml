@@ -107,7 +107,8 @@ components:
             connectionType: "Follow"
         pageNumber: 1
         pageSize: 10
-        total: 100
+        pageCount: 100
+        totalConnections: 3
     Connection:
       type: object
       properties:
