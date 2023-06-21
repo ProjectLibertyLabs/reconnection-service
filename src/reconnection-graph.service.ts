@@ -12,7 +12,6 @@ import { u64 } from "@polkadot/types"
 export class ReconnectionGraphService implements OnApplicationBootstrap, OnApplicationShutdown {
     private api: ApiPromise;
     private logger: Logger;
-    private type DsnpUserId = u64;
 
     constructor(private configService: ReconnectionConfigService) {
         this.logger = new Logger(ReconnectionGraphService.name);
@@ -38,16 +37,23 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
         await this.api.disconnect();
     }
 
-    update_user_graph(dsnpUserId: DsnpUserId, providerId: ProviderId, update_connections: bool) {
+    async update_user_graph(dsnpUserId: u64, providerId: u64, update_connections: boolean) {
+        // TODO
+        // https://github.com/AmplicaLabs/reconnection-service/issues/20
+        // Calling out to the provider to obtain a user's Provider graph
 
+
+        // https://github.com/AmplicaLabs/reconnection-service/issues/21
+        // Calling out to the blockchain to obtain the user's DSNP Graph
+        // Import the DSNP Graph into GraphSDK
+
+        // https://github.com/AmplicaLabs/reconnection-service/issues/22
+        // Adding missing connections to the user's DSNP Graph using GraphSDK API
+        // Export DSNP Graph changes and send to blockchain
+        // Re-import DSNP Graph from chain & verify
+        //     (if updating connections as well, do the same for connections--but do not transitively update connections - of - connections)
     }
 
-    // TODO
-    // Calling out to the provider to obtain a user's Provider graph
-    // Calling out to the blockchain to obtain the user's DSNP Graph
-    // Import the DSNP Graph into GraphSDK
-    // Adding missing connections to the user's DSNP Graph using GraphSDK API
-    // Export DSNP Graph changes and send to blockchain
-    // Re-import DSNP Graph from chain & verify
-    //     (if updating connections as well, do the same for connections--but do not transitively update connections - of - connections)
+    // TODO define interfaces for the request / response to / from the provider webhook
+    // async get_user_graph_from_provider(dsnpUserId: u64): {}
 }
