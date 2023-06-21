@@ -30,6 +30,21 @@ paths:
             format: int64  # Represents a 64-bit integer
             minimum: 1     # Ensures the integer is non-negative
             maximum: 18446744073709551615  # Maximum value of a u64
+        - name: page
+          in: query
+          description: Page number
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of connections per page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
       responses:
         '200':
           description: successful operation
@@ -59,57 +74,71 @@ components:
           example: 10
         connections:
           $ref: '#/components/schemas/Connections'
-        followers:
-          $ref: '#/components/schemas/Followers'
         graphKeypair:
           $ref: '#/components/schemas/GraphKeyPair'
     Connections:
-      type: array
-      items:
-        type: object
-        properties:
-          DSNPId:
-            type: integer
-            format: int64
-            example: 1024
-          privacy:
-            type: string
-            example: "Public"
-            enum:
-              - Public
-              - Private
-          connectionType:
-            type: string
-            example: "Follow"
-            enum:
-              - Follow
-              - Friendship
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Connection'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
       xml:
         name: connections
-    Followers:
-      type: array
-      items:
-        type: object
-        properties:
-          DSNPId:
-            type: integer
-            format: int64
-            example: 2048
-          privacy:
-            type: string
-            example: "Public"
-            enum:
-              - Public
-              - Private
+      example:
+        data:
+          - DSNPId: 1024
+            privacy: "Public"
+            direction: "connectionTo"
+            connectionType: "Follow"
+          - DSNPId: 2048
+            privacy: "Private"
+            direction: "bidirectional"
+            connectionType: "Friendship"
+          - DSNPId: 3072
+            privacy: "Public"
+            direction: "connectionFrom"
+            connectionType: "Follow"
+        page: 1
+        pageSize: 10
+        total: 100
+    Connection:
+      type: object
+      properties:
+        DSNPId:
+          type: integer
+          format: int64
+        privacy:
+          type: string
+          enum:
+            - Public
+            - Private
+        direction:
+          type: string
+          enum:
+            - connectionTo
+            - bidirectional
+            - connectionFrom
+        connectionType:
+          type: string
+          enum:
+            - Follow
+            - Friendship
     GraphKeyPair:
       type: object
       properties:
         publicKey:
-         type: string
-         example: "0xe5be9a5092b81bca64be81d212e7f2f9eba183bb7a90954f7b76361f6edb5c0a"
+          type: string
+          example: "0xe5be9a5092b81bca64be81d212e7f2f9eba183bb7a90954f7b76361f6edb5c0a"
         privateKey:
-         type: string
-         example: "0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+          type: string
+          example: "0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
       xml:
         name: graph key pair
   securitySchemes:
