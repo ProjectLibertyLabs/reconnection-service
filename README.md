@@ -4,7 +4,30 @@ A microservice to reconnect graphs in DSNP/Frequency
 ## Overview/Design
 The Graph Reconnection Service is designed to be hosted by a Provider inside their own environment. The service will scan the Frequency chain for new delegations to the Provider delegating Graph schema permissions for a user. The service then requests the user's Provider Graph and keys from the Provider, and updates the user's graph on-chain.
 
-## Sequence Diagram
+The following diagrams are intended as a guide for providers to understand how to work with DSNP's social graph.
+
+For user relationships to be stored in a DSNP social graph, the users on both ends of the relationship must have DSNP accounts\nand have granted graph permission to the provider.
+
+## Provider Flow
+```mermaid
+flowchart LR
+    A(Ask wallet to\nauthorize account\ncreation) --> B(Create DSNP\nacccount)
+    B -->|private graph| C(Ask wallet to generate\nsocial graph key and\nstore provider copy) --> E(Announce public key\nto chain) --> D
+    B --->|public graph| D(done)
+```
+
+## Reconnection Service
+
+### High-level flow
+```mermaid
+flowchart TD
+pub1["Public Friend/Follow"] --- pub2(Create Graph\nData) --> pub3(Compress)
+priFollow1["Private Follows"] --- priFollow2(Create Graph\nData) --> priFollow3(Compress) --> priFollow4(Encrypt)
+priFriend1["Private Friends"] --- priFriend2(Create Graph\nData) --> priFriend3(Compress) --> priFriend4(Encrypt)
+priFriend2 --> priFriend5(Create PRId Data)
+```
+
+### Sequence Diagram
 ```mermaid
 sequenceDiagram;
 Note left of P:Initial state:<br/>Alice <-MeWe-> Bob<br/>Alice <-MeWe-> Charlie<br/>Bob <-MeWe-> Charlie
@@ -65,4 +88,15 @@ Note left of P:Initial state:<br/>Alice <-MeWe-> Bob<br/>Alice <-MeWe-> Charlie<
   S->>F: Update & re-encrypt <connection>'s Graph (Charlie added)
   end
   Note left of P:State:<br/>Alice <-DSNP-> Bob<br/>Alice <-DSNP-> Charlie<br/>Bob <-DSNP-> Charlie
+```
+
+## Handling External DSNP User Data Changes
+
+```mermaid
+flowchart LR
+dspn1(Listen for User\nData Changed\nEvents) --> dsnp2{Is the\nowning\nuser on\nthis\nprovider?}
+dsnp2 -->|yes| dsnp4{Is the\ntarget user\non this\nprovider?}
+dsnp4 -->|yes| dsnp5("Apply deltas to\nprovider graph\n(using GraphSDK)")
+dsnp2 -->|no| dsnp6(No action required)
+dsnp4 -->|no| dsnp7(Show non-provider\nuser as an external\nDSNP user)
 ```
