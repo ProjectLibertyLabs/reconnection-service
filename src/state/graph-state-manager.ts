@@ -14,6 +14,16 @@ class GraphStateManager {
     return graph;
   }
 
+  public async isGraphStateFull(stateId: number): Promise<boolean> {
+    const graph = this.graphStates.get(stateId);
+    if (graph) {
+        const graphCapacity = await graph.getGraphCapacity();
+        const graphStatesCount = await graph.getGraphUsersCount();
+        return graphCapacity === graphStatesCount;
+    }
+    return false;
+  }
+
   public getGraphState(stateId: number): Graph | undefined {
     return this.graphStates.get(stateId);
   }
