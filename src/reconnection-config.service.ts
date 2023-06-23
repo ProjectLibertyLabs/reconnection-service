@@ -53,23 +53,23 @@ export class ReconnectionConfigService {
     ]);
   }
 
-  public get redisUrl(): URL | undefined {
-    return this.nestConfigService.get('REDIS_URL');
+  public get redisUrl(): URL {
+    return this.nestConfigService.get('REDIS_URL')!;
   }
 
-  public get frequencyUrl(): URL | undefined {
-    return this.nestConfigService.get('FREQUENCY_URL');
+  public get frequencyUrl(): URL {
+    return this.nestConfigService.get('FREQUENCY_URL')!;
   }
 
-  public providerBaseUrl(id: bigint): URL | undefined {
-    return this.providerMap.get(id.toString())?.baseUrl;
+  public providerBaseUrl(id: bigint): URL {
+    return this.providerMap.get(id.toString())?.baseUrl!;
   }
 
-  public providerUserGraphEndpoint(id: bigint): string | undefined {
-    return this.providerMap.get(id.toString())?.userGraphEndpoint;
+  public providerUserGraphEndpoint(id: bigint): string {
+    return this.providerMap.get(id.toString())?.userGraphEndpoint!;
   }
 
-  public providerApiToken(id: bigint): string | undefined {
-    return this.providerMap.get(id.toString())?.apiToken;
+  public providerApiToken(id: bigint): string {
+    return this.providerMap.get(id.toString())?.apiToken!;
   }
 }

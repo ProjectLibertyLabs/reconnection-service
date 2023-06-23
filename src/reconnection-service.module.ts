@@ -8,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ReconnectionServiceController } from './reconnection-service.controller';
 import { ReconnectionConfigService } from './reconnection-config.service';
 import { configModuleOptions } from './config/env.config';
+import { ReconnectionGraphService } from './reconnection-graph.service';
 
 @Module({
   imports: [
@@ -30,6 +31,6 @@ import { configModuleOptions } from './config/env.config';
     }),
   ],
   controllers: [ReconnectionServiceController],
-  providers: [ReconnectionConfigService],
+  providers: [ReconnectionConfigService, ReconnectionGraphService],
 })
 export class ReconnectionServiceModule {}
