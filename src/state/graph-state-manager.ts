@@ -29,6 +29,7 @@ class GraphStateManager {
   }
 
   public removeGraphState(stateId: number): void {
+    this.graphStates.get(stateId)?.freeGraphState();
     this.graphStates.delete(stateId);
   }
 }
