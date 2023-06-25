@@ -1,15 +1,27 @@
-import { Graph, EnvironmentInterface, Action, Update, DsnpGraphEdge } from "@dsnp/graph-sdk";
+import { Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType } from "@dsnp/graph-sdk";
 
-class GraphStateManager {
+export class GraphStateManager {
   private graphStates: Map<number, Graph>; // Map to store multiple graph states
+  private currentStateId: number; // Current state ID
+  private environment: EnvironmentInterface; // Environment details
+  private capacity?: number; // Graph capacity
 
-  constructor() {
+  constructor(environment: EnvironmentInterface, capacity?: number) {
     this.graphStates = new Map<number, Graph>();
+    this.currentStateId = 1; // Initial state ID
+    this.environment = environment;
+    this.capacity = capacity;
   }
 
-  public async createGraphState(environment: EnvironmentInterface, capacity?: number): Promise<Graph> {
-    const graph = new Graph(environment, capacity);
-    const stateId = graph.getGraphHandle();
+  private generateStateId(): number {
+    const stateId = this.currentStateId;
+    this.currentStateId += 1;
+    return stateId;
+  }
+
+  public async createGraphState(): Promise<Graph> {
+    const graph = new Graph(this.environment, this.capacity);
+    const stateId = this.generateStateId();
     this.graphStates.set(stateId, graph);
     return graph;
   }
@@ -17,21 +29,30 @@ class GraphStateManager {
   public async isGraphStateFull(stateId: number): Promise<boolean> {
     const graph = this.graphStates.get(stateId);
     if (graph) {
-        const graphCapacity = await graph.getGraphCapacity();
-        const graphStatesCount = await graph.getGraphUsersCount();
-        return graphCapacity === graphStatesCount;
+      const graphCapacity = await graph.getGraphCapacity();
+      const graphStatesCount = await graph.getGraphUsersCount();
+      return graphCapacity === graphStatesCount;
     }
     return false;
   }
 
-  public getGraphState(stateId: number): Graph | undefined {
-    return this.graphStates.get(stateId);
+  public async getTotalStatesCount(): Promise<number> {
+    return this.graphStates.size;
+  }
+
+  public static async generateKeyPair(keyType: GraphKeyType): Promise<GraphKeyPair> {
+    return Graph.generateKeyPair(keyType);
   }
 
   public removeGraphState(stateId: number): void {
     this.graphStates.get(stateId)?.freeGraphState();
     this.graphStates.delete(stateId);
   }
-}
 
-export const graphStateManager = new GraphStateManager();
+  public async clearAllGraphStates(): Promise<void> {
+    this.graphStates.forEach((graph) => {
+      graph.freeGraphState();
+    });
+    this.graphStates.clear();
+  }
+}
