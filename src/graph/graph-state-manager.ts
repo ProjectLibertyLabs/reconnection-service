@@ -2,6 +2,7 @@ import { Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType } from "@dsnp/g
 
 export class GraphStateManager {
   private graphStates: Map<number, Graph>; // Map to store multiple graph states
+  private dsnpUserIdVsStateId: Map<number, number>; // Map to store dsnpUserId vs stateId
   private currentStateId: number; // Current state ID
   private environment: EnvironmentInterface; // Environment details
   private capacity?: number; // Graph capacity
