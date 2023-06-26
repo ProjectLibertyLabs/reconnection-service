@@ -6,9 +6,7 @@ const logger = new Logger('main');
 
 async function bootstrap() {
   const app = await NestFactory.create(ReconnectionServiceModule, {
-    logger: process.env.DEBUG
-      ? ['error', 'warn', 'log', 'debug']
-      : ['error', 'warn', 'log'],
+    logger: process.env.DEBUG ? ['error', 'warn', 'log', 'debug'] : ['error', 'warn', 'log'],
   });
 
   try {
@@ -16,11 +14,10 @@ async function bootstrap() {
     app.useGlobalPipes(new ValidationPipe());
     await app.listen(3000);
   } catch (e) {
-    logger.error(e);
     await app.close();
+    logger.log('****** MAIN CATCH ********');
+    logger.error(e);
   }
 }
 
-bootstrap().catch((e) => {
-  logger.error(e);
-});
+bootstrap();

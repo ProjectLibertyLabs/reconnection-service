@@ -3,7 +3,7 @@ https://docs.nestjs.com/providers#services
 */
 
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ConfigService as NestConfigService } from '@nestjs/config';
 
 export interface ConfigEnvironmentVariables {
   REDIS_URL: URL;
@@ -12,6 +12,8 @@ export interface ConfigEnvironmentVariables {
   PROVIDER_BASE_URL: URL;
   PROVIDER_USER_GRAPH_ENDPOINT: string;
   PROVIDER_ACCESS_TOKEN: string;
+  BLOCKCHAIN_SCAN_INTERVAL_MINUTES: number;
+  QUEUE_HIGH_WATER: number;
 }
 
 interface ProviderDetails {
@@ -20,6 +22,8 @@ interface ProviderDetails {
   apiToken: string;
 }
 
+const REDIS_RE = 'redis://(?:([^:]+)(?::([^@]+))?@)?([^:]+):(d+)(?:/(d+))?';
+
 /// Config service to get global app and provider-specific config values.
 /// Though this is currently designed to take a single environment-injected
 /// Provider config, it is designed with an API suitable for a multi-provider
@@ -27,18 +31,13 @@ interface ProviderDetails {
 /// configuration values, so that it may be swapped out without requiring the rest
 /// of the application to change.
 @Injectable()
-export class ReconnectionConfigService {
+export class ConfigService {
   public providerMap: Map<string, ProviderDetails>;
 
-  constructor(
-    private nestConfigService: ConfigService<ConfigEnvironmentVariables>,
-  ) {
-    const providerId: bigint =
-      nestConfigService.get<bigint>('PROVIDER_ID') ?? 0n;
+  constructor(private nestConfigService: NestConfigService<ConfigEnvironmentVariables>) {
+    const providerId: bigint = nestConfigService.get<bigint>('PROVIDER_ID') ?? 0n;
     const baseUrl = nestConfigService.get('PROVIDER_BASE_URL');
-    const userGraphEndpoint = nestConfigService.get(
-      'PROVIDER_USER_GRAPH_ENDPOINT',
-    );
+    const userGraphEndpoint = nestConfigService.get('PROVIDER_USER_GRAPH_ENDPOINT');
     const apiToken = this.nestConfigService.get('PROVIDER_ACCESS_TOKEN');
 
     this.providerMap = new Map<string, ProviderDetails>([
@@ -71,5 +70,13 @@ export class ReconnectionConfigService {
 
   public providerApiToken(id: bigint): string {
     return this.providerMap.get(id.toString())?.apiToken!;
+  }
+
+  public getBlockchainScanIntervalMinutes(): number {
+    return this.nestConfigService.get<number>('BLOCKCHAIN_SCAN_INTERVAL_MINUTES') ?? 1;
+  }
+
+  public getQueueHighWater(): number {
+    return this.nestConfigService.get<number>('QUEUE_HIGH_WATER')!;
   }
 }
