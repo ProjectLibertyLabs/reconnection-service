@@ -29,7 +29,7 @@
   },
   "homepage": "https://github.com/AmplicaLabs/reconnection-service#readme",
   "dependencies": {
-    "@dsnp/graph-sdk": "^0.0.0-80aab4",
+    "@dsnp/graph-sdk": "^0.0.0-6bbde0",
     "@frequency-chain/api-augment": "^1.6.0",
     "@nestjs/axios": "^2.0.0",
     "@nestjs/common": "^9.4.0",

@@ -1,13 +1,13 @@
 import { GraphKeyType, GraphKeyPair, DsnpKeys, ImportBundle, PageData } from "@dsnp/graph-sdk";
 
 export class ImportBundleBuilder {
-    private static dsnpUserId: number;
+    private static dsnpUserId: string;
     private static schemaId: number;
     private static keyPairs: GraphKeyPair[];
     private static dsnpKeys: DsnpKeys;
     private static pages: PageData[];
   
-    static setDsnpUserId(dsnpUserId: number): typeof ImportBundleBuilder {
+    static setDsnpUserId(dsnpUserId: string): typeof ImportBundleBuilder {
       ImportBundleBuilder.dsnpUserId = dsnpUserId;
       return this;
     }
@@ -42,10 +42,10 @@ export class ImportBundleBuilder {
       };
   
       // Reset the static properties for the next build
-      ImportBundleBuilder.dsnpUserId = 0;
+      ImportBundleBuilder.dsnpUserId = "";
       ImportBundleBuilder.schemaId = 0;
       ImportBundleBuilder.keyPairs = [];
-      ImportBundleBuilder.dsnpKeys = { dsnpUserId: 0, keysHash: 0, keys: [] };
+      ImportBundleBuilder.dsnpKeys = { dsnpUserId: "", keysHash: 0, keys: [] };
       ImportBundleBuilder.pages = [];
   
       return importBundle;
