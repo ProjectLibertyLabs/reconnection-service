@@ -9,8 +9,6 @@ import {
 export class GraphStateManager {
   private graphStates: Map<number, Graph>; // Map to store multiple graph states
 
-  private dsnpUserIdVsStateId: Map<number, number[]>; // Map to store dsnpUserId vs stateId
-
   private currentStateId: number; // Current state ID
 
   private environment: EnvironmentInterface; // Environment details
@@ -58,17 +56,9 @@ export class GraphStateManager {
   }
 
   public async ImportUserData(
-    dsnpUserId: number,
     payload: ImportBundle[],
   ): Promise<boolean> {
-    const userStates = this.dsnpUserIdVsStateId.get(dsnpUserId);
-    if (userStates) {
-      const stateId = userStates[userStates.length - 1];
-      const graph = this.graphStates.get(stateId);
-      if (graph) {
-        return graph.importUserData(payload);
-      }
-    }
+    // TODO: Implement this method
     return false;
   }
 
