@@ -85,16 +85,19 @@ export class GraphStateManager {
     return false;
   }
 
-  public async exportGraphUpdates(dsnpUserId: string): Promise<Update[] | undefined> {
+  public async exportGraphUpdates(dsnpUserId: string): Promise<Update[]> {
     const stateIds = this.userToStatesMap.get(dsnpUserId);
+    let updates: Update[] = [];
     if (stateIds) {
-      const lastStateId = stateIds[stateIds.length - 1];
-      const graph = this.graphStates.get(lastStateId);
-      if (graph) {
-        return graph.exportUpdates();
+      for (const stateId of stateIds) {
+        const graph = this.graphStates.get(stateId);
+        if (graph) {
+          const graphUpdates = await graph.exportUpdates();
+          updates = [...updates, ...graphUpdates];
+        }
       }
     }
-    return undefined;
+    return updates;
   }
 
   public removeGraphState(stateId: number): void {
