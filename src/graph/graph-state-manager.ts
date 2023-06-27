@@ -7,7 +7,10 @@ import {
 } from '@dsnp/graph-sdk';
 
 export class GraphStateManager {
+
   private graphStates: Map<number, Graph>; // Map to store multiple graph states
+
+  private userToStatesMap: Map<string, number[]>; // Map to store user to state mapping
 
   private currentStateId: number; // Current state ID
 
@@ -28,10 +31,11 @@ export class GraphStateManager {
     return stateId;
   }
 
-  public async createGraphState(): Promise<Graph> {
+  public async createGraphState(dsnpUserId: string): Promise<Graph> {
     const graph = new Graph(this.environment, this.capacity);
     const stateId = this.generateStateId();
     this.graphStates.set(stateId, graph);
+    this.userToStatesMap.set(dsnpUserId, [stateId]);
     return graph;
   }
 
@@ -55,10 +59,31 @@ export class GraphStateManager {
     return Graph.generateKeyPair(keyType);
   }
 
-  public async ImportUserData(
+  public async getAllStatesForUser(
+    dsnpUserId: string,
+  ): Promise<number[] | undefined> {
+    return this.userToStatesMap.get(dsnpUserId);
+  }
+  
+  public async importUserData(
+    dsnpUserId: string,
     payload: ImportBundle[],
   ): Promise<boolean> {
-    // TODO: Implement this method
+
+    let stateIds = this.userToStatesMap.get(dsnpUserId)??[];
+    if (stateIds.length === 0 || await this.isGraphStateFull(stateIds[stateIds.length - 1])) {
+      await this.createGraphState(dsnpUserId);
+      const stateId = this.generateStateId();
+      this.userToStatesMap.set(dsnpUserId, [stateId]);
+      stateIds = [...stateIds, stateId];
+    }
+    
+    const lastStateId = stateIds[stateIds.length - 1];
+    const graph = this.graphStates.get(lastStateId);
+    if (graph) {
+      await graph.importUserData(payload);
+      return true;
+    }
     return false;
   }
 
