@@ -5,8 +5,8 @@ https://docs.nestjs.com/providers#services
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { options } from '@frequency-chain/api-augment';
 import { ApiPromise, HttpProvider, WsProvider } from '@polkadot/api';
-import { u64 } from '@polkadot/types';
-import { ConfigService } from './config/config.service';
+import { MessageSourceId, ProviderId } from '@frequency-chain/api-augment/interfaces';
+import { ConfigService } from '../config/config.service';
 
 @Injectable()
 export class ReconnectionGraphService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -38,7 +38,10 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     await this.api.disconnect();
   }
 
-  public async updateUserGraph(dsnpUserId: u64, providerId: u64, updateConnections: boolean): Promise<void> {
+  public async updateUserGraph(dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<void> {
+    this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
+    const dsnpUserId: MessageSourceId = this.api.registry.createType('MessageSourceId', dsnpUserStr);
+    const providerId: ProviderId = this.api.registry.createType('ProviderId', providerStr);
     // TODO
     // https://github.com/AmplicaLabs/reconnection-service/issues/20
     // Calling out to the provider to obtain a user's Provider graph
