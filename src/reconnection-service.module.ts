@@ -5,7 +5,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { RedisModule } from '@liaoliaots/nestjs-redis';
 import { ReconnectionServiceController } from './reconnection-service.controller';
 import { ConfigService } from './config/config.service';
-import { ReconnectionGraphService } from './processor/reconnection-graph.service';
 import { BlockchainScannerService } from './blockchain-scanner.service';
 import { ConfigModule } from './config/config.module';
 import { ProcessorModule } from './processor/processor.module';
