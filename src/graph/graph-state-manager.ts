@@ -1,5 +1,7 @@
+import { Injectable } from '@nestjs/common';
 import { Action, Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, ImportBundle, Update } from '@dsnp/graph-sdk';
 
+@Injectable()
 export class GraphStateManager {
   private graphStates: Map<number, Graph>; // Map to store multiple graph states
 
