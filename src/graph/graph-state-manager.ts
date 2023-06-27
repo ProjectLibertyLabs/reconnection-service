@@ -57,17 +57,16 @@ export class GraphStateManager {
 
   public async importUserData(dsnpUserId: string, payload: ImportBundle[]): Promise<boolean> {
     let stateIds = this.userToStatesMap.get(dsnpUserId) ?? [];
+    var currentGraph : Graph | undefined;
+
     if (stateIds.length === 0 || (await this.isGraphStateFull(stateIds[stateIds.length - 1]))) {
-      await this.createGraphState(dsnpUserId);
-      const stateId = this.generateStateId();
-      stateIds = [...stateIds, stateId];
+      currentGraph = await this.createGraphState(dsnpUserId);
+    } else {
+      currentGraph = this.graphStates.get(stateIds[stateIds.length - 1]);
     }
 
-    const lastStateId = stateIds[stateIds.length - 1];
-    const graph = this.graphStates.get(lastStateId);
-    if (graph) {
-      await graph.importUserData(payload);
-      return true;
+    if (currentGraph) {
+      return currentGraph.importUserData(payload);
     }
     return false;
   }
