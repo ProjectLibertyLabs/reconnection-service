@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Action, Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, ImportBundle, Update } from '@dsnp/graph-sdk';
+import { Action, Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, ImportBundle, Update, Config } from '@dsnp/graph-sdk';
 
 @Injectable()
 export class GraphStateManager {
@@ -43,6 +43,14 @@ export class GraphStateManager {
       return graphCapacity === graphStatesCount;
     }
     return false;
+  }
+
+  public async getGraphConfig(stateId?: number): Promise<Config> {
+    const graph = this.graphStates.get(stateId ?? this.currentStateId);
+    if (graph) {
+      return graph.getGraphConfig(this.environment);
+    }
+    return {} as Config;
   }
 
   public async getTotalStatesCount(): Promise<number> {

@@ -16,4 +16,12 @@ describe('GraphStateManager', () => {
   it('should be defined', () => {
     expect(graphStateManager).toBeDefined();
   });
+
+  it('should return graph config', async () => {
+    const config = await graphStateManager.getGraphConfig();
+    expect(config).toBeDefined();
+    expect(config.maxGraphPageSizeBytes).toBeDefined();
+    expect(config.maxGraphPageSizeBytes).toBeGreaterThan(0);
+  });
+
 });
