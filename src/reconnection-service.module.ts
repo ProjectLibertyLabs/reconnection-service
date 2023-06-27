@@ -5,9 +5,11 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { RedisModule } from '@liaoliaots/nestjs-redis';
 import { ReconnectionServiceController } from './reconnection-service.controller';
 import { ConfigService } from './config/config.service';
-import { ReconnectionGraphService } from './reconnection-graph.service';
+import { ReconnectionGraphService } from './processor/reconnection-graph.service';
 import { BlockchainScannerService } from './blockchain-scanner.service';
 import { ConfigModule } from './config/config.module';
+import { ProcessorModule } from './processor/processor.module';
+import { DevelopmentController } from './development.controller';
 
 @Module({
   imports: [
@@ -61,10 +63,20 @@ import { ConfigModule } from './config/config.module';
     }),
     BullModule.registerQueue({
       name: 'graphUpdateQueue',
+      defaultJobOptions: {
+        attempts: 3,
+        removeOnComplete: true,
+      },
     }),
     ScheduleModule.forRoot(),
+    ProcessorModule,
   ],
-  providers: [ConfigService, ReconnectionGraphService, BlockchainScannerService],
-  controllers: [ReconnectionServiceController],
+  providers: [ConfigService, BlockchainScannerService],
+  controllers: [
+    // Uncomment the following line to enable development/debug endpoints
+    // DevelopmentController,
+    ReconnectionServiceController,
+  ],
+  exports: [BullModule],
 })
 export class ReconnectionServiceModule {}
