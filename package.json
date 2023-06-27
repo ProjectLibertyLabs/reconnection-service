@@ -7,7 +7,7 @@
     "build": "npx tsc",
     "start": "node dist/main.js",
     "start:dev": "set -a ; source .env.dev ; ts-node-dev -r tsconfig-paths/register src/main.ts",
-    "start:dev:docker": "npm ci && npm run start:dev",
+    "start:dev:docker": "npm ci && ts-node-dev -r tsconfig-paths/register src/main.ts",
     "docker-build": "docker build -t reconnection-service .",
     "docker-build:dev": "docker-compose -f docker-compose.dev.yaml build",
     "docker-run": "docker build -t reconnection-service-deploy . ; docker run -p 6379:6379 --env-file .env.dev reconnection-service-deploy",
@@ -29,7 +29,7 @@
   },
   "homepage": "https://github.com/AmplicaLabs/reconnection-service#readme",
   "dependencies": {
-    "@frequency-chain/api-augment": "1.6.1",
+    "@frequency-chain/api-augment": "1.7.0-rc1",
     "@liaoliaots/nestjs-redis": "^9.0.5",
     "@nestjs/axios": "^2.0.0",
     "@nestjs/bullmq": "^10.0.0",
