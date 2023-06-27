@@ -70,7 +70,7 @@ import { DevelopmentController } from './development.controller';
   providers: [ConfigService, ReconnectionGraphService, BlockchainScannerService],
   controllers: [
     // Uncomment the following line to enable development/debug endpoints
-    DevelopmentController,
+    // DevelopmentController,
     ReconnectionServiceController,
   ],
   exports: [BullModule],
