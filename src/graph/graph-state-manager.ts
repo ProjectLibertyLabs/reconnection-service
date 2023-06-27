@@ -28,7 +28,8 @@ export class GraphStateManager {
     const graph = new Graph(this.environment, this.capacity);
     const stateId = this.generateStateId();
     this.graphStates.set(stateId, graph);
-    this.userToStatesMap.set(dsnpUserId, [stateId]);
+    const stateIds = this.userToStatesMap.get(dsnpUserId) ?? [];
+    this.userToStatesMap.set(dsnpUserId, [...stateIds, stateId]);
     return graph;
   }
 
@@ -59,7 +60,6 @@ export class GraphStateManager {
     if (stateIds.length === 0 || (await this.isGraphStateFull(stateIds[stateIds.length - 1]))) {
       await this.createGraphState(dsnpUserId);
       const stateId = this.generateStateId();
-      this.userToStatesMap.set(dsnpUserId, [stateId]);
       stateIds = [...stateIds, stateId];
     }
 
