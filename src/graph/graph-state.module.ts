@@ -9,9 +9,10 @@ import { EnvironmentType } from '@dsnp/graph-sdk';
         {
             provide: GraphStateManager,
             useFactory: () => {
-                // Replace with env needed for testing as default is mainnet
-                // var env = { environmentType: EnvironmentType.Mainnet };
-                createGraphStateManager();
+                const environmentConfig = {
+                    environmentType: EnvironmentType.Mainnet // Or any other environment
+                };
+                return createGraphStateManager(environmentConfig);
             },
         },
     ],
