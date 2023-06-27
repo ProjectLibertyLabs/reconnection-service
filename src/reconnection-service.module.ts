@@ -8,6 +8,8 @@ import { ConfigService } from './config/config.service';
 import { ReconnectionGraphService } from './reconnection-graph.service';
 import { BlockchainScannerService } from './blockchain-scanner.service';
 import { ConfigModule } from './config/config.module';
+import { ProcessorModule } from './processor/processor.module';
+import { DevelopmentController } from './development.controller';
 
 @Module({
   imports: [
@@ -63,8 +65,14 @@ import { ConfigModule } from './config/config.module';
       name: 'graphUpdateQueue',
     }),
     ScheduleModule.forRoot(),
+    ProcessorModule,
   ],
   providers: [ConfigService, ReconnectionGraphService, BlockchainScannerService],
-  controllers: [ReconnectionServiceController],
+  controllers: [
+    // Uncomment the following line to enable development/debug endpoints
+    DevelopmentController,
+    ReconnectionServiceController,
+  ],
+  exports: [BullModule],
 })
 export class ReconnectionServiceModule {}
