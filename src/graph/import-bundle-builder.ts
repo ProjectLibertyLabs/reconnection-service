@@ -1,10 +1,4 @@
-import {
-  GraphKeyType,
-  GraphKeyPair,
-  DsnpKeys,
-  ImportBundle,
-  PageData,
-} from '@dsnp/graph-sdk';
+import { GraphKeyType, GraphKeyPair, DsnpKeys, ImportBundle, PageData } from '@dsnp/graph-sdk';
 
 export class ImportBundleBuilder {
   private static dsnpUserId: string;
@@ -27,11 +21,7 @@ export class ImportBundleBuilder {
     return this;
   }
 
-  static addGraphKeyPair(
-    keyType: GraphKeyType,
-    publicKey: Uint8Array,
-    secretKey: Uint8Array,
-  ): typeof ImportBundleBuilder {
+  static addGraphKeyPair(keyType: GraphKeyType, publicKey: Uint8Array, secretKey: Uint8Array): typeof ImportBundleBuilder {
     if (!ImportBundleBuilder.keyPairs) {
       ImportBundleBuilder.keyPairs = [];
     }
@@ -44,11 +34,7 @@ export class ImportBundleBuilder {
     return this;
   }
 
-  static addPageData(
-    pageId: number,
-    content: Uint8Array,
-    contentHash: number,
-  ): typeof ImportBundleBuilder {
+  static addPageData(pageId: number, content: Uint8Array, contentHash: number): typeof ImportBundleBuilder {
     if (!ImportBundleBuilder.pages) {
       ImportBundleBuilder.pages = [];
     }

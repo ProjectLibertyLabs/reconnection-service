@@ -1,13 +1,6 @@
-import {
-  Graph,
-  EnvironmentInterface,
-  GraphKeyPair,
-  GraphKeyType,
-  ImportBundle,
-} from '@dsnp/graph-sdk';
+import { Action, Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, ImportBundle, Update } from '@dsnp/graph-sdk';
 
 export class GraphStateManager {
-
   private graphStates: Map<number, Graph>; // Map to store multiple graph states
 
   private userToStatesMap: Map<string, number[]>; // Map to store user to state mapping
@@ -31,7 +24,7 @@ export class GraphStateManager {
     return stateId;
   }
 
-  public async createGraphState(dsnpUserId: string): Promise<Graph> {
+  private async createGraphState(dsnpUserId: string): Promise<Graph> {
     const graph = new Graph(this.environment, this.capacity);
     const stateId = this.generateStateId();
     this.graphStates.set(stateId, graph);
@@ -39,7 +32,7 @@ export class GraphStateManager {
     return graph;
   }
 
-  public async isGraphStateFull(stateId: number): Promise<boolean> {
+  private async isGraphStateFull(stateId: number): Promise<boolean> {
     const graph = this.graphStates.get(stateId);
     if (graph) {
       const graphCapacity = await graph.getGraphCapacity();
@@ -53,31 +46,23 @@ export class GraphStateManager {
     return this.graphStates.size;
   }
 
-  public static async generateKeyPair(
-    keyType: GraphKeyType,
-  ): Promise<GraphKeyPair> {
+  public static async generateKeyPair(keyType: GraphKeyType): Promise<GraphKeyPair> {
     return Graph.generateKeyPair(keyType);
   }
 
-  public async getAllStatesForUser(
-    dsnpUserId: string,
-  ): Promise<number[] | undefined> {
+  public async getAllStatesForUser(dsnpUserId: string): Promise<number[] | undefined> {
     return this.userToStatesMap.get(dsnpUserId);
   }
-  
-  public async importUserData(
-    dsnpUserId: string,
-    payload: ImportBundle[],
-  ): Promise<boolean> {
 
-    let stateIds = this.userToStatesMap.get(dsnpUserId)??[];
-    if (stateIds.length === 0 || await this.isGraphStateFull(stateIds[stateIds.length - 1])) {
+  public async importUserData(dsnpUserId: string, payload: ImportBundle[]): Promise<boolean> {
+    let stateIds = this.userToStatesMap.get(dsnpUserId) ?? [];
+    if (stateIds.length === 0 || (await this.isGraphStateFull(stateIds[stateIds.length - 1]))) {
       await this.createGraphState(dsnpUserId);
       const stateId = this.generateStateId();
       this.userToStatesMap.set(dsnpUserId, [stateId]);
       stateIds = [...stateIds, stateId];
     }
-    
+
     const lastStateId = stateIds[stateIds.length - 1];
     const graph = this.graphStates.get(lastStateId);
     if (graph) {
@@ -85,6 +70,30 @@ export class GraphStateManager {
       return true;
     }
     return false;
+  }
+
+  public async applyActions(dsnpUserId: string, actions: Action[]): Promise<boolean> {
+    const stateIds = this.userToStatesMap.get(dsnpUserId);
+    if (stateIds) {
+      const lastStateId = stateIds[stateIds.length - 1];
+      const graph = this.graphStates.get(lastStateId);
+      if (graph) {
+        return graph.applyActions(actions);
+      }
+    }
+    return false;
+  }
+
+  public async exportGraphUpdates(dsnpUserId: string): Promise<Update[] | undefined> {
+    const stateIds = this.userToStatesMap.get(dsnpUserId);
+    if (stateIds) {
+      const lastStateId = stateIds[stateIds.length - 1];
+      const graph = this.graphStates.get(lastStateId);
+      if (graph) {
+        return graph.exportUpdates();
+      }
+    }
+    return undefined;
   }
 
   public removeGraphState(stateId: number): void {

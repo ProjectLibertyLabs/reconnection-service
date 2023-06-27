@@ -1,11 +1,5 @@
 import { expect } from '@jest/globals';
-import {
-  GraphKeyType,
-  GraphKeyPair,
-  DsnpKeys,
-  PageData,
-  ImportBundle,
-} from '@dsnp/graph-sdk';
+import { GraphKeyType, GraphKeyPair, DsnpKeys, PageData, ImportBundle } from '@dsnp/graph-sdk';
 import { ImportBundleBuilder } from './import-bundle-builder';
 
 describe('ImportBundleBuilder', () => {
@@ -32,15 +26,9 @@ describe('ImportBundleBuilder', () => {
       },
     ];
 
-    const importBundle: ImportBundle = ImportBundleBuilder.setDsnpUserId(
-      dsnpUserId,
-    )
+    const importBundle: ImportBundle = ImportBundleBuilder.setDsnpUserId(dsnpUserId)
       .setSchemaId(schemaId)
-      .addGraphKeyPair(
-        GraphKeyType.X25519,
-        new Uint8Array([1, 2, 3]),
-        new Uint8Array([4, 5, 6]),
-      )
+      .addGraphKeyPair(GraphKeyType.X25519, new Uint8Array([1, 2, 3]), new Uint8Array([4, 5, 6]))
       .setDsnpKeys(dsnpKeys)
       .addPageData(1, new Uint8Array([10, 11, 12]), 789)
       .build();
