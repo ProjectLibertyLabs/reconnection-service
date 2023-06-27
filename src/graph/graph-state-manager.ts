@@ -15,6 +15,7 @@ export class GraphStateManager {
 
   constructor(environment: EnvironmentInterface, capacity?: number) {
     this.graphStates = new Map<number, Graph>();
+    this.userToStatesMap = new Map<string, number[]>();
     this.currentStateId = 1; // Initial state ID
     this.environment = environment;
     this.capacity = capacity;
@@ -46,7 +47,7 @@ export class GraphStateManager {
   }
 
   public async getGraphConfig(stateId?: number): Promise<Config> {
-    const graph = this.graphStates.get(stateId ?? this.currentStateId);
+    const graph = this.graphStates.get(stateId ?? this.graphStates.size);
     if (graph) {
       return graph.getGraphConfig(this.environment);
     }
