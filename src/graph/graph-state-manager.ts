@@ -11,8 +11,7 @@ export class GraphStateManager {
 
   private static graphStateFinalizer = new FinalizationRegistry((graphState: Graph) => {
     if (graphState) {
-      console.log('Finalizing graph state');
-      graphState.freeGraphState(); // Assuming there is a method freeGraphState() that frees up resources in Graph.
+      graphState.freeGraphState();
     }
   });
 
