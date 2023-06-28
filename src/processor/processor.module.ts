@@ -12,5 +12,6 @@ import { ReconnectionGraphService } from './reconnection-graph.service';
   imports: [BullModule, ConfigModule],
   controllers: [],
   providers: [QueueConsumerService, ReconnectionGraphService],
+  exports: [ReconnectionGraphService]
 })
 export class ProcessorModule {}
