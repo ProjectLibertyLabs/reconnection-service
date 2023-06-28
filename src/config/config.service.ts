@@ -16,6 +16,7 @@ export interface ConfigEnvironmentVariables {
   QUEUE_HIGH_WATER: number;
   GRAPH_ENVIRONMENT_TYPE: string;
   GRAPH_ENVIRONMENT_DEV_CONFIG: string;
+  GRAPH_CAPACITY: number;
 }
 
 interface ProviderDetails {
@@ -88,5 +89,9 @@ export class ConfigService {
 
   public graph_environment_config(): string {
     return this.nestConfigService.get<string>('GRAPH_ENVIRONMENT_DEV_CONFIG')!;
+  }
+
+  public graph_capacity(): number {
+    return this.nestConfigService.get<number>('GRAPH_CAPACITY')!;
   }
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Action, Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, ImportBundle, Update, Config } from '@dsnp/graph-sdk';
+import { Action, Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, ImportBundle, Update, Config, DevEnvironment, EnvironmentType } from '@dsnp/graph-sdk';
+import { ConfigService } from '../config/config.service';
 
 @Injectable()
 export class GraphStateManager {
@@ -15,9 +16,17 @@ export class GraphStateManager {
     }
   });
 
-  constructor(environment: EnvironmentInterface, capacity?: number) {
-    this.environment = environment;
-    this.capacity = capacity;
+  constructor(private configService: ConfigService) {
+    const environmentType = configService.graph_environment_type();
+    if (environmentType === EnvironmentType.Dev.toString()) {
+      const config_json = configService.graph_environment_config();
+      let config: Config = JSON.parse(config_json);
+      const devEnvironment: DevEnvironment = { environmentType: EnvironmentType.Dev, config };
+      this.environment = devEnvironment;
+    } else {
+      this.environment = { environmentType: EnvironmentType[environmentType as keyof typeof EnvironmentType] };
+    }
+    this.capacity = configService.graph_capacity();
     this.graphState = new Graph(this.environment, this.capacity);
 
     GraphStateManager.graphStateFinalizer.register(this, this.graphState);

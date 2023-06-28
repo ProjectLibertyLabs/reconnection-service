@@ -1,24 +1,67 @@
+require('dotenv').config({ path: '.env.test' });
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { GraphStateManager } from './graph-state-manager';
 import { DsnpKeys, EnvironmentType, GraphKeyPair, ImportBundle, PageData } from '@dsnp/graph-sdk';
-import { ConfigModule } from '../config/config.module';
+import { ConfigService } from '../config/config.service';
+import { configModuleOptions } from '../config/env.config';
+import { ConfigModule } from '@nestjs/config';
+import { GraphManagerModule } from './graph-state.module';
+
+type ProcessEnv = {
+  REDIS_URL: string;
+  FREQUENCY_URL: string;
+  PROVIDER_ID: string;
+  PROVIDER_BASE_URL: string;
+  PROVIDER_USER_GRAPH_ENDPOINT: string;
+  PROVIDER_ACCESS_TOKEN: string;
+  BLOCKCHAIN_SCAN_INTERVAL_MINUTES: string;
+  QUEUE_HIGH_WATER: string;
+  GRAPH_ENVIRONMENT_TYPE: string;
+  GRAPH_ENVIRONMENT_CONFIG: string;
+};
 
 describe('GraphStateManager', () => {
-  let graphStateManager: GraphStateManager;
+  const REDIS_URL = 'redis://localhost:6389';
+  const FREQUENCY_URL = 'ws://localhost:9933';
+  const PROVIDER_ID = '1';
+  const PROVIDER_BASE_URL = 'https://some-provider';
+  const PROVIDER_USER_GRAPH_ENDPOINT = 'user-graph';
+  const PROVIDER_ACCESS_TOKEN = 'some-token';
+  const BLOCKCHAIN_SCAN_INTERVAL_MINUTES = '60';
+  const QUEUE_HIGH_WATER = '1000';
+  const GRAPH_ENVIRONMENT_TYPE = 'Mainnet';
+  const GRAPH_ENVIRONMENT_CONFIG = '{}';
 
+  const ALL_ENV = {
+    REDIS_URL,
+    FREQUENCY_URL,
+    PROVIDER_ID,
+    PROVIDER_BASE_URL,
+    PROVIDER_USER_GRAPH_ENDPOINT,
+    PROVIDER_ACCESS_TOKEN,
+    BLOCKCHAIN_SCAN_INTERVAL_MINUTES,
+    QUEUE_HIGH_WATER,
+    GRAPH_ENVIRONMENT_TYPE,
+    GRAPH_ENVIRONMENT_CONFIG,
+  };
+  let graphStateManager: GraphStateManager;
+  
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      imports: [],
-      providers: [{
-        provide: GraphStateManager,
-        useFactory: () => {
-          return new GraphStateManager({ environmentType: EnvironmentType.Mainnet });
-        }
-      }],
+      imports: [
+        GraphManagerModule,
+        ConfigModule.forRoot({
+          ...configModuleOptions,
+          isGlobal: true,
+        }),
+      ],
+      providers: [GraphStateManager, ConfigService],
     }).compile();
-
+  
     graphStateManager = module.get<GraphStateManager>(GraphStateManager);
   });
+  
 
   it('should be defined', () => {
     expect(graphStateManager).toBeDefined();
