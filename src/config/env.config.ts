@@ -13,5 +13,18 @@ export const configModuleOptions: ConfigModuleOptions = {
       .min(1)
       .default(3 * 60),
     QUEUE_HIGH_WATER: Joi.number().min(100).default(1000),
+    GRAPH_ENVIRONMENT_TYPE: Joi.string().required(),
+    // GRAPH_ENVIRONMENT_DEV_CONFIG is optional, but if it is set, it must be a valid JSON string
+    GRAPH_ENVIRONMENT_DEV_CONFIG: Joi.string().when('GRAPH_ENVIRONMENT_TYPE', {
+      is: 'Dev',
+      then: Joi.string().required().custom((value: string, helpers) => {
+        try {
+          JSON.parse(value);
+        } catch (e) {
+          return helpers.error('any.invalid');
+        }
+        return value;
+      }
+    )}),
   }),
 };

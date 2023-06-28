@@ -14,6 +14,8 @@ export interface ConfigEnvironmentVariables {
   PROVIDER_ACCESS_TOKEN: string;
   BLOCKCHAIN_SCAN_INTERVAL_MINUTES: number;
   QUEUE_HIGH_WATER: number;
+  GRAPH_ENVIRONMENT_TYPE: string;
+  GRAPH_ENVIRONMENT_DEV_CONFIG: string;
 }
 
 interface ProviderDetails {
@@ -39,7 +41,7 @@ export class ConfigService {
     const baseUrl = nestConfigService.get('PROVIDER_BASE_URL');
     const userGraphEndpoint = nestConfigService.get('PROVIDER_USER_GRAPH_ENDPOINT');
     const apiToken = this.nestConfigService.get('PROVIDER_ACCESS_TOKEN');
-
+    
     this.providerMap = new Map<string, ProviderDetails>([
       [
         providerId.toString(),
@@ -78,5 +80,13 @@ export class ConfigService {
 
   public getQueueHighWater(): number {
     return this.nestConfigService.get<number>('QUEUE_HIGH_WATER')!;
+  }
+
+  public graph_environment_type(): string {
+    return this.nestConfigService.get<string>('GRAPH_ENVIRONMENT_TYPE')!;
+  }
+
+  public graph_environment_config(): string {
+    return this.nestConfigService.get<string>('GRAPH_ENVIRONMENT_DEV_CONFIG')!;
   }
 }
