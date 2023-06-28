@@ -92,6 +92,6 @@ export class ConfigService {
   }
 
   public graph_capacity(): number {
-    return this.nestConfigService.get<number>('GRAPH_CAPACITY')!;
+    return this.nestConfigService.get<number>('GRAPH_CAPACITY')?? 0;
   }
 }

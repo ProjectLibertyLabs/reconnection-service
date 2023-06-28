@@ -26,7 +26,7 @@ export class GraphStateManager {
     } else {
       this.environment = { environmentType: EnvironmentType[environmentType as keyof typeof EnvironmentType] };
     }
-    this.capacity = configService.graph_capacity();
+    this.capacity = configService.graph_capacity() > 0? configService.graph_capacity(): undefined;
     this.graphState = new Graph(this.environment, this.capacity);
 
     GraphStateManager.graphStateFinalizer.register(this, this.graphState);

@@ -62,9 +62,15 @@ describe('GraphStateManager', () => {
     graphStateManager = module.get<GraphStateManager>(GraphStateManager);
   });
   
-
   it('should be defined', () => {
     expect(graphStateManager).toBeDefined();
+  });
+
+  it('should return graph config', async () => {
+    const graphConfig = await graphStateManager.getGraphConfig();
+    expect(graphConfig).toBeDefined();
+    expect(graphConfig.sdkMaxUsersGraphSize).toBeDefined();
+    expect(graphConfig.sdkMaxUsersGraphSize).toBeGreaterThan(0);
   });
 
   it('should initialize state and import bundle upon request', async () => {

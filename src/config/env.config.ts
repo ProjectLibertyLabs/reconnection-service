@@ -26,6 +26,6 @@ export const configModuleOptions: ConfigModuleOptions = {
         return value;
       }
     )}),
-    GRAPH_CAPACITY: Joi.number().min(1).default(1000),
+    GRAPH_CAPACITY: Joi.number().min(1).default(0),
   }),
 };
