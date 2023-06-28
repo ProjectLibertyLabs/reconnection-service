@@ -81,9 +81,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
         throw new Error(`Bad status ${response.status} (${response.statusText} from Provider web hook.)`)
       }
 
-      //TODO Remove this code
-      this.logger.log("GOT RESPONSE!");
-      this.logger.log(response);
+      this.logger.debug(response.data);
 
       return response.data;
 
