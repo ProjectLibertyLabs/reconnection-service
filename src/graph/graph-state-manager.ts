@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Action, Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, ImportBundle, Update, Config, DevEnvironment, EnvironmentType } from '@dsnp/graph-sdk';
+import { Action, Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, ImportBundle, Update, Config, DevEnvironment, EnvironmentType, DsnpKeys, DsnpPublicKey, DsnpGraphEdge } from '@dsnp/graph-sdk';
 import { ConfigService } from '../config/config.service';
 
 @Injectable()
@@ -32,13 +32,15 @@ export class GraphStateManager {
     GraphStateManager.graphStateFinalizer.register(this, this.graphState);
   }
 
-  private async isGraphStateFull(): Promise<boolean> {
+  public async getGraphState(): Promise<Graph> {
     if (this.graphState) {
-      const graphCapacity = await this.graphState.getGraphCapacity();
-      const graphStatesCount = await this.graphState.getGraphUsersCount();
-      return graphCapacity === graphStatesCount;
+      return this.graphState;
     }
-    return false;
+    return {} as Graph;
+  }
+
+  public async getGraphCapacity(): Promise<number> {
+    return this.graphState.getGraphCapacity();
   }
 
   public async getGraphConfig(): Promise<Config> {
@@ -52,6 +54,9 @@ export class GraphStateManager {
     return Graph.generateKeyPair(keyType);
   }
 
+  public static async deserializeDsnpKeys(keys: DsnpKeys): Promise<DsnpPublicKey[]> {
+    return Graph.deserializeDsnpKeys(keys);
+  }
 
   public async importUserData(payload: ImportBundle[]): Promise<boolean> {
     if (this.graphState) {
@@ -79,5 +84,47 @@ export class GraphStateManager {
       return this.graphState.removeUserGraph(dsnpUserId);
     }
     return false;
+  }
+
+  public async graphContainsUser(dsnpUserId: string): Promise<boolean> {
+    if (this.graphState) {
+      return this.graphState.containsUserGraph(dsnpUserId);
+    }
+    return false;
+  }
+
+  public async getConnectionsForUserGraph(dsnpUserId: string, schemaId: number, includePending: boolean): Promise<DsnpGraphEdge[]> {
+    if (this.graphState) {
+      return this.graphState.getConnectionsForUserGraph(dsnpUserId, schemaId, includePending);
+    }
+    return [];
+  }
+
+  public async getConnectionWithoutKeys(): Promise<string[]> {
+    if (this.graphState) {
+      return this.graphState.getConnectionsWithoutKeys();
+    }
+    return [];
+  }
+
+  public async getOneSidedPrivateFriendshipConnections(dsnpUserId: string): Promise<DsnpGraphEdge[]> {
+    if (this.graphState) {
+      return this.graphState.getOneSidedPrivateFriendshipConnections(dsnpUserId);
+    }
+    return [];
+  }
+
+  public async getPublicKeys(dsnpUserId: string): Promise<DsnpPublicKey[]> {
+    if (this.graphState) {
+      return this.graphState.getPublicKeys(dsnpUserId);
+    }
+    return [];
+  }
+
+  public async forceCalculateGraphs(dsnpUserId: string): Promise<Update[]> {
+    if (this.graphState) {
+      return this.graphState.forceCalculateGraphs(dsnpUserId);
+    }
+    return [];
   }
 }
