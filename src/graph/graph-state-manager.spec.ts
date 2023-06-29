@@ -46,8 +46,8 @@ describe('GraphStateManager', () => {
     GRAPH_ENVIRONMENT_CONFIG,
   };
   let graphStateManager: GraphStateManager;
-  
-  beforeEach(async () => {
+
+  beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [
         GraphManagerModule,
@@ -58,10 +58,10 @@ describe('GraphStateManager', () => {
       ],
       providers: [GraphStateManager, ConfigService],
     }).compile();
-  
+
     graphStateManager = module.get<GraphStateManager>(GraphStateManager);
   });
-  
+
   it('should be defined', () => {
     expect(graphStateManager).toBeDefined();
   });
@@ -126,13 +126,13 @@ describe('GraphStateManager', () => {
     const actions = [] as Action[];
     const action_1 = {
         type: "Connect",
-        ownerDsnpUserId: "1",
+        ownerDsnpUserId: "10",
         connection: {
-            dsnpUserId: "2",
+            dsnpUserId: "4",
             schemaId: 1,
         } as Connection,
         dsnpKeys: {
-          dsnpUserId: "2",
+          dsnpUserId: "4",
           keysHash: 100,
           keys: [],
         } as DsnpKeys,
