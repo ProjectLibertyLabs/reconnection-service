@@ -5,6 +5,6 @@ import { ConfigModule } from '../config/config.module';
 @Module({
     imports: [ConfigModule],
     providers: [GraphStateManager],
-    exports: [],
+    exports: [GraphStateManager],
 })
 export class GraphManagerModule {}
