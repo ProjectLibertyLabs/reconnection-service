@@ -7,6 +7,7 @@ import { options } from '@frequency-chain/api-augment';
 import { ApiPromise, HttpProvider, WsProvider } from '@polkadot/api';
 import { MessageSourceId, ProviderId } from '@frequency-chain/api-augment/interfaces';
 import { ConfigService } from '../config/config.service';
+import { GraphStateManager } from '../graph/graph-state-manager';
 
 @Injectable()
 export class ReconnectionGraphService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -14,7 +15,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
   private logger: Logger;
 
-  constructor(private configService: ConfigService) {
+  constructor(private configService: ConfigService, private graphStateManager: GraphStateManager) {
     this.logger = new Logger(ReconnectionGraphService.name);
   }
 

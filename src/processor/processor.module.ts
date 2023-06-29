@@ -8,10 +8,11 @@ import { ConfigModule } from '#app/config/config.module';
 import { QueueConsumerService } from './queue-consumer.service';
 import { ReconnectionGraphService } from './reconnection-graph.service';
 import { GraphManagerModule } from '../graph/graph-state.module';
+import { GraphStateManager } from '../graph/graph-state-manager';
 
 @Module({
   imports: [BullModule, ConfigModule, GraphManagerModule],
   controllers: [],
-  providers: [QueueConsumerService, ReconnectionGraphService],
+  providers: [QueueConsumerService, ReconnectionGraphService, GraphStateManager],
 })
 export class ProcessorModule {}
