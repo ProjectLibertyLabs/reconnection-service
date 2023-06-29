@@ -32,7 +32,7 @@ export class GraphStateManager {
     GraphStateManager.graphStateFinalizer.register(this, this.graphState);
   }
 
-  private async isGraphStateFull(stateId: number): Promise<boolean> {
+  private async isGraphStateFull(): Promise<boolean> {
     if (this.graphState) {
       const graphCapacity = await this.graphState.getGraphCapacity();
       const graphStatesCount = await this.graphState.getGraphUsersCount();
@@ -41,7 +41,7 @@ export class GraphStateManager {
     return false;
   }
 
-  public async getGraphConfig(stateId?: number): Promise<Config> {
+  public async getGraphConfig(): Promise<Config> {
     if (this.graphState) {
       return this.graphState.getGraphConfig(this.environment);
     }
@@ -53,7 +53,7 @@ export class GraphStateManager {
   }
 
 
-  public async importUserData(dsnpUserId: string, payload: ImportBundle[]): Promise<boolean> {
+  public async importUserData(payload: ImportBundle[]): Promise<boolean> {
     if (this.graphState) {
       return this.graphState.importUserData(payload);
     }

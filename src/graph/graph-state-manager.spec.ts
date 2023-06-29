@@ -107,7 +107,7 @@ describe('GraphStateManager', () => {
       pages: [pageData1],
     };
 
-    const import_result1 = await graphStateManager.importUserData(dsnpUserId1.toString(), [importBundle1]);
+    const import_result1 = await graphStateManager.importUserData([importBundle1]);
     expect(import_result1).toBe(true);
 
     // if import is successful and not state is created, it should have a state
