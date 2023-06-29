@@ -2,7 +2,7 @@ require('dotenv').config({ path: '.env.test' });
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { GraphStateManager } from './graph-state-manager';
-import { DsnpKeys, EnvironmentType, GraphKeyPair, ImportBundle, PageData } from '@dsnp/graph-sdk';
+import { Action, ConnectAction, Connection, DsnpKeys, EnvironmentType, GraphKeyPair, ImportBundle, PageData } from '@dsnp/graph-sdk';
 import { ConfigService } from '../config/config.service';
 import { configModuleOptions } from '../config/env.config';
 import { ConfigModule } from '@nestjs/config';
@@ -116,8 +116,35 @@ describe('GraphStateManager', () => {
     expect(graphConfig).toBeDefined();
     expect(graphConfig.maxGraphPageSizeBytes).toBeDefined();
 
-    const exportUpdates = await graphStateManager.exportGraphUpdates(dsnpUserId1.toString());
+    const exportUpdates = await graphStateManager.exportGraphUpdates();
     expect(exportUpdates).toBeDefined();
     expect(exportUpdates.length).toBe(0);
+  });
+
+  it('should apply actions and export graph updates', async () => {
+    // Set up actions
+    const actions = [] as Action[];
+    const action_1 = {
+        type: "Connect",
+        ownerDsnpUserId: "1",
+        connection: {
+            dsnpUserId: "2",
+            schemaId: 1,
+        } as Connection,
+        dsnpKeys: {
+          dsnpUserId: "2",
+          keysHash: 100,
+          keys: [],
+        } as DsnpKeys,
+    } as ConnectAction;
+
+    actions.push(action_1);
+
+    let applyActionsResult = await graphStateManager.applyActions(actions);
+    expect(applyActionsResult).toBe(true);
+
+    const exportUpdates = await graphStateManager.exportGraphUpdates();
+    expect(exportUpdates).toBeDefined();
+    expect(exportUpdates.length).toBe(1);
   });
 });

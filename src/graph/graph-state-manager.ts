@@ -60,14 +60,14 @@ export class GraphStateManager {
     return false;
   }
 
-  public async applyActions(dsnpUserId: string, actions: Action[]): Promise<boolean> {
+  public async applyActions(actions: Action[]): Promise<boolean> {
     if (this.graphState) {
       return this.graphState.applyActions(actions);
     }
     return false;
   }
 
-  public async exportGraphUpdates(dsnpUserId: string): Promise<Update[]> {
+  public async exportGraphUpdates(): Promise<Update[]> {
     if (this.graphState) {
       return await this.graphState.exportUpdates();
     }
