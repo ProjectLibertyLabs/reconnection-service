@@ -2,7 +2,7 @@ require('dotenv').config({ path: '.env.test' });
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { GraphStateManager } from './graph-state-manager';
-import { Action, ConnectAction, Connection, DsnpKeys, EnvironmentType, GraphKeyPair, ImportBundle, PageData } from '@dsnp/graph-sdk';
+import { Action, ConnectAction, Connection, DsnpKeys, EnvironmentType, Graph, GraphKeyPair, GraphKeyType, ImportBundle, KeyData, PageData } from '@dsnp/graph-sdk';
 import { ConfigService } from '../config/config.service';
 import { configModuleOptions } from '../config/env.config';
 import { ConfigModule } from '@nestjs/config';
@@ -146,5 +146,48 @@ describe('GraphStateManager', () => {
     const exportUpdates = await graphStateManager.exportGraphUpdates();
     expect(exportUpdates).toBeDefined();
     expect(exportUpdates.length).toBe(1);
+  });
+
+  it('getConnectionsWithoutKeys with empty connections should return empty array', async () => {
+    const connections = await graphStateManager.getConnectionWithoutKeys();
+    expect(connections).toBeDefined();
+    expect(connections.length).toBe(0);
+  });
+
+  it('getPublicKeys with empty connections should return empty array', async () => {
+    const publicKeys = await graphStateManager.getPublicKeys('1');
+    expect(publicKeys).toBeDefined();
+    expect(publicKeys.length).toBe(0);
+  });
+
+  it('Read and deserialize published graph keys', async () => {
+    let dsnp_key_owner = 1000;
+
+	  // published keys blobs fetched from blockchain
+	  let published_keys_blob = [
+	  	64, 15, 234, 44, 175, 171, 220, 131, 117, 43, 227, 111, 165, 52, 150, 64, 218, 44, 130,
+	  	138, 221, 10, 41, 13, 241, 60, 210, 216, 23, 62, 178, 73, 111,
+	  ];
+	  let dsnp_keys = {
+          dsnpUserId: dsnp_key_owner.toString(),
+          keysHash: 100,
+          keys: [
+              {
+                  index: 0,
+                  content: new Uint8Array(published_keys_blob),
+              }
+
+           ] as KeyData[],
+      } as DsnpKeys;
+      
+      const deserialized_keys = await GraphStateManager.deserializeDsnpKeys(dsnp_keys);
+      expect(deserialized_keys).toBeDefined();
+  });
+
+  it('generateKeyPair should return a key pair', async () => {
+    const keyPair = await GraphStateManager.generateKeyPair(GraphKeyType.X25519);
+    expect(keyPair).toBeDefined();
+    expect(keyPair.publicKey).toBeDefined();
+    expect(keyPair.secretKey).toBeDefined();
   });
 });
