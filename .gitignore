@@ -4,4 +4,3 @@ dist
 .vscode
 coverage
 .env.test
-.env.docker.dev
