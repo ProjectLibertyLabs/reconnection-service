@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Action, Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, ImportBundle, Update, Config, DevEnvironment, EnvironmentType, DsnpKeys, DsnpPublicKey, DsnpGraphEdge } from '@dsnp/graph-sdk';
+import { Action, Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, ImportBundle, Update, Config, DevEnvironment, EnvironmentType, DsnpKeys, DsnpPublicKey, DsnpGraphEdge, ConnectionType, PrivacyType } from '@dsnp/graph-sdk';
 import { ConfigService } from '../config/config.service';
 
 @Injectable()
@@ -48,6 +48,13 @@ export class GraphStateManager {
       return this.graphState.getGraphConfig(this.environment);
     }
     return {} as Config;
+  }
+
+  public async getSchemaIdFromConfig(connectionType: ConnectionType, privacyType: PrivacyType): Promise<number> {
+    if (this.graphState) {
+      return this.graphState.getSchemaIdFromConfig(this.environment, connectionType, privacyType);
+    }
+    return 0;
   }
 
   public static async generateKeyPair(keyType: GraphKeyType): Promise<GraphKeyPair> {

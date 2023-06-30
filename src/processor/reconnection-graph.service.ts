@@ -8,6 +8,7 @@ import { ApiPromise, HttpProvider, WsProvider } from '@polkadot/api';
 import { MessageSourceId, ProviderId } from '@frequency-chain/api-augment/interfaces';
 import { ConfigService } from '../config/config.service';
 import { GraphStateManager } from '../graph/graph-state-manager';
+import { ConnectionType, PrivacyType } from '@dsnp/graph-sdk';
 
 @Injectable()
 export class ReconnectionGraphService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -43,6 +44,12 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
     const dsnpUserId: MessageSourceId = this.api.registry.createType('MessageSourceId', dsnpUserStr);
     const providerId: ProviderId = this.api.registry.createType('ProviderId', providerStr);
+    const graphSdkConfig  = await this.graphStateManager.getGraphConfig();
+    const public_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
+    const public_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Public);
+    const private_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Private);
+    const private_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Private);
+    
     // TODO
     // https://github.com/AmplicaLabs/reconnection-service/issues/20
     // Calling out to the provider to obtain a user's Provider graph

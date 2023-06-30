@@ -2,7 +2,7 @@ require('dotenv').config({ path: '.env.test' });
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { GraphStateManager } from './graph-state-manager';
-import { Action, ConnectAction, Connection, DsnpKeys, EnvironmentType, Graph, GraphKeyPair, GraphKeyType, ImportBundle, KeyData, PageData } from '@dsnp/graph-sdk';
+import { Action, ConnectAction, Connection, ConnectionType, DsnpKeys, EnvironmentType, Graph, GraphKeyPair, GraphKeyType, ImportBundle, KeyData, PageData, PrivacyType } from '@dsnp/graph-sdk';
 import { ConfigService } from '../config/config.service';
 import { configModuleOptions } from '../config/env.config';
 import { ConfigModule } from '@nestjs/config';
@@ -189,5 +189,20 @@ describe('GraphStateManager', () => {
     expect(keyPair).toBeDefined();
     expect(keyPair.publicKey).toBeDefined();
     expect(keyPair.secretKey).toBeDefined();
+  });
+
+  it('should remove user graph', async () => {
+    const removeUserGraphResult = await graphStateManager.removeUserGraph('1');
+    expect(removeUserGraphResult).toBe(true);
+  });
+
+  it('should return false if graph does not contain user', async () => {
+    const containsUserGraphResult = await graphStateManager.graphContainsUser('1');
+    expect(containsUserGraphResult).toBe(false);
+  });
+  
+  it('should return schema id for connection type and privacy type', async () => {
+    const schemaId = await graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
+    expect(schemaId).toBeGreaterThan(0);
   });
 });
