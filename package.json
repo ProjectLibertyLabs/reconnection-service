@@ -15,7 +15,8 @@
     "docker-stop:dev": "docker-compose -f docker-compose.dev.yaml stop",
     "clean": "rm -Rf dist",
     "lint": "tsc --noEmit --pretty && eslint \"**/*.ts\" --fix",
-    "test": "npx jest"
+    "cp:env": "cp env.template .env.test",
+    "test": "npm run cp:env && NODE_ENV=test jest --detectOpenHandles --forceExit --coverage --verbose"
   },
   "repository": {
     "type": "git",
@@ -29,6 +30,7 @@
   },
   "homepage": "https://github.com/AmplicaLabs/reconnection-service#readme",
   "dependencies": {
+    "@dsnp/graph-sdk": "^0.0.0-e04907",
     "@frequency-chain/api-augment": "1.7.0-rc1",
     "@liaoliaots/nestjs-redis": "^9.0.5",
     "@nestjs/axios": "^2.0.0",
@@ -55,9 +57,11 @@
   "devDependencies": {
     "@jest/globals": "^29.5.0",
     "@polkadot/typegen": "10.9.1",
+    "@types/jest": "^29.5.2",
     "@types/time-constants": "^1.0.0",
     "@typescript-eslint/parser": "^5.59.8",
     "@typescript-eslint/typescript-estree": "5.59.8",
+    "dotenv": "^16.3.1",
     "eslint": "^8.42.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-airbnb-typescript": "^17.0.0",

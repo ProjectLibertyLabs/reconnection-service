@@ -8,14 +8,16 @@ import { options } from '@frequency-chain/api-augment';
 import { ApiPromise, HttpProvider, WsProvider } from '@polkadot/api';
 import { MessageSourceId, ProviderId } from '@frequency-chain/api-augment/interfaces';
 import { ConfigService } from '../config/config.service';
+import { GraphStateManager } from '../graph/graph-state-manager';
 import { GraphKeyPair, ProviderGraph } from '../interfaces/provider-graph.interface';
+import { ConnectionType, PrivacyType } from '@dsnp/graph-sdk';
 
 @Injectable()
 export class ReconnectionGraphService implements OnApplicationBootstrap, OnApplicationShutdown {
   private api: ApiPromise;
   private logger: Logger;
 
-  constructor(private configService: ConfigService) {
+  constructor(private configService: ConfigService, private graphStateManager: GraphStateManager) {
     this.logger = new Logger(ReconnectionGraphService.name);
   }
 
@@ -48,6 +50,14 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const [graphConnections, graphKeyPair] = await this.getUserGraphFromProvider(dsnpUserId, providerId);
     this.logger.log("graphConnections", graphConnections);
     this.logger.log("graphKeyPair", graphKeyPair);
+
+    // graph config and respective schema ids
+    const graphSdkConfig  = await this.graphStateManager.getGraphConfig();
+    const public_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
+    const public_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Public);
+    const private_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Private);
+    const private_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Private);
+    
     // TODO
     // https://github.com/AmplicaLabs/reconnection-service/issues/21
     // Calling out to the blockchain to obtain the user's DSNP Graph

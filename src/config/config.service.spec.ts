@@ -39,6 +39,8 @@ describe('ReconnectionConfigService', () => {
   const PROVIDER_ACCESS_TOKEN = 'some-token';
   const BLOCKCHAIN_SCAN_INTERVAL_MINUTES = 60;
   const QUEUE_HIGH_WATER = 1000;
+  const GRAPH_ENVIRONMENT_TYPE = 'Mainnet';
+  const GRAPH_ENVIRONMENT_CONFIG = '{}';
 
   const ALL_ENV = {
     REDIS_URL,
@@ -49,6 +51,8 @@ describe('ReconnectionConfigService', () => {
     PROVIDER_ACCESS_TOKEN,
     BLOCKCHAIN_SCAN_INTERVAL_MINUTES,
     QUEUE_HIGH_WATER,
+    GRAPH_ENVIRONMENT_TYPE,
+    GRAPH_ENVIRONMENT_CONFIG,
   };
 
   describe('invalid environment', () => {
