@@ -8,8 +8,6 @@ export class GraphStateManager {
 
   private environment: EnvironmentInterface; // Environment details
 
-  private capacity?: number; // Graph capacity
-
   private static graphStateFinalizer = new FinalizationRegistry((graphState: Graph) => {
     if (graphState) {
       graphState.freeGraphState();
@@ -26,8 +24,7 @@ export class GraphStateManager {
     } else {
       this.environment = { environmentType: EnvironmentType[environmentType as keyof typeof EnvironmentType] };
     }
-    this.capacity = configService.graph_capacity() > 0? configService.graph_capacity(): undefined;
-    this.graphState = new Graph(this.environment, this.capacity);
+    this.graphState = new Graph(this.environment);
 
     GraphStateManager.graphStateFinalizer.register(this, this.graphState);
   }
@@ -37,10 +34,6 @@ export class GraphStateManager {
       return this.graphState;
     }
     return {} as Graph;
-  }
-
-  public async getGraphCapacity(): Promise<number> {
-    return this.graphState.getGraphCapacity();
   }
 
   public async getGraphConfig(): Promise<Config> {
