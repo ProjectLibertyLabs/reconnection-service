@@ -10,7 +10,7 @@ import { MessageSourceId, ProviderId } from '@frequency-chain/api-augment/interf
 import { ConfigService } from '../config/config.service';
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { GraphKeyPair, ProviderGraph } from '../interfaces/provider-graph.interface';
-import { ConnectionType, PrivacyType } from '@dsnp/graph-sdk';
+import { ConnectionType, ImportBundle, PrivacyType } from '@dsnp/graph-sdk';
 
 @Injectable()
 export class ReconnectionGraphService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -57,7 +57,10 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const public_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Public);
     const private_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Private);
     const private_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Private);
+    const public_key_schema_id = graphSdkConfig.graphPublicKeySchemaId;
     
+    const importBundles = await this.formImportBundles(dsnpUserId, public_follow_schema_id, graphKeyPair);
+    await this.graphStateManager.importUserData(importBundles);
     // TODO
     // https://github.com/AmplicaLabs/reconnection-service/issues/21
     // Calling out to the blockchain to obtain the user's DSNP Graph
@@ -124,5 +127,10 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
         throw e;
       }
     }
+  }
+
+  async formImportBundles(dsnpUserId: MessageSourceId, paginatedSchemaId: number, graphKeyPair: GraphKeyPair): Promise<ImportBundle[]> {
+    let importBundles: ImportBundle[] = [];
+    return importBundles;
   }
 }
