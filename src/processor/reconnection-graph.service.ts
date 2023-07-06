@@ -219,7 +219,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       }
 
       switch(connection.direction) {
-        case 'connectionTo'||'bidirectional':
+        case 'connectionTo':
           actions.push({
             ownerDsnpUserId: dsnpUserId.toString(),
             dsnpKeys: dsnpKeys,
@@ -228,7 +228,20 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
               schemaId,
             } as Connection,
           } as ConnectAction);
-        case 'connectionFrom' || 'bidirectional':{
+        case 'connectionFrom':{
+          // queue an event to update the other user's graph
+          // TODO
+        }
+        case 'bidirectional':{
+          actions.push({
+            ownerDsnpUserId: dsnpUserId.toString(),
+            dsnpKeys: dsnpKeys,
+            connection: {
+              dsnpUserId: connection.dsnpId,
+              schemaId,
+            } as Connection,
+          } as ConnectAction);
+          
           // queue an event to update the other user's graph
           // TODO
         }
