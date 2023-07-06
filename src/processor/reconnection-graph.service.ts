@@ -6,11 +6,12 @@ import axios, { AxiosError, AxiosInstance } from "axios";
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { options } from '@frequency-chain/api-augment';
 import { ApiPromise, HttpProvider, WsProvider } from '@polkadot/api';
-import { MessageSourceId, ProviderId } from '@frequency-chain/api-augment/interfaces';
+import { ItemizedStoragePageResponse, ItemizedStorageResponse, MessageSourceId, PaginatedStorageResponse, ProviderId } from '@frequency-chain/api-augment/interfaces';
 import { ConfigService } from '../config/config.service';
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { GraphKeyPair, ProviderGraph } from '../interfaces/provider-graph.interface';
-import { ConnectionType, ImportBundle, PrivacyType } from '@dsnp/graph-sdk';
+import { Config, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType } from '@dsnp/graph-sdk';
+import { ImportBundleBuilder } from "#app/graph/import-bundle-builder";
 
 @Injectable()
 export class ReconnectionGraphService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -53,13 +54,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
     // graph config and respective schema ids
     const graphSdkConfig  = await this.graphStateManager.getGraphConfig();
-    const public_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
-    const public_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Public);
-    const private_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Private);
-    const private_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Private);
-    const public_key_schema_id = graphSdkConfig.graphPublicKeySchemaId;
-    
-    const importBundles = await this.formImportBundles(dsnpUserId, public_follow_schema_id, graphKeyPair);
+    const importBundles = await this.formImportBundles(dsnpUserId, graphSdkConfig, graphKeyPair);
     await this.graphStateManager.importUserData(importBundles);
     // TODO
     // https://github.com/AmplicaLabs/reconnection-service/issues/21
@@ -129,8 +124,73 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     }
   }
 
-  async formImportBundles(dsnpUserId: MessageSourceId, paginatedSchemaId: number, graphKeyPair: GraphKeyPair): Promise<ImportBundle[]> {
+  async formImportBundles(dsnpUserId: MessageSourceId, graphSdkConfig: Config, graphKeyPair: GraphKeyPair): Promise<ImportBundle[]> {
     let importBundles: ImportBundle[] = [];
+    const public_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
+    const public_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Public);
+    const private_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Private);
+    const private_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Private);
+    const public_key_schema_id = graphSdkConfig.graphPublicKeySchemaId;
+
+    let publicFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(public_follow_schema_id, dsnpUserId);
+    let publicFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(public_friendship_schema_id, dsnpUserId);
+    let privateFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(private_follow_schema_id, dsnpUserId);
+    let privateFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(private_friendship_schema_id, dsnpUserId);
+    let publicKeys: ItemizedStoragePageResponse = await this.api.rpc.statefulStorage.getItemizedStorage(public_key_schema_id, dsnpUserId);
+    
+    const dsnpKeys: DsnpKeys = {
+      dsnpUserId: dsnpUserId.toString(),
+      keysHash: publicKeys.content_hash.toNumber(),
+      keys: publicKeys.items.map((item: ItemizedStorageResponse) => {
+        return {
+          index: item.index.toNumber(),
+          content: item.payload.toU8a(),
+        } as KeyData;
+      }),
+    };
+
+
+    // for each PaginatedStorageResponse, create an import bundle
+    importBundles.push(...publicFollows.map((publicFollow) => {
+      return ImportBundleBuilder.setDsnpUserId(dsnpUserId.toString())
+        .setSchemaId(public_follow_schema_id)
+        .setDsnpKeys(dsnpKeys)
+        .setDsnpUserId(dsnpUserId.toString())
+        .addPageData(publicFollow.page_id.toNumber(), publicFollow.payload, publicFollow.content_hash.toNumber())
+        .addGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
+        .build();
+    }));
+
+    importBundles.push(...publicFriendships.map((publicFriendship) => {
+      return ImportBundleBuilder.setDsnpUserId(dsnpUserId.toString())
+        .setSchemaId(public_friendship_schema_id)
+        .setDsnpKeys(dsnpKeys)
+        .setDsnpUserId(dsnpUserId.toString())
+        .addPageData(publicFriendship.page_id.toNumber(), publicFriendship.payload, publicFriendship.content_hash.toNumber())
+        .addGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
+        .build();
+    }));
+
+    importBundles.push(...privateFollows.map((privateFollow) => {
+      return ImportBundleBuilder.setDsnpUserId(dsnpUserId.toString())
+        .setSchemaId(private_follow_schema_id)
+        .setDsnpKeys(dsnpKeys)
+        .setDsnpUserId(dsnpUserId.toString())
+        .addPageData(privateFollow.page_id.toNumber(), privateFollow.payload, privateFollow.content_hash.toNumber())
+        .addGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
+        .build();
+    }));
+
+    importBundles.push(...privateFriendships.map((privateFriendship) => {
+      return ImportBundleBuilder.setDsnpUserId(dsnpUserId.toString())
+        .setSchemaId(private_friendship_schema_id)
+        .setDsnpKeys(dsnpKeys)
+        .setDsnpUserId(dsnpUserId.toString())
+        .addPageData(privateFriendship.page_id.toNumber(), privateFriendship.payload, privateFriendship.content_hash.toNumber())
+        .addGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
+        .build();
+    }));
+    
     return importBundles;
   }
 }

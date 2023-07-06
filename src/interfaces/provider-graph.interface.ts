@@ -6,6 +6,6 @@ export interface ProviderGraph {
 }
 
 export interface GraphKeyPair {
-    publicKey: string;
-    privateKey: string;
+    publicKey: Uint8Array;
+    privateKey: Uint8Array;
 }
