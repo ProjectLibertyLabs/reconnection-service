@@ -10,7 +10,7 @@ import { InjectRedis } from '@liaoliaots/nestjs-redis';
 import Redis from 'ioredis';
 import { MessageSourceId, ProviderId } from '@frequency-chain/api-augment/interfaces';
 import { ConfigService } from './config/config.service';
-import { createGraphUpdateJob } from './interfaces/graph-update-job.interface';
+import { UpdateTransitiveGraphs, createGraphUpdateJob } from './interfaces/graph-update-job.interface';
 
 const LAST_SEEN_BLOCK_NUMBER_KEY = 'lastSeenBlockNumber';
 
@@ -103,7 +103,7 @@ export class BlockchainScannerService implements OnApplicationBootstrap, OnAppli
         const events = (await currentApi.query.system.events()).toArray();
         const filteredEvents = events.reduce((jobs: Promise<any>[], { event }) => {
           if (this.api.events.msa.DelegationGranted.is(event)) {
-            const { key: jobId, data } = createGraphUpdateJob(event.data.delegatorId, event.data.providerId);
+            const { key: jobId, data } = createGraphUpdateJob(event.data.delegatorId, event.data.providerId, UpdateTransitiveGraphs);
             jobs.push(this.graphUpdateQueue.add('graphUpdate', data, { jobId }));
             this.logger.debug(`Queued graph update for DSNP user ${data.dsnpId}, provider ${data.providerId}`);
           }
