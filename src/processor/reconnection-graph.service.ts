@@ -54,8 +54,13 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
     // graph config and respective schema ids
     const graphSdkConfig  = await this.graphStateManager.getGraphConfig();
+    
+    // get the user's DSNP Graph from the blockchain and form import bundles
     const importBundles = await this.formImportBundles(dsnpUserId, graphSdkConfig, graphKeyPair);
-    await this.graphStateManager.importUserData(importBundles);
+    await this.graphStateManager.importUserData(importBundles).then((results) => {
+      throw new Error(JSON.stringify("importUserData results: " + results));
+    });
+
     // TODO
     // https://github.com/AmplicaLabs/reconnection-service/issues/21
     // Calling out to the blockchain to obtain the user's DSNP Graph
