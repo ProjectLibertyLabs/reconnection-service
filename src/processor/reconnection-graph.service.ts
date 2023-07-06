@@ -70,12 +70,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const exportedUpdates: Update[] = await this.graphStateManager.exportGraphUpdates();
     
     // TODO
-    // https://github.com/AmplicaLabs/reconnection-service/issues/21
-    // Calling out to the blockchain to obtain the user's DSNP Graph
-    // Import the DSNP Graph into GraphSDK
-    // https://github.com/AmplicaLabs/reconnection-service/issues/22
-    // Adding missing connections to the user's DSNP Graph using GraphSDK API
-    // Export DSNP Graph changes and send to blockchain
+    // Send exported updates to the chain
     // Re-import DSNP Graph from chain & verify
     //     (if updating connections as well, do the same for connections--but do not transitively update connections - of - connections)
   }
@@ -241,7 +236,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
               schemaId,
             } as Connection,
           } as ConnectAction);
-          
+
           // queue an event to update the other user's graph
           // TODO
         }
