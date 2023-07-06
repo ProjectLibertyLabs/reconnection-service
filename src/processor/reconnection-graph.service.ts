@@ -10,7 +10,7 @@ import { ItemizedStoragePageResponse, ItemizedStorageResponse, MessageSourceId, 
 import { ConfigService } from '../config/config.service';
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { GraphKeyPair, ProviderGraph } from '../interfaces/provider-graph.interface';
-import { Config, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType } from '@dsnp/graph-sdk';
+import { Action, Config, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, Update } from '@dsnp/graph-sdk';
 import { ImportBundleBuilder } from "#app/graph/import-bundle-builder";
 
 @Injectable()
@@ -61,6 +61,14 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       throw new Error(JSON.stringify("importUserData results: " + results));
     });
 
+    // using graphConnections form Action[] and update the user's DSNP Graph
+    const actions: ConnectAction[] = await this.formConnections(dsnpUserId, graphSdkConfig, graphConnections);
+    await this.graphStateManager.applyActions(actions).then((results) => {
+      throw new Error(JSON.stringify("applyActions results: " + results));
+    });
+
+    const exportedUpdates: Update[] = await this.graphStateManager.exportGraphUpdates();
+    
     // TODO
     // https://github.com/AmplicaLabs/reconnection-service/issues/21
     // Calling out to the blockchain to obtain the user's DSNP Graph
@@ -135,27 +143,14 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const public_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Public);
     const private_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Private);
     const private_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Private);
-    const public_key_schema_id = graphSdkConfig.graphPublicKeySchemaId;
 
-    let publicFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(public_follow_schema_id, dsnpUserId);
-    let publicFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(public_friendship_schema_id, dsnpUserId);
-    let privateFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(private_follow_schema_id, dsnpUserId);
-    let privateFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(private_friendship_schema_id, dsnpUserId);
-    let publicKeys: ItemizedStoragePageResponse = await this.api.rpc.statefulStorage.getItemizedStorage(public_key_schema_id, dsnpUserId);
-    
-    const dsnpKeys: DsnpKeys = {
-      dsnpUserId: dsnpUserId.toString(),
-      keysHash: publicKeys.content_hash.toNumber(),
-      keys: publicKeys.items.map((item: ItemizedStorageResponse) => {
-        return {
-          index: item.index.toNumber(),
-          content: item.payload.toU8a(),
-        } as KeyData;
-      }),
-    };
+    const publicFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(public_follow_schema_id, dsnpUserId);
+    const publicFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(public_friendship_schema_id, dsnpUserId);
+    const privateFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(private_follow_schema_id, dsnpUserId);
+    const privateFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(private_friendship_schema_id, dsnpUserId);
 
+    const dsnpKeys = await this.formDsnpKeys(dsnpUserId, graphSdkConfig);
 
-    // for each PaginatedStorageResponse, create an import bundle
     importBundles.push(...publicFollows.map((publicFollow) => {
       return ImportBundleBuilder.setDsnpUserId(dsnpUserId.toString())
         .setSchemaId(public_follow_schema_id)
@@ -197,5 +192,68 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     }));
     
     return importBundles;
+  }
+
+  async formConnections(dsnpUserId: MessageSourceId, graphSdkConfig: Config, graphConnections: ProviderGraph[]): Promise<ConnectAction[]> {
+    const dsnpKeys = await this.formDsnpKeys(dsnpUserId, graphSdkConfig);
+    const public_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
+    const public_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Public);
+    const private_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Private);
+    const private_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Private);
+
+    let actions: ConnectAction[] = [];
+    graphConnections.forEach((connection) => {
+      let schemaId: number;
+      const connectionType = connection.connectionType.toLowerCase();
+      const privacyType = connection.privacyType.toLowerCase();
+      
+      switch (connectionType) {
+        case 'follow':
+          schemaId = privacyType === 'public' ? public_follow_schema_id : private_follow_schema_id;
+          break;
+        case 'friendship':
+          schemaId = privacyType === 'public' ? public_friendship_schema_id : private_friendship_schema_id;
+          break;
+        default:
+          throw new Error(`Unrecognized connection type: ${connectionType}`);
+      }
+
+      switch(connection.direction) {
+        case 'connectionTo'||'bidirectional':
+          actions.push({
+            ownerDsnpUserId: dsnpUserId.toString(),
+            dsnpKeys: dsnpKeys,
+            connection: {
+              dsnpUserId: connection.dsnpId,
+              schemaId,
+            } as Connection,
+          } as ConnectAction);
+        case 'connectionFrom' || 'bidirectional':{
+          // queue an event to update the other user's graph
+          // TODO
+        }
+        default:
+          throw new Error(`Unrecognized connection direction: ${connection.direction}`);
+      }
+    });
+    return actions;
+  }
+
+  async formDsnpKeys(dsnpUserId: MessageSourceId, graphSdkConfig: Config): Promise<DsnpKeys> {
+    const public_key_schema_id = graphSdkConfig.graphPublicKeySchemaId;
+    let publicKeys: ItemizedStoragePageResponse = await this.api.rpc.statefulStorage.getItemizedStorage(public_key_schema_id, dsnpUserId);
+    
+    const dsnpKeys: DsnpKeys = {
+      dsnpUserId: dsnpUserId.toString(),
+      keysHash: publicKeys.content_hash.toNumber(),
+      keys: publicKeys.items.map((item: ItemizedStorageResponse) => {
+        return {
+          index: item.index.toNumber(),
+          content: item.payload.toU8a(),
+        } as KeyData;
+      }),
+    };
+
+    return dsnpKeys;
   }
 }
