@@ -10,8 +10,7 @@ import { ItemizedStoragePageResponse, ItemizedStorageResponse, MessageSourceId, 
 import { ConfigService } from '../config/config.service';
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { GraphKeyPair, ProviderGraph } from '../interfaces/provider-graph.interface';
-import { Action, Config, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, Update } from '@dsnp/graph-sdk';
-import { ImportBundleBuilder } from "#app/graph/import-bundle-builder";
+import { ImportBundleBuilder, Config, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, Update } from '@dsnp/graph-sdk';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
