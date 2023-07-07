@@ -12,6 +12,9 @@ import { GraphStateManager } from '../graph/graph-state-manager';
 import { GraphKeyPair, ProviderGraph } from '../interfaces/provider-graph.interface';
 import { Action, Config, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, Update } from '@dsnp/graph-sdk';
 import { ImportBundleBuilder } from "#app/graph/import-bundle-builder";
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
 
 @Injectable()
 export class ReconnectionGraphService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -19,7 +22,11 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
   private logger: Logger;
 
-  constructor(private configService: ConfigService, private graphStateManager: GraphStateManager) {
+  constructor(
+    private configService: ConfigService, 
+    private graphStateManager: GraphStateManager,
+    @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
+    ) {
     this.logger = new Logger(ReconnectionGraphService.name);
   }
 
@@ -63,7 +70,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     });
 
     // using graphConnections form Action[] and update the user's DSNP Graph
-    const actions: ConnectAction[] = await this.formConnections(dsnpUserId, graphSdkConfig, graphConnections);
+    const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, graphSdkConfig, graphConnections);
     await this.graphStateManager.applyActions(actions).then((results) => {
       throw new Error(JSON.stringify("applyActions results: " + results));
     });
@@ -189,7 +196,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     return importBundles;
   }
 
-  async formConnections(dsnpUserId: MessageSourceId, graphSdkConfig: Config, graphConnections: ProviderGraph[]): Promise<ConnectAction[]> {
+  async formConnections(dsnpUserId: MessageSourceId, providerId: MessageSourceId, graphSdkConfig: Config, graphConnections: ProviderGraph[]): Promise<ConnectAction[]> {
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId, graphSdkConfig);
     const public_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
     const public_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Public);
@@ -224,8 +231,8 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
             } as Connection,
           } as ConnectAction);
         case 'connectionFrom':{
-          // queue an event to update the other user's graph
-          // TODO
+          const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, false);
+          this.graphUpdateQueue.add('graphUpdate', data, { jobId });
         }
         case 'bidirectional':{
           actions.push({
@@ -236,9 +243,8 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
               schemaId,
             } as Connection,
           } as ConnectAction);
-
-          // queue an event to update the other user's graph
-          // TODO
+          const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, false);
+          this.graphUpdateQueue.add('graphUpdate', data, { jobId });
         }
         default:
           throw new Error(`Unrecognized connection direction: ${connection.direction}`);
