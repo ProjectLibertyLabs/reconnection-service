@@ -51,6 +51,6 @@ export class QueueConsumerService extends WorkerHost {
       }
     }
 
-    this.graphSdkService.updateUserGraph(job.data.dsnpId, job.data.providerId, false);
+    this.graphSdkService.updateUserGraph(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
   }
 }

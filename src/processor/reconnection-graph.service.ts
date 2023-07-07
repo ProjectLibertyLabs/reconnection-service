@@ -57,8 +57,6 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
     // TODO set state based on the response from getUserGraphFromProvider
     const [graphConnections, graphKeyPair] = await this.getUserGraphFromProvider(dsnpUserId, providerId);
-    this.logger.log('graphConnections', graphConnections);
-    this.logger.log('graphKeyPair', graphKeyPair);
 
     // graph config and respective schema ids
     const graphSdkConfig  = await this.graphStateManager.getGraphConfig();
@@ -69,13 +67,18 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       throw new Error(JSON.stringify("importUserData results: " + results));
     });
 
-    // using graphConnections form Action[] and update the user's DSNP Graph
-    const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, graphSdkConfig, graphConnections);
-    await this.graphStateManager.applyActions(actions).then((results) => {
-      throw new Error(JSON.stringify("applyActions results: " + results));
-    });
+    let exportedUpdates: Update[] = [];
 
-    const exportedUpdates: Update[] = await this.graphStateManager.exportGraphUpdates();
+    if (updateConnections) {
+      // using graphConnections form Action[] and update the user's DSNP Graph
+      const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, graphSdkConfig, graphConnections);
+      await this.graphStateManager.applyActions(actions).then((results) => {
+        throw new Error(JSON.stringify("applyActions results: " + results));
+      });
+      exportedUpdates = await this.graphStateManager.exportGraphUpdates();
+    }else {
+      exportedUpdates = await this.graphStateManager.forceCalculateGraphs(dsnpUserId.toString());
+    }
     
     // TODO
     // Send exported updates to the chain
