@@ -14,6 +14,6 @@ import { GraphStateManager } from '../graph/graph-state-manager';
   imports: [BullModule, ConfigModule, GraphManagerModule],
   controllers: [],
   providers: [QueueConsumerService, ReconnectionGraphService, GraphStateManager],
-  exports: [ReconnectionGraphService]
+  exports: [ReconnectionGraphService],
 })
 export class ProcessorModule {}
