@@ -9,7 +9,7 @@ import { ApiPromise, HttpProvider, WsProvider } from '@polkadot/api';
 import { ItemizedStoragePageResponse, ItemizedStorageResponse, MessageSourceId, PaginatedStorageResponse, ProviderId } from '@frequency-chain/api-augment/interfaces';
 import { ConfigService } from '../config/config.service';
 import { GraphStateManager } from '../graph/graph-state-manager';
-import { GraphKeyPair, ProviderGraph } from '../interfaces/provider-graph.interface';
+import { GraphKeyPair, KeyType, ProviderGraph } from '../interfaces/provider-graph.interface';
 import { ImportBundleBuilder, Config, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, Update } from '@dsnp/graph-sdk';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -156,7 +156,12 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId, graphSdkConfig);
   
     const importBundleBuilder = new ImportBundleBuilder();
-  
+    // Only X25519 is supported for now
+    const graphKeyType = GraphKeyType.X25519;
+    if (graphKeyPair.keyType !== KeyType.X25519) {
+      throw new Error(`Graph key type ${graphKeyPair.keyType} does not match expected type ${graphKeyType}`);
+    }
+
     importBundles.push(
       ...publicFollows.map((publicFollow) =>
         importBundleBuilder
@@ -164,7 +169,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .withSchemaId(public_follow_schema_id)
           .withDsnpKeys(dsnpKeys)
           .withPageData(publicFollow.page_id.toNumber(), publicFollow.payload, publicFollow.content_hash.toNumber())
-          .withGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
+          .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey)
           .build()
       )
     );
