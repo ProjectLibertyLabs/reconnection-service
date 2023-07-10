@@ -142,61 +142,72 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
   }
 
   async formImportBundles(dsnpUserId: MessageSourceId, graphSdkConfig: Config, graphKeyPair: GraphKeyPair): Promise<ImportBundle[]> {
-    let importBundles: ImportBundle[] = [];
+    const importBundles: ImportBundle[] = [];
     const public_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
     const public_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Public);
     const private_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Private);
     const private_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Private);
-
+  
     const publicFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(public_follow_schema_id, dsnpUserId);
     const publicFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(public_friendship_schema_id, dsnpUserId);
     const privateFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(private_follow_schema_id, dsnpUserId);
     const privateFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(private_friendship_schema_id, dsnpUserId);
-
+  
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId, graphSdkConfig);
-
-    importBundles.push(...publicFollows.map((publicFollow) => {
-      return ImportBundleBuilder.setDsnpUserId(dsnpUserId.toString())
-        .setSchemaId(public_follow_schema_id)
-        .setDsnpKeys(dsnpKeys)
-        .setDsnpUserId(dsnpUserId.toString())
-        .addPageData(publicFollow.page_id.toNumber(), publicFollow.payload, publicFollow.content_hash.toNumber())
-        .addGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
-        .build();
-    }));
-
-    importBundles.push(...publicFriendships.map((publicFriendship) => {
-      return ImportBundleBuilder.setDsnpUserId(dsnpUserId.toString())
-        .setSchemaId(public_friendship_schema_id)
-        .setDsnpKeys(dsnpKeys)
-        .setDsnpUserId(dsnpUserId.toString())
-        .addPageData(publicFriendship.page_id.toNumber(), publicFriendship.payload, publicFriendship.content_hash.toNumber())
-        .addGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
-        .build();
-    }));
-
-    importBundles.push(...privateFollows.map((privateFollow) => {
-      return ImportBundleBuilder.setDsnpUserId(dsnpUserId.toString())
-        .setSchemaId(private_follow_schema_id)
-        .setDsnpKeys(dsnpKeys)
-        .setDsnpUserId(dsnpUserId.toString())
-        .addPageData(privateFollow.page_id.toNumber(), privateFollow.payload, privateFollow.content_hash.toNumber())
-        .addGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
-        .build();
-    }));
-
-    importBundles.push(...privateFriendships.map((privateFriendship) => {
-      return ImportBundleBuilder.setDsnpUserId(dsnpUserId.toString())
-        .setSchemaId(private_friendship_schema_id)
-        .setDsnpKeys(dsnpKeys)
-        .setDsnpUserId(dsnpUserId.toString())
-        .addPageData(privateFriendship.page_id.toNumber(), privateFriendship.payload, privateFriendship.content_hash.toNumber())
-        .addGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
-        .build();
-    }));
-    
+  
+    const importBundleBuilder = new ImportBundleBuilder();
+  
+    importBundles.push(
+      ...publicFollows.map((publicFollow) =>
+        importBundleBuilder
+          .withDsnpUserId(dsnpUserId.toString())
+          .withSchemaId(public_follow_schema_id)
+          .withDsnpKeys(dsnpKeys)
+          .withPageData(publicFollow.page_id.toNumber(), publicFollow.payload, publicFollow.content_hash.toNumber())
+          .withGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
+          .build()
+      )
+    );
+  
+    importBundles.push(
+      ...publicFriendships.map((publicFriendship) =>
+        importBundleBuilder
+          .withDsnpUserId(dsnpUserId.toString())
+          .withSchemaId(public_friendship_schema_id)
+          .withDsnpKeys(dsnpKeys)
+          .withPageData(publicFriendship.page_id.toNumber(), publicFriendship.payload, publicFriendship.content_hash.toNumber())
+          .withGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
+          .build()
+      )
+    );
+  
+    importBundles.push(
+      ...privateFollows.map((privateFollow) =>
+        importBundleBuilder
+          .withDsnpUserId(dsnpUserId.toString())
+          .withSchemaId(private_follow_schema_id)
+          .withDsnpKeys(dsnpKeys)
+          .withPageData(privateFollow.page_id.toNumber(), privateFollow.payload, privateFollow.content_hash.toNumber())
+          .withGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
+          .build()
+      )
+    );
+  
+    importBundles.push(
+      ...privateFriendships.map((privateFriendship) =>
+        importBundleBuilder
+          .withDsnpUserId(dsnpUserId.toString())
+          .withSchemaId(private_friendship_schema_id)
+          .withDsnpKeys(dsnpKeys)
+          .withPageData(privateFriendship.page_id.toNumber(), privateFriendship.payload, privateFriendship.content_hash.toNumber())
+          .withGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
+          .build()
+      )
+    );
+  
     return importBundles;
   }
+  
 
   async formConnections(dsnpUserId: MessageSourceId, providerId: MessageSourceId, graphSdkConfig: Config, graphConnections: ProviderGraph[]): Promise<ConnectAction[]> {
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId, graphSdkConfig);
