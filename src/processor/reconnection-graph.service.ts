@@ -62,18 +62,14 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     
     // get the user's DSNP Graph from the blockchain and form import bundles
     const importBundles = await this.formImportBundles(dsnpUserId, graphSdkConfig, graphKeyPair);
-    await this.graphStateManager.importUserData(importBundles).then((results) => {
-      throw new Error(JSON.stringify("importUserData results: " + results));
-    });
+    await this.graphStateManager.importUserData(importBundles);
 
     let exportedUpdates: Update[] = [];
 
     if (updateConnections) {
       // using graphConnections form Action[] and update the user's DSNP Graph
       const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, graphSdkConfig, graphConnections);
-      await this.graphStateManager.applyActions(actions).then((results) => {
-        throw new Error(JSON.stringify("applyActions results: " + results));
-      });
+      await this.graphStateManager.applyActions(actions);
       exportedUpdates = await this.graphStateManager.exportGraphUpdates();
     }else {
       exportedUpdates = await this.graphStateManager.forceCalculateGraphs(dsnpUserId.toString());
