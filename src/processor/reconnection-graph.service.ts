@@ -13,7 +13,7 @@ import { GraphKeyPair, KeyType, ProviderGraph } from '../interfaces/provider-gra
 import { ImportBundleBuilder, Config, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, Update } from '@dsnp/graph-sdk';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
+import { SkipTransitiveGraphs, createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
 
 @Injectable()
 export class ReconnectionGraphService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -249,7 +249,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
             } as Connection,
           } as ConnectAction);
         case 'connectionFrom':{
-          const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, false);
+          const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
           this.graphUpdateQueue.add('graphUpdate', data, { jobId });
         }
         case 'bidirectional':{
@@ -261,7 +261,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
               schemaId,
             } as Connection,
           } as ConnectAction);
-          const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, false);
+          const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
           this.graphUpdateQueue.add('graphUpdate', data, { jobId });
         }
         default:
