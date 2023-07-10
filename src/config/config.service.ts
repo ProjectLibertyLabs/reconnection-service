@@ -16,6 +16,7 @@ export interface ConfigEnvironmentVariables {
   QUEUE_HIGH_WATER: number;
   GRAPH_ENVIRONMENT_TYPE: string;
   GRAPH_ENVIRONMENT_DEV_CONFIG: string;
+  CAPACITY_BATCH_LIMIT: number;
 }
 
 interface ProviderDetails {

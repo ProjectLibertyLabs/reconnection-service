@@ -17,6 +17,7 @@ type ProcessEnv = {
   PROVIDER_ACCESS_TOKEN: string;
   BLOCKCHAIN_SCAN_INTERVAL_MINUTES: string;
   QUEUE_HIGH_WATER: string;
+  CAPACITY_BATCH_LIMIT: number;
   GRAPH_ENVIRONMENT_TYPE: string;
   GRAPH_ENVIRONMENT_CONFIG: string;
 };
@@ -30,6 +31,7 @@ describe('GraphStateManager', () => {
   const PROVIDER_ACCESS_TOKEN = 'some-token';
   const BLOCKCHAIN_SCAN_INTERVAL_MINUTES = '60';
   const QUEUE_HIGH_WATER = '1000';
+  const CAPACITY_BATCH_LIMIT = '2';
   const GRAPH_ENVIRONMENT_TYPE = 'Mainnet';
   const GRAPH_ENVIRONMENT_CONFIG = '{}';
 
@@ -42,6 +44,7 @@ describe('GraphStateManager', () => {
     PROVIDER_ACCESS_TOKEN,
     BLOCKCHAIN_SCAN_INTERVAL_MINUTES,
     QUEUE_HIGH_WATER,
+    CAPACITY_BATCH_LIMIT,
     GRAPH_ENVIRONMENT_TYPE,
     GRAPH_ENVIRONMENT_CONFIG,
   };
@@ -138,7 +141,7 @@ describe('GraphStateManager', () => {
 
     actions.push(action_1);
 
-    let applyActionsResult = await graphStateManager.applyActions(actions);
+    const applyActionsResult = await graphStateManager.applyActions(actions);
     expect(applyActionsResult).toBe(true);
 
     const exportUpdates = await graphStateManager.exportGraphUpdates();
