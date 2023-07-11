@@ -177,7 +177,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .withSchemaId(public_friendship_schema_id)
           .withDsnpKeys(dsnpKeys)
           .withPageData(publicFriendship.page_id.toNumber(), publicFriendship.payload, publicFriendship.content_hash.toNumber())
-          .withGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
+          .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey)
           .build()
       )
     );
@@ -189,7 +189,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .withSchemaId(private_follow_schema_id)
           .withDsnpKeys(dsnpKeys)
           .withPageData(privateFollow.page_id.toNumber(), privateFollow.payload, privateFollow.content_hash.toNumber())
-          .withGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
+          .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey)
           .build()
       )
     );
@@ -201,7 +201,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .withSchemaId(private_friendship_schema_id)
           .withDsnpKeys(dsnpKeys)
           .withPageData(privateFriendship.page_id.toNumber(), privateFriendship.payload, privateFriendship.content_hash.toNumber())
-          .withGraphKeyPair(GraphKeyType.X25519, graphKeyPair.publicKey, graphKeyPair.privateKey)
+          .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey)
           .build()
       )
     );
