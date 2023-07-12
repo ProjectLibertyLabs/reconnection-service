@@ -22,7 +22,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
   private logger: Logger;
 
   constructor(
-    private configService: ConfigService, 
+    private configService: ConfigService,
     private graphStateManager: GraphStateManager,
     @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
     ) {
@@ -59,7 +59,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
     // graph config and respective schema ids
     const graphSdkConfig  = await this.graphStateManager.getGraphConfig();
-    
+
     // get the user's DSNP Graph from the blockchain and form import bundles
     const importBundles = await this.formImportBundles(dsnpUserId, graphSdkConfig, graphKeyPair);
     await this.graphStateManager.importUserData(importBundles);
@@ -143,14 +143,14 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const public_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Public);
     const private_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Private);
     const private_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Private);
-  
-    const publicFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(public_follow_schema_id, dsnpUserId);
-    const publicFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(public_friendship_schema_id, dsnpUserId);
-    const privateFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(private_follow_schema_id, dsnpUserId);
-    const privateFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(private_friendship_schema_id, dsnpUserId);
-  
+
+    const publicFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(dsnpUserId, public_follow_schema_id);
+    const publicFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(dsnpUserId, public_friendship_schema_id);
+    const privateFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(dsnpUserId, private_follow_schema_id);
+    const privateFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(dsnpUserId, private_friendship_schema_id);
+
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId, graphSdkConfig);
-  
+
     const importBundleBuilder = new ImportBundleBuilder();
     // Only X25519 is supported for now
     const graphKeyType = GraphKeyType.X25519;
@@ -169,7 +169,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .build()
       )
     );
-  
+
     importBundles.push(
       ...publicFriendships.map((publicFriendship) =>
         importBundleBuilder
@@ -181,7 +181,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .build()
       )
     );
-  
+
     importBundles.push(
       ...privateFollows.map((privateFollow) =>
         importBundleBuilder
@@ -193,7 +193,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .build()
       )
     );
-  
+
     importBundles.push(
       ...privateFriendships.map((privateFriendship) =>
         importBundleBuilder
@@ -205,10 +205,10 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .build()
       )
     );
-  
+
     return importBundles;
   }
-  
+
 
   async formConnections(dsnpUserId: MessageSourceId, providerId: MessageSourceId, graphSdkConfig: Config, graphConnections: ProviderGraph[]): Promise<ConnectAction[]> {
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId, graphSdkConfig);
@@ -222,7 +222,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       let schemaId: number;
       const connectionType = connection.connectionType.toLowerCase();
       const privacyType = connection.privacyType.toLowerCase();
-      
+
       switch (connectionType) {
         case 'follow':
           schemaId = privacyType === 'public' ? public_follow_schema_id : private_follow_schema_id;
@@ -244,9 +244,11 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
               schemaId,
             } as Connection,
           } as ConnectAction);
+          break;
         case 'connectionFrom':{
           const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
           this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+          break;
         }
         case 'bidirectional':{
           actions.push({
@@ -259,6 +261,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           } as ConnectAction);
           const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
           this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+          break;
         }
         default:
           throw new Error(`Unrecognized connection direction: ${connection.direction}`);
@@ -269,8 +272,8 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
   async formDsnpKeys(dsnpUserId: MessageSourceId, graphSdkConfig: Config): Promise<DsnpKeys> {
     const public_key_schema_id = graphSdkConfig.graphPublicKeySchemaId;
-    let publicKeys: ItemizedStoragePageResponse = await this.api.rpc.statefulStorage.getItemizedStorage(public_key_schema_id, dsnpUserId);
-    
+    let publicKeys: ItemizedStoragePageResponse = await this.api.rpc.statefulStorage.getItemizedStorage(dsnpUserId, public_key_schema_id);
+
     const dsnpKeys: DsnpKeys = {
       dsnpUserId: dsnpUserId.toString(),
       keysHash: publicKeys.content_hash.toNumber(),
