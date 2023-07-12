@@ -13,7 +13,7 @@ tags:
       description: Find out more
       url: http://swagger.io
 paths:
-  /connections/{DSNPId}:
+  /connections/{dsnpId}:
     get:
       tags:
         - connections
@@ -21,7 +21,7 @@ paths:
       description: Returns social connections for a user
       operationId: getConnectionsByDSNPId
       parameters:
-        - name: DSNPId
+        - name: dsnpId
           in: path
           description: DSNPId of the user's social connections to return
           required: true
@@ -67,7 +67,7 @@ components:
     ConnectionsApiResponse:
       type: object
       properties:
-        DSNPId:
+        dsnpId:
           type: integer
           format: int64
           example: 10
@@ -95,15 +95,15 @@ components:
         name: connections
       example:
         data:
-          - DSNPId: 1024
+          - dsnpId: 1024
             privacyType: "Public"
             direction: "connectionTo"
             connectionType: "Follow"
-          - DSNPId: 2048
+          - dsnpId: 2048
             privacyType: "Private"
             direction: "bidirectional"
             connectionType: "Friendship"
-          - DSNPId: 3072
+          - dsnpId: 3072
             privacyType: "Public"
             direction: "connectionFrom"
             connectionType: "Follow"
@@ -114,7 +114,7 @@ components:
     Connection:
       type: object
       properties:
-        DSNPId:
+        dsnpId:
           type: integer
           format: int64
         privacyType:
@@ -136,6 +136,9 @@ components:
     GraphKeyPair:
       type: object
       properties:
+        keyType:
+          type: string
+            example: "X25519"
         publicKey:
           type: string
           example: "0xe5be9a5092b81bca64be81d212e7f2f9eba183bb7a90954f7b76361f6edb5c0a"
