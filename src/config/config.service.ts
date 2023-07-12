@@ -83,6 +83,10 @@ export class ConfigService {
     return this.nestConfigService.get<number>('QUEUE_HIGH_WATER')!;
   }
 
+  public getCapacityBatchLimit(): string {
+    return this.nestConfigService.get<string>('CAPACITY_BATCH_LIMIT')!;
+  }
+
   public graph_environment_type(): string {
     return this.nestConfigService.get<string>('GRAPH_ENVIRONMENT_TYPE')!;
   }
