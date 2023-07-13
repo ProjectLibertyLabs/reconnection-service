@@ -74,7 +74,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     }else {
       exportedUpdates = await this.graphStateManager.forceCalculateGraphs(dsnpUserId.toString());
     }
-    
+
     // TODO
     // Send exported updates to the chain
     // Re-import DSNP Graph from chain & verify
@@ -159,52 +159,60 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     }
 
     importBundles.push(
-      ...publicFollows.map((publicFollow) =>
-        importBundleBuilder
-          .withDsnpUserId(dsnpUserId.toString())
-          .withSchemaId(public_follow_schema_id)
-          .withDsnpKeys(dsnpKeys)
-          .withPageData(publicFollow.page_id.toNumber(), publicFollow.payload, publicFollow.content_hash.toNumber())
-          .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey)
-          .build()
-      )
-    );
+      ...publicFollows.map((publicFollow) => {
+          importBundleBuilder
+            .withDsnpUserId(dsnpUserId.toString())
+            .withSchemaId(public_follow_schema_id)
+            .withPageData(publicFollow.page_id.toNumber(), publicFollow.payload, publicFollow.content_hash.toNumber())
+            .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey)
+
+          if (dsnpKeys) {
+            importBundleBuilder.withDsnpKeys(dsnpKeys);
+          }
+          return importBundleBuilder.build();
+      }));
 
     importBundles.push(
-      ...publicFriendships.map((publicFriendship) =>
+      ...publicFriendships.map((publicFriendship) => {
         importBundleBuilder
           .withDsnpUserId(dsnpUserId.toString())
           .withSchemaId(public_friendship_schema_id)
-          .withDsnpKeys(dsnpKeys)
           .withPageData(publicFriendship.page_id.toNumber(), publicFriendship.payload, publicFriendship.content_hash.toNumber())
           .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey)
-          .build()
-      )
-    );
+
+        if (dsnpKeys) {
+          importBundleBuilder.withDsnpKeys(dsnpKeys);
+        }
+        return importBundleBuilder.build();
+      }));
 
     importBundles.push(
-      ...privateFollows.map((privateFollow) =>
+      ...privateFollows.map((privateFollow) => {
         importBundleBuilder
           .withDsnpUserId(dsnpUserId.toString())
           .withSchemaId(private_follow_schema_id)
-          .withDsnpKeys(dsnpKeys)
           .withPageData(privateFollow.page_id.toNumber(), privateFollow.payload, privateFollow.content_hash.toNumber())
           .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey)
-          .build()
-      )
-    );
+
+          if (dsnpKeys) {
+            importBundleBuilder.withDsnpKeys(dsnpKeys);
+          }
+          return importBundleBuilder.build();
+        }));
 
     importBundles.push(
-      ...privateFriendships.map((privateFriendship) =>
+      ...privateFriendships.map((privateFriendship) => {
         importBundleBuilder
           .withDsnpUserId(dsnpUserId.toString())
           .withSchemaId(private_friendship_schema_id)
-          .withDsnpKeys(dsnpKeys)
           .withPageData(privateFriendship.page_id.toNumber(), privateFriendship.payload, privateFriendship.content_hash.toNumber())
           .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey)
-          .build()
-      )
-    );
+
+        if (dsnpKeys) {
+          importBundleBuilder.withDsnpKeys(dsnpKeys);
+        }
+        return importBundleBuilder.build();
+      }));
 
     return importBundles;
   }
@@ -235,30 +243,41 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       }
 
       switch(connection.direction) {
-        case 'connectionTo':
-          actions.push({
+        case 'connectionTo': {
+          let connectionAction = {
+            type: "Connect",
             ownerDsnpUserId: dsnpUserId.toString(),
-            dsnpKeys: dsnpKeys,
             connection: {
               dsnpUserId: connection.dsnpId,
               schemaId,
             } as Connection,
-          } as ConnectAction);
+          } as ConnectAction;
+
+          if (dsnpKeys) {
+            connectionAction['dsnpKeys'] = dsnpKeys;
+          }
+          actions.push(connectionAction);
           break;
+        }
         case 'connectionFrom':{
           const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
           this.graphUpdateQueue.add('graphUpdate', data, { jobId });
           break;
         }
         case 'bidirectional':{
-          actions.push({
+          let connectionAction = {
+            type: "Connect",
             ownerDsnpUserId: dsnpUserId.toString(),
-            dsnpKeys: dsnpKeys,
             connection: {
               dsnpUserId: connection.dsnpId,
               schemaId,
             } as Connection,
-          } as ConnectAction);
+          } as ConnectAction;
+
+          if (dsnpKeys) {
+            connectionAction['dsnpKeys'] = dsnpKeys;
+          }
+          actions.push(connectionAction);
           const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
           this.graphUpdateQueue.add('graphUpdate', data, { jobId });
           break;
@@ -270,20 +289,25 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     return actions;
   }
 
-  async formDsnpKeys(dsnpUserId: MessageSourceId, graphSdkConfig: Config): Promise<DsnpKeys> {
+  async formDsnpKeys(dsnpUserId: MessageSourceId, graphSdkConfig: Config): Promise<DsnpKeys | undefined> {
     const public_key_schema_id = graphSdkConfig.graphPublicKeySchemaId;
     let publicKeys: ItemizedStoragePageResponse = await this.api.rpc.statefulStorage.getItemizedStorage(dsnpUserId, public_key_schema_id);
 
-    const dsnpKeys: DsnpKeys = {
-      dsnpUserId: dsnpUserId.toString(),
-      keysHash: publicKeys.content_hash.toNumber(),
-      keys: publicKeys.items.map((item: ItemizedStorageResponse) => {
-        return {
-          index: item.index.toNumber(),
-          content: item.payload.toU8a(),
-        } as KeyData;
-      }),
-    };
+    let dsnpKeys: DsnpKeys | undefined;
+    if (publicKeys.items.length > 0) {
+      dsnpKeys = {
+        dsnpUserId: dsnpUserId.toString(),
+        keysHash: publicKeys.content_hash.toNumber(),
+        keys: publicKeys.items.map((item: ItemizedStorageResponse) => {
+          return {
+            index: item.index.toNumber(),
+            content: item.payload.toU8a(),
+          } as KeyData;
+        }),
+      };
+    } else {
+      dsnpKeys = undefined;
+    }
 
     return dsnpKeys;
   }
