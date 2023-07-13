@@ -94,9 +94,10 @@ Note left of P:Initial state:<br/>Alice <-MeWe-> Bob<br/>Alice <-MeWe-> Charlie<
 
 ```mermaid
 flowchart LR
-dspn1(Listen for User\nData Changed\nEvents) --> dsnp2{Is the\nowning\nuser on\nthis\nprovider?}
-dsnp2 -->|yes| dsnp4{Is the\ntarget user\non this\nprovider?}
-dsnp4 -->|yes| dsnp5("Apply deltas to\nprovider graph\n(using GraphSDK)")
+dspn1(Listen for\nPaginatedPageUpdated\nevents on-chain) --> dsnp2{Is the\nowning\nuser on\nthis\nprovider?}
+dsnp2 -->|yes| dsnp3(Read user's graph\nfrom chain\nand import to GraphSDK)
+dsnp3 --> dsnp4{Is the\ntarget user\non this\nprovider?}
+dsnp4 -->|yes| dsnp5("Apply deltas to\nprovider graph")
 dsnp2 -->|no| dsnp6(No action required)
 dsnp4 -->|no| dsnp7(Show non-provider\nuser as an external\nDSNP user)
 ```
