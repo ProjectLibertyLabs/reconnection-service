@@ -40,6 +40,7 @@ describe('ReconnectionConfigService', () => {
   const BLOCKCHAIN_SCAN_INTERVAL_MINUTES = 60;
   const QUEUE_HIGH_WATER = 1000;
   const CAPACITY_BATCH_LIMIT = 2;
+  const PROVIDER_ACCOUNT_SEED_PHRASE = '';
   const GRAPH_ENVIRONMENT_TYPE = 'Mainnet';
   const GRAPH_ENVIRONMENT_CONFIG = '{}';
 
@@ -53,6 +54,7 @@ describe('ReconnectionConfigService', () => {
     BLOCKCHAIN_SCAN_INTERVAL_MINUTES,
     QUEUE_HIGH_WATER,
     CAPACITY_BATCH_LIMIT,
+    PROVIDER_ACCOUNT_SEED_PHRASE,
     GRAPH_ENVIRONMENT_TYPE,
     GRAPH_ENVIRONMENT_CONFIG,
   };
@@ -126,6 +128,11 @@ describe('ReconnectionConfigService', () => {
       const { CAPACITY_BATCH_LIMIT: dummy, ...env } = ALL_ENV;
       await expect(setupConfigService({ CAPACITY_BATCH_LIMIT: -1, ...env })).rejects.toBeDefined();
       await expect(setupConfigService({ CAPACITY_BATCH_LIMIT: 'foo', ...env })).rejects.toBeDefined();
+    });
+
+    it('invalid provider account seed phrase should fail', async () => {
+      const { PROVIDER_ACCOUNT_SEED_PHRASE: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ PROVIDER_ACCOUNT_SEED_PHRASE: '', ...env })).rejects.toBeDefined();
     });
   });
 

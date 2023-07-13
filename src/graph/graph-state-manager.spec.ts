@@ -18,6 +18,7 @@ type ProcessEnv = {
   BLOCKCHAIN_SCAN_INTERVAL_MINUTES: string;
   QUEUE_HIGH_WATER: string;
   CAPACITY_BATCH_LIMIT: number;
+  PROVIDER_ACCOUNT_SEED_PHRASE: string;
   GRAPH_ENVIRONMENT_TYPE: string;
   GRAPH_ENVIRONMENT_CONFIG: string;
 };
@@ -32,6 +33,7 @@ describe('GraphStateManager', () => {
   const BLOCKCHAIN_SCAN_INTERVAL_MINUTES = '60';
   const QUEUE_HIGH_WATER = '1000';
   const CAPACITY_BATCH_LIMIT = '2';
+  const PROVIDER_ACCOUNT_SEED_PHRASE = '';
   const GRAPH_ENVIRONMENT_TYPE = 'Mainnet';
   const GRAPH_ENVIRONMENT_CONFIG = '{}';
 
@@ -45,6 +47,7 @@ describe('GraphStateManager', () => {
     BLOCKCHAIN_SCAN_INTERVAL_MINUTES,
     QUEUE_HIGH_WATER,
     CAPACITY_BATCH_LIMIT,
+    PROVIDER_ACCOUNT_SEED_PHRASE,
     GRAPH_ENVIRONMENT_TYPE,
     GRAPH_ENVIRONMENT_CONFIG,
   };
@@ -180,7 +183,7 @@ describe('GraphStateManager', () => {
 
            ] as KeyData[],
       } as DsnpKeys;
-      
+
       const deserialized_keys = await GraphStateManager.deserializeDsnpKeys(dsnp_keys);
       expect(deserialized_keys).toBeDefined();
   });
@@ -201,7 +204,7 @@ describe('GraphStateManager', () => {
     const containsUserGraphResult = await graphStateManager.graphContainsUser('1');
     expect(containsUserGraphResult).toBe(false);
   });
-  
+
   it('should return schema id for connection type and privacy type', async () => {
     const schemaId = await graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
     expect(schemaId).toBeGreaterThan(0);

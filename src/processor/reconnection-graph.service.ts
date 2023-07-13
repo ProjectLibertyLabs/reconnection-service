@@ -14,6 +14,7 @@ import { ImportBundleBuilder, Config, ConnectAction, Connection, ConnectionType,
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { SkipTransitiveGraphs, createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
+import { ExtrinsicHelper } from '../scaffolding/extrinsicHelpers';
 
 @Injectable()
 export class ReconnectionGraphService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -75,8 +76,20 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       exportedUpdates = await this.graphStateManager.forceCalculateGraphs(dsnpUserId.toString());
     }
 
+    exportedUpdates.forEach(async (bundle) => {
+      let op: any;
+      switch (bundle.type) {
+        case 'PersistPage':
+          // Send exported updates to the chain
+          // op = ExtrinsicHelper.upsertPage(alice.keypair, schemaId, alice.msaId, bundle.ownerDsnpUserId, bundle.payload, bundle.prevHash);
+          // await ExtrinsicHelper.api.tx.frequencyTxPayment.payWithCapacityBatchAll(calls)
+          break;
+
+        default:
+          break;
+      }
+    });
     // TODO
-    // Send exported updates to the chain
     // Re-import DSNP Graph from chain & verify
     //     (if updating connections as well, do the same for connections--but do not transitively update connections - of - connections)
   }
