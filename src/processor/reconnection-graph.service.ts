@@ -177,8 +177,6 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
             .withDsnpUserId(dsnpUserId.toString())
             .withSchemaId(public_follow_schema_id)
             .withPageData(publicFollow.page_id.toNumber(), publicFollow.payload, publicFollow.content_hash.toNumber())
-            .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey)
-
           if (dsnpKeys) {
             importBundleBuilder.withDsnpKeys(dsnpKeys);
           }
@@ -191,7 +189,6 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .withDsnpUserId(dsnpUserId.toString())
           .withSchemaId(public_friendship_schema_id)
           .withPageData(publicFriendship.page_id.toNumber(), publicFriendship.payload, publicFriendship.content_hash.toNumber())
-          .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey)
 
         if (dsnpKeys) {
           importBundleBuilder.withDsnpKeys(dsnpKeys);
@@ -257,14 +254,14 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
       switch(connection.direction) {
         case 'connectionTo': {
-          let connectionAction = {
+          let connectionAction: ConnectAction = {
             type: "Connect",
             ownerDsnpUserId: dsnpUserId.toString(),
             connection: {
               dsnpUserId: connection.dsnpId,
               schemaId,
-            } as Connection,
-          } as ConnectAction;
+            },
+          };
 
           if (dsnpKeys) {
             connectionAction['dsnpKeys'] = dsnpKeys;
@@ -278,14 +275,14 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           break;
         }
         case 'bidirectional':{
-          let connectionAction = {
+          let connectionAction: ConnectAction = {
             type: "Connect",
             ownerDsnpUserId: dsnpUserId.toString(),
             connection: {
               dsnpUserId: connection.dsnpId,
               schemaId,
-            } as Connection,
-          } as ConnectAction;
+            },
+          };
 
           if (dsnpKeys) {
             connectionAction['dsnpKeys'] = dsnpKeys;
@@ -311,12 +308,10 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       dsnpKeys = {
         dsnpUserId: dsnpUserId.toString(),
         keysHash: publicKeys.content_hash.toNumber(),
-        keys: publicKeys.items.map((item: ItemizedStorageResponse) => {
-          return {
-            index: item.index.toNumber(),
-            content: item.payload.toU8a(),
-          } as KeyData;
-        }),
+        keys: publicKeys.items.map((item: ItemizedStorageResponse): KeyData => ({
+          index: item.index.toNumber(),
+          content: item.payload.toU8a(),
+        })),
       };
     } else {
       dsnpKeys = undefined;
