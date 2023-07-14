@@ -123,7 +123,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
         const { data }: { data: ProviderGraph[] } = response.data.connections;
         allConnections.push(...data);
 
-        const { graphKeypair }: { graphKeypair: GraphKeyPair[] } = response.data.graphKeypairs;
+        const { graphKeypair }: { graphKeypair: GraphKeyPair[] } = response.data.graphKeyPairs;
         if (graphKeypair) {
           keyPairs.push(...graphKeypair);
         }

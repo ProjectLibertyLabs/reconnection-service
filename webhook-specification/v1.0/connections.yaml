@@ -73,7 +73,7 @@ components:
           example: 10
         connections:
           $ref: '#/components/schemas/Connections'
-        graphKeypairs:
+        graphKeyPairs:
           $ref: '#/components/schemas/GraphKeyPairs'
     Connections:
       type: object
