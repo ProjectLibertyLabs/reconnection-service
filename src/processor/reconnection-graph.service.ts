@@ -7,13 +7,13 @@ import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } fro
 import { options } from '@frequency-chain/api-augment';
 import { ApiPromise, HttpProvider, WsProvider } from '@polkadot/api';
 import { ItemizedStoragePageResponse, ItemizedStorageResponse, MessageSourceId, PaginatedStorageResponse, ProviderId } from '@frequency-chain/api-augment/interfaces';
-import { ConfigService } from '../config/config.service';
-import { GraphStateManager } from '../graph/graph-state-manager';
-import { GraphKeyPair, KeyType, ProviderGraph } from '../interfaces/provider-graph.interface';
 import { ImportBundleBuilder, Config, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, Update } from '@dsnp/graph-sdk';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { SkipTransitiveGraphs, createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
+import { GraphKeyPair, KeyType, ProviderGraph } from '../interfaces/provider-graph.interface';
+import { GraphStateManager } from '../graph/graph-state-manager';
+import { ConfigService } from '../config/config.service';
 import { ExtrinsicHelper } from '../scaffolding/extrinsicHelpers';
 
 @Injectable()
@@ -22,11 +22,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
   private logger: Logger;
 
-  constructor(
-    private configService: ConfigService,
-    private graphStateManager: GraphStateManager,
-    @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
-    ) {
+  constructor(private configService: ConfigService, private graphStateManager: GraphStateManager, @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue) {
     this.logger = new Logger(ReconnectionGraphService.name);
   }
 
@@ -50,6 +46,10 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     await this.api.disconnect();
   }
 
+  public get capacityBatchLimit(): number {
+    return this.api.consts.frequencyTxPayment.maximumCapacityBatchLength;
+  }
+
   public async updateUserGraph(dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<void> {
     this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
     const dsnpUserId: MessageSourceId = this.api.registry.createType('MessageSourceId', dsnpUserStr);
@@ -59,7 +59,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const [graphConnections, graphKeyPair] = await this.getUserGraphFromProvider(dsnpUserId, providerId);
 
     // graph config and respective schema ids
-    const graphSdkConfig  = await this.graphStateManager.getGraphConfig();
+    const graphSdkConfig = await this.graphStateManager.getGraphConfig();
 
     // get the user's DSNP Graph from the blockchain and form import bundles
     const importBundles = await this.formImportBundles(dsnpUserId, graphSdkConfig, graphKeyPair);
@@ -72,7 +72,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, graphSdkConfig, graphConnections);
       await this.graphStateManager.applyActions(actions);
       exportedUpdates = await this.graphStateManager.exportGraphUpdates();
-    }else {
+    } else {
       exportedUpdates = await this.graphStateManager.forceCalculateGraphs(dsnpUserId.toString());
     }
 
@@ -173,28 +173,30 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
     importBundles.push(
       ...publicFollows.map((publicFollow) => {
-          importBundleBuilder
-            .withDsnpUserId(dsnpUserId.toString())
-            .withSchemaId(public_follow_schema_id)
-            .withPageData(publicFollow.page_id.toNumber(), publicFollow.payload, publicFollow.content_hash.toNumber())
-          if (dsnpKeys) {
-            importBundleBuilder.withDsnpKeys(dsnpKeys);
-          }
-          return importBundleBuilder.build();
-      }));
+        importBundleBuilder
+          .withDsnpUserId(dsnpUserId.toString())
+          .withSchemaId(public_follow_schema_id)
+          .withPageData(publicFollow.page_id.toNumber(), publicFollow.payload, publicFollow.content_hash.toNumber());
+        if (dsnpKeys) {
+          importBundleBuilder.withDsnpKeys(dsnpKeys);
+        }
+        return importBundleBuilder.build();
+      }),
+    );
 
     importBundles.push(
       ...publicFriendships.map((publicFriendship) => {
         importBundleBuilder
           .withDsnpUserId(dsnpUserId.toString())
           .withSchemaId(public_friendship_schema_id)
-          .withPageData(publicFriendship.page_id.toNumber(), publicFriendship.payload, publicFriendship.content_hash.toNumber())
+          .withPageData(publicFriendship.page_id.toNumber(), publicFriendship.payload, publicFriendship.content_hash.toNumber());
 
         if (dsnpKeys) {
           importBundleBuilder.withDsnpKeys(dsnpKeys);
         }
         return importBundleBuilder.build();
-      }));
+      }),
+    );
 
     importBundles.push(
       ...privateFollows.map((privateFollow) => {
@@ -202,13 +204,14 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .withDsnpUserId(dsnpUserId.toString())
           .withSchemaId(private_follow_schema_id)
           .withPageData(privateFollow.page_id.toNumber(), privateFollow.payload, privateFollow.content_hash.toNumber())
-          .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey)
+          .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey);
 
-          if (dsnpKeys) {
-            importBundleBuilder.withDsnpKeys(dsnpKeys);
-          }
-          return importBundleBuilder.build();
-        }));
+        if (dsnpKeys) {
+          importBundleBuilder.withDsnpKeys(dsnpKeys);
+        }
+        return importBundleBuilder.build();
+      }),
+    );
 
     importBundles.push(
       ...privateFriendships.map((privateFriendship) => {
@@ -216,17 +219,17 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .withDsnpUserId(dsnpUserId.toString())
           .withSchemaId(private_friendship_schema_id)
           .withPageData(privateFriendship.page_id.toNumber(), privateFriendship.payload, privateFriendship.content_hash.toNumber())
-          .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey)
+          .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey);
 
         if (dsnpKeys) {
           importBundleBuilder.withDsnpKeys(dsnpKeys);
         }
         return importBundleBuilder.build();
-      }));
+      }),
+    );
 
     return importBundles;
   }
-
 
   async formConnections(dsnpUserId: MessageSourceId, providerId: MessageSourceId, graphSdkConfig: Config, graphConnections: ProviderGraph[]): Promise<ConnectAction[]> {
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId, graphSdkConfig);
@@ -235,7 +238,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const private_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Private);
     const private_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Private);
 
-    let actions: ConnectAction[] = [];
+    const actions: ConnectAction[] = [];
     graphConnections.forEach((connection) => {
       let schemaId: number;
       const connectionType = connection.connectionType.toLowerCase();
@@ -252,10 +255,10 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           throw new Error(`Unrecognized connection type: ${connectionType}`);
       }
 
-      switch(connection.direction) {
+      switch (connection.direction) {
         case 'connectionTo': {
-          let connectionAction: ConnectAction = {
-            type: "Connect",
+          const connectionAction: ConnectAction = {
+            type: 'Connect',
             ownerDsnpUserId: dsnpUserId.toString(),
             connection: {
               dsnpUserId: connection.dsnpId,
@@ -264,19 +267,19 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           };
 
           if (dsnpKeys) {
-            connectionAction['dsnpKeys'] = dsnpKeys;
+            connectionAction.dsnpKeys = dsnpKeys;
           }
           actions.push(connectionAction);
           break;
         }
-        case 'connectionFrom':{
+        case 'connectionFrom': {
           const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
           this.graphUpdateQueue.add('graphUpdate', data, { jobId });
           break;
         }
-        case 'bidirectional':{
-          let connectionAction: ConnectAction = {
-            type: "Connect",
+        case 'bidirectional': {
+          const connectionAction: ConnectAction = {
+            type: 'Connect',
             ownerDsnpUserId: dsnpUserId.toString(),
             connection: {
               dsnpUserId: connection.dsnpId,
@@ -285,7 +288,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           };
 
           if (dsnpKeys) {
-            connectionAction['dsnpKeys'] = dsnpKeys;
+            connectionAction.dsnpKeys = dsnpKeys;
           }
           actions.push(connectionAction);
           const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
@@ -301,17 +304,19 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
   async formDsnpKeys(dsnpUserId: MessageSourceId, graphSdkConfig: Config): Promise<DsnpKeys | undefined> {
     const public_key_schema_id = graphSdkConfig.graphPublicKeySchemaId;
-    let publicKeys: ItemizedStoragePageResponse = await this.api.rpc.statefulStorage.getItemizedStorage(dsnpUserId, public_key_schema_id);
+    const publicKeys: ItemizedStoragePageResponse = await this.api.rpc.statefulStorage.getItemizedStorage(dsnpUserId, public_key_schema_id);
 
     let dsnpKeys: DsnpKeys | undefined;
     if (publicKeys.items.length > 0) {
       dsnpKeys = {
         dsnpUserId: dsnpUserId.toString(),
         keysHash: publicKeys.content_hash.toNumber(),
-        keys: publicKeys.items.map((item: ItemizedStorageResponse): KeyData => ({
-          index: item.index.toNumber(),
-          content: item.payload.toU8a(),
-        })),
+        keys: publicKeys.items.map(
+          (item: ItemizedStorageResponse): KeyData => ({
+            index: item.index.toNumber(),
+            content: item.payload.toU8a(),
+          }),
+        ),
       };
     } else {
       dsnpKeys = undefined;

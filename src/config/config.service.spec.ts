@@ -39,7 +39,6 @@ describe('ReconnectionConfigService', () => {
   const PROVIDER_ACCESS_TOKEN = 'some-token';
   const BLOCKCHAIN_SCAN_INTERVAL_MINUTES = 60;
   const QUEUE_HIGH_WATER = 1000;
-  const CAPACITY_BATCH_LIMIT = 10;
   const PROVIDER_ACCOUNT_SEED_PHRASE = '';
   const GRAPH_ENVIRONMENT_TYPE = 'Mainnet';
   const GRAPH_ENVIRONMENT_CONFIG = '{}';
@@ -53,7 +52,6 @@ describe('ReconnectionConfigService', () => {
     PROVIDER_ACCESS_TOKEN,
     BLOCKCHAIN_SCAN_INTERVAL_MINUTES,
     QUEUE_HIGH_WATER,
-    CAPACITY_BATCH_LIMIT,
     PROVIDER_ACCOUNT_SEED_PHRASE,
     GRAPH_ENVIRONMENT_TYPE,
     GRAPH_ENVIRONMENT_CONFIG,
@@ -122,12 +120,6 @@ describe('ReconnectionConfigService', () => {
       await expect(setupConfigService({ QUEUE_HIGH_WATER: -1, ...env })).rejects.toBeDefined();
       await expect(setupConfigService({ QUEUE_HIGH_WATER: 99, ...env })).rejects.toBeDefined();
       await expect(setupConfigService({ QUEUE_HIGH_WATER: 'foo', ...env })).rejects.toBeDefined();
-    });
-
-    it('invalid capacity batch limit should fail', async () => {
-      const { CAPACITY_BATCH_LIMIT: dummy, ...env } = ALL_ENV;
-      await expect(setupConfigService({ CAPACITY_BATCH_LIMIT: -1, ...env })).rejects.toBeDefined();
-      await expect(setupConfigService({ CAPACITY_BATCH_LIMIT: 'foo', ...env })).rejects.toBeDefined();
     });
 
     it('invalid provider account seed phrase should fail', async () => {
