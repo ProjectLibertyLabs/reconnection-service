@@ -15,6 +15,10 @@ import { GraphKeyPair, KeyType, ProviderGraph } from '../interfaces/provider-gra
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { ConfigService } from '../config/config.service';
 import { ExtrinsicHelper } from '../scaffolding/extrinsicHelpers';
+import { createKeys } from "../scaffolding/apiConnection";
+import { SubmittableExtrinsic } from '@polkadot/api-base/types';
+import { ISubmittableResult } from '@polkadot/types/types';
+
 
 @Injectable()
 export class ReconnectionGraphService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -40,10 +44,13 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     this.api = await ApiPromise.create({ provider: chainProvider, ...options });
     await this.api.isReady;
     this.logger.log('Blockchain API ready.');
+    await ExtrinsicHelper.initialize();
   }
 
   async onApplicationShutdown() {
     await this.api.disconnect();
+    await ExtrinsicHelper.api.disconnect();
+    await ExtrinsicHelper.apiPromise.disconnect();
   }
 
   public get capacityBatchLimit(): number {
@@ -74,19 +81,34 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       exportedUpdates = await this.graphStateManager.forceCalculateGraphs(dsnpUserId.toString());
     }
 
-    exportedUpdates.forEach(async (bundle) => {
-      let op: any;
+    let providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
+    let calls: SubmittableExtrinsic<"rxjs", ISubmittableResult>[] = [];
+    let promises: Promise<any>[] = [];
+
+    exportedUpdates.forEach((bundle) => {
+      const ownerMsaId: MessageSourceId = this.api.registry.createType('MessageSourceId', bundle.ownerDsnpUserId);
       switch (bundle.type) {
         case 'PersistPage':
-          // Send exported updates to the chain
-          // op = ExtrinsicHelper.upsertPage(alice.keypair, schemaId, alice.msaId, bundle.ownerDsnpUserId, bundle.payload, bundle.prevHash);
-          // await ExtrinsicHelper.api.tx.frequencyTxPayment.payWithCapacityBatchAll(calls)
+          const payload: any = Array.from(Array.prototype.slice.call(bundle.payload));
+          const upsertPageCall = ExtrinsicHelper.api.tx.statefulStorage.upsertPage(
+            ownerMsaId,
+            bundle.schemaId,
+            bundle.pageId,
+            bundle.prevHash,
+            payload,
+          );
+
+          calls.push(upsertPageCall);
           break;
 
         default:
           break;
       }
     });
+
+    let payWithCapacityBatchAllOp = ExtrinsicHelper.payWithCapacityBatchAll(providerKeys, calls);
+    const [batchCompletedEvent, eventMap] = await payWithCapacityBatchAllOp.signAndSend();
+
     // TODO
     // Re-import DSNP Graph from chain & verify
     //     (if updating connections as well, do the same for connections--but do not transitively update connections - of - connections)
@@ -162,7 +184,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId, graphSdkConfig);
 
-    const importBundleBuilder = new ImportBundleBuilder();
+    let importBundleBuilder = new ImportBundleBuilder();
     // Only X25519 is supported for now
     // check if all keys are of type X25519
     const areKeysCorrectType = graphKeyPair.every((keyPair) => keyPair.keyType === KeyType.X25519);
@@ -171,17 +193,13 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     }
 
     importBundles.push(
-      ...publicFollows.map((publicFollow) => {
+      ...publicFollows.map((publicFollow) =>
         importBundleBuilder
           .withDsnpUserId(dsnpUserId.toString())
           .withSchemaId(public_follow_schema_id)
-          .withPageData(publicFollow.page_id.toNumber(), publicFollow.payload, publicFollow.content_hash.toNumber());
-        if (dsnpKeys) {
-          importBundleBuilder.withDsnpKeys(dsnpKeys);
-        }
-        return importBundleBuilder.build();
-      }),
-    );
+          .withPageData(publicFollow.page_id.toNumber(), publicFollow.payload, publicFollow.content_hash.toNumber())
+          .build()
+      ));
 
     importBundles.push(
       ...publicFriendships.map((publicFriendship) => {
