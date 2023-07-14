@@ -16,7 +16,6 @@ export interface ConfigEnvironmentVariables {
   QUEUE_HIGH_WATER: number;
   GRAPH_ENVIRONMENT_TYPE: string;
   GRAPH_ENVIRONMENT_DEV_CONFIG: string;
-  CAPACITY_BATCH_LIMIT: number;
   PROVIDER_ACCOUNT_SEED_PHRASE: string;
 }
 
@@ -82,10 +81,6 @@ export class ConfigService {
 
   public getQueueHighWater(): number {
     return this.nestConfigService.get<number>('QUEUE_HIGH_WATER')!;
-  }
-
-  public getCapacityBatchLimit(): string {
-    return this.nestConfigService.get<string>('CAPACITY_BATCH_LIMIT')!;
   }
 
   public getProviderAccountSeedPhrase(): string {
