@@ -218,7 +218,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
             .withSchemaId(private_follow_schema_id)
             .withPageData(privateFollow.page_id.toNumber(), privateFollow.payload, privateFollow.content_hash.toNumber())
             .withDsnpKeys(dsnpKeys)
-            .withGraphKeyPair(graphKeyPair)
+            .withGraphKeyPairs(graphKeyPair)
             .build()
             ));
 
@@ -229,7 +229,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
             .withSchemaId(private_friendship_schema_id)
             .withPageData(privateFriendship.page_id.toNumber(), privateFriendship.payload, privateFriendship.content_hash.toNumber())
             .withDsnpKeys(dsnpKeys)
-            .withGraphKeyPair(graphKeyPair)
+            .withGraphKeyPairs(graphKeyPair)
             .build()
             ));
     }
