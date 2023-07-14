@@ -5,7 +5,6 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { RedisModule } from '@liaoliaots/nestjs-redis';
 import { ReconnectionServiceController } from './reconnection-service.controller';
 import { ConfigService } from './config/config.service';
-import { ReconnectionGraphService } from './processor/reconnection-graph.service';
 import { BlockchainScannerService } from './blockchain-scanner.service';
 import { ConfigModule } from './config/config.module';
 import { ProcessorModule } from './processor/processor.module';
@@ -13,6 +12,7 @@ import { DevelopmentController } from './development.controller';
 
 @Module({
   imports: [
+    BullModule,
     ConfigModule,
     RedisModule.forRootAsync(
       {
@@ -40,43 +40,15 @@ import { DevelopmentController } from './development.controller';
       // disable throwing uncaughtException if an error event is emitted and it has no listeners
       ignoreErrors: false,
     }),
-    BullModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => {
-        // Note: BullMQ doesn't honor a URL for the Redis connection, and
-        // JS URL doesn't parse 'redis://' as a valid protocol.
-        // We could pass REDIS_HOST, REDIS_PORT, etc, in the environment, but
-        // trying to keep the # of environment variables from proliferating
-        const url = new URL(configService.redisUrl.toString().replace(/^redis[s]*/, 'http'));
-        const { hostname, port, username, password, pathname } = url;
-        return {
-          connection: {
-            host: hostname || undefined,
-            port: port ? Number(port) : undefined,
-            username: username || undefined,
-            password: password || undefined,
-            db: pathname?.length > 1 ? Number(pathname.slice(1)) : undefined,
-          },
-        };
-      },
-      inject: [ConfigService],
-    }),
-    BullModule.registerQueue({
-      name: 'graphUpdateQueue',
-      defaultJobOptions: {
-        attempts: 3,
-        removeOnComplete: true,
-      },
-    }),
     ScheduleModule.forRoot(),
     ProcessorModule,
   ],
   providers: [ConfigService, BlockchainScannerService],
   controllers: [
     // Uncomment the following line to enable development/debug endpoints
-    // DevelopmentController,
+    DevelopmentController,
     ReconnectionServiceController,
   ],
-  exports: [BullModule],
+  exports: [],
 })
 export class ReconnectionServiceModule {}

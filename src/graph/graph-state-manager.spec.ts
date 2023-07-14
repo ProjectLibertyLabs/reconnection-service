@@ -1,12 +1,30 @@
+// ignore moving this to down to the bottom of the file, it will cause the test to fail
+// ignore linting this file, it will cause the test to fail
+// tslint:disable-next-line: no-var-requires
 require('dotenv').config({ path: '.env.test' });
 
 import { Test, TestingModule } from '@nestjs/testing';
+import {
+  Action,
+  ConnectAction,
+  Connection,
+  ConnectionType,
+  DsnpKeys,
+  EnvironmentType,
+  Graph,
+  GraphKeyPair,
+  GraphKeyType,
+  ImportBundle,
+  KeyData,
+  PageData,
+  PrivacyType,
+} from '@dsnp/graph-sdk';
+import { ConfigModule } from '@nestjs/config';
 import { GraphStateManager } from './graph-state-manager';
-import { Action, ConnectAction, Connection, ConnectionType, DsnpKeys, EnvironmentType, Graph, GraphKeyPair, GraphKeyType, ImportBundle, KeyData, PageData, PrivacyType } from '@dsnp/graph-sdk';
 import { ConfigService } from '../config/config.service';
 import { configModuleOptions } from '../config/env.config';
-import { ConfigModule } from '@nestjs/config';
 import { GraphManagerModule } from './graph-state.module';
+
 
 type ProcessEnv = {
   REDIS_URL: string;
@@ -17,6 +35,7 @@ type ProcessEnv = {
   PROVIDER_ACCESS_TOKEN: string;
   BLOCKCHAIN_SCAN_INTERVAL_MINUTES: string;
   QUEUE_HIGH_WATER: string;
+  PROVIDER_ACCOUNT_SEED_PHRASE: string;
   GRAPH_ENVIRONMENT_TYPE: string;
   GRAPH_ENVIRONMENT_CONFIG: string;
 };
@@ -30,6 +49,7 @@ describe('GraphStateManager', () => {
   const PROVIDER_ACCESS_TOKEN = 'some-token';
   const BLOCKCHAIN_SCAN_INTERVAL_MINUTES = '60';
   const QUEUE_HIGH_WATER = '1000';
+  const PROVIDER_ACCOUNT_SEED_PHRASE = 'some seed phrase';
   const GRAPH_ENVIRONMENT_TYPE = 'Mainnet';
   const GRAPH_ENVIRONMENT_CONFIG = '{}';
 
@@ -42,6 +62,7 @@ describe('GraphStateManager', () => {
     PROVIDER_ACCESS_TOKEN,
     BLOCKCHAIN_SCAN_INTERVAL_MINUTES,
     QUEUE_HIGH_WATER,
+    PROVIDER_ACCOUNT_SEED_PHRASE,
     GRAPH_ENVIRONMENT_TYPE,
     GRAPH_ENVIRONMENT_CONFIG,
   };
@@ -123,22 +144,22 @@ describe('GraphStateManager', () => {
     // Set up actions
     const actions = [] as Action[];
     const action_1 = {
-        type: "Connect",
-        ownerDsnpUserId: "10",
-        connection: {
-            dsnpUserId: "4",
-            schemaId: 1,
-        } as Connection,
-        dsnpKeys: {
-          dsnpUserId: "4",
-          keysHash: 100,
-          keys: [],
-        } as DsnpKeys,
+      type: 'Connect',
+      ownerDsnpUserId: '10',
+      connection: {
+        dsnpUserId: '4',
+        schemaId: 1,
+      } as Connection,
+      dsnpKeys: {
+        dsnpUserId: '4',
+        keysHash: 100,
+        keys: [],
+      } as DsnpKeys,
     } as ConnectAction;
 
     actions.push(action_1);
 
-    let applyActionsResult = await graphStateManager.applyActions(actions);
+    const applyActionsResult = await graphStateManager.applyActions(actions);
     expect(applyActionsResult).toBe(true);
 
     const exportUpdates = await graphStateManager.exportGraphUpdates();
@@ -159,27 +180,25 @@ describe('GraphStateManager', () => {
   });
 
   it('Read and deserialize published graph keys', async () => {
-    let dsnp_key_owner = 1000;
+    const dsnp_key_owner = 1000;
 
-	  // published keys blobs fetched from blockchain
-	  let published_keys_blob = [
-	  	64, 15, 234, 44, 175, 171, 220, 131, 117, 43, 227, 111, 165, 52, 150, 64, 218, 44, 130,
-	  	138, 221, 10, 41, 13, 241, 60, 210, 216, 23, 62, 178, 73, 111,
-	  ];
-	  let dsnp_keys = {
-          dsnpUserId: dsnp_key_owner.toString(),
-          keysHash: 100,
-          keys: [
-              {
-                  index: 0,
-                  content: new Uint8Array(published_keys_blob),
-              }
+    // published keys blobs fetched from blockchain
+    const published_keys_blob = [
+      64, 15, 234, 44, 175, 171, 220, 131, 117, 43, 227, 111, 165, 52, 150, 64, 218, 44, 130, 138, 221, 10, 41, 13, 241, 60, 210, 216, 23, 62, 178, 73, 111,
+    ];
+    const dsnp_keys = {
+      dsnpUserId: dsnp_key_owner.toString(),
+      keysHash: 100,
+      keys: [
+        {
+          index: 0,
+          content: new Uint8Array(published_keys_blob),
+        },
+      ] as KeyData[],
+    } as DsnpKeys;
 
-           ] as KeyData[],
-      } as DsnpKeys;
-      
-      const deserialized_keys = await GraphStateManager.deserializeDsnpKeys(dsnp_keys);
-      expect(deserialized_keys).toBeDefined();
+    const deserialized_keys = await GraphStateManager.deserializeDsnpKeys(dsnp_keys);
+    expect(deserialized_keys).toBeDefined();
   });
 
   it('generateKeyPair should return a key pair', async () => {
@@ -198,7 +217,7 @@ describe('GraphStateManager', () => {
     const containsUserGraphResult = await graphStateManager.graphContainsUser('1');
     expect(containsUserGraphResult).toBe(false);
   });
-  
+
   it('should return schema id for connection type and privacy type', async () => {
     const schemaId = await graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
     expect(schemaId).toBeGreaterThan(0);

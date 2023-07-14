@@ -73,8 +73,8 @@ components:
           example: 10
         connections:
           $ref: '#/components/schemas/Connections'
-        graphKeypair:
-          $ref: '#/components/schemas/GraphKeyPair'
+        graphKeyPairs:
+          $ref: '#/components/schemas/GraphKeyPairs'
     Connections:
       type: object
       properties:
@@ -133,6 +133,13 @@ components:
           enum:
             - Follow
             - Friendship
+    GraphKeyPairs:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/GraphKeyPair'
     GraphKeyPair:
       type: object
       properties:
