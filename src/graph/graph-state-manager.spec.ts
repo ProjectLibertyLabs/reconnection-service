@@ -1,4 +1,8 @@
+// ignore moving this to down to the bottom of the file, it will cause the test to fail
+// ignore linting this file, it will cause the test to fail
+// tslint:disable-next-line: no-var-requires
 require('dotenv').config({ path: '.env.test' });
+
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   Action,
