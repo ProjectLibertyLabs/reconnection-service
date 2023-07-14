@@ -39,7 +39,7 @@ describe('ReconnectionConfigService', () => {
   const PROVIDER_ACCESS_TOKEN = 'some-token';
   const BLOCKCHAIN_SCAN_INTERVAL_MINUTES = 60;
   const QUEUE_HIGH_WATER = 1000;
-  const PROVIDER_ACCOUNT_SEED_PHRASE = '';
+  const PROVIDER_ACCOUNT_SEED_PHRASE = 'some seed phrase';
   const GRAPH_ENVIRONMENT_TYPE = 'Mainnet';
   const GRAPH_ENVIRONMENT_CONFIG = '{}';
 

@@ -47,7 +47,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
   }
 
   public get capacityBatchLimit(): number {
-    return this.api.consts.frequencyTxPayment.maximumCapacityBatchLength;
+    return this.api.consts.frequencyTxPayment.maximumCapacityBatchLength.toNumber();
   }
 
   public async updateUserGraph(dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<void> {
@@ -55,14 +55,12 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const dsnpUserId: MessageSourceId = this.api.registry.createType('MessageSourceId', dsnpUserStr);
     const providerId: ProviderId = this.api.registry.createType('ProviderId', providerStr);
 
-    // TODO set state based on the response from getUserGraphFromProvider
-    const [graphConnections, graphKeyPair] = await this.getUserGraphFromProvider(dsnpUserId, providerId);
-
+    const [graphConnections, graphKeyPairs] = await this.getUserGraphFromProvider(dsnpUserId, providerId);
     // graph config and respective schema ids
     const graphSdkConfig = await this.graphStateManager.getGraphConfig();
 
     // get the user's DSNP Graph from the blockchain and form import bundles
-    const importBundles = await this.formImportBundles(dsnpUserId, graphSdkConfig, graphKeyPair);
+    const importBundles = await this.formImportBundles(dsnpUserId, graphSdkConfig, graphKeyPairs);
     await this.graphStateManager.importUserData(importBundles);
 
     let exportedUpdates: Update[] = [];
@@ -111,7 +109,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     });
 
     const allConnections: ProviderGraph[] = [];
-    let keyPair = {};
+    const keyPairs: GraphKeyPair[] = [];
     try {
       let hasNextPage = true;
       while (hasNextPage) {
@@ -125,9 +123,9 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
         const { data }: { data: ProviderGraph[] } = response.data.connections;
         allConnections.push(...data);
 
-        const { graphKeypair }: { graphKeypair: GraphKeyPair } = response.data;
+        const { graphKeypair }: { graphKeypair: GraphKeyPair[] } = response.data.graphKeyPairs;
         if (graphKeypair) {
-          keyPair = graphKeypair;
+          keyPairs.push(...graphKeypair);
         }
 
         const { pagination } = response.data.connections;
@@ -140,7 +138,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
         }
       }
 
-      return [allConnections, keyPair];
+      return [allConnections, keyPairs];
     } catch (e) {
       if (e instanceof AxiosError) {
         throw new Error(JSON.stringify(e));
@@ -150,7 +148,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     }
   }
 
-  async formImportBundles(dsnpUserId: MessageSourceId, graphSdkConfig: Config, graphKeyPair: GraphKeyPair): Promise<ImportBundle[]> {
+  async formImportBundles(dsnpUserId: MessageSourceId, graphSdkConfig: Config, graphKeyPair: GraphKeyPair[]): Promise<ImportBundle[]> {
     const importBundles: ImportBundle[] = [];
     const public_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
     const public_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Public);
@@ -166,9 +164,10 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
     const importBundleBuilder = new ImportBundleBuilder();
     // Only X25519 is supported for now
-    const graphKeyType = GraphKeyType.X25519;
-    if (graphKeyPair.keyType !== KeyType.X25519) {
-      throw new Error(`Graph key type ${graphKeyPair.keyType} does not match expected type ${graphKeyType}`);
+    // check if all keys are of type X25519
+    const areKeysCorrectType = graphKeyPair.every((keyPair) => keyPair.keyType === KeyType.X25519);
+    if (!areKeysCorrectType) {
+      throw new Error('Only X25519 keys are supported for now');
     }
 
     importBundles.push(
@@ -204,14 +203,19 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .withDsnpUserId(dsnpUserId.toString())
           .withSchemaId(private_follow_schema_id)
           .withPageData(privateFollow.page_id.toNumber(), privateFollow.payload, privateFollow.content_hash.toNumber())
-          .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey);
+          
+          if (dsnpKeys) {
+            importBundleBuilder.withDsnpKeys(dsnpKeys);
+          }
 
-        if (dsnpKeys) {
-          importBundleBuilder.withDsnpKeys(dsnpKeys);
-        }
-        return importBundleBuilder.build();
-      }),
-    );
+          if (graphKeyPair.length > 0) {
+            // write each key to the graph
+            graphKeyPair.forEach((keyPair) => {
+              importBundleBuilder.withGraphKeyPair(GraphKeyType.X25519, keyPair.publicKey, keyPair.privateKey);
+            });
+          }
+          return importBundleBuilder.build();
+        }));
 
     importBundles.push(
       ...privateFriendships.map((privateFriendship) => {
@@ -219,11 +223,18 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .withDsnpUserId(dsnpUserId.toString())
           .withSchemaId(private_friendship_schema_id)
           .withPageData(privateFriendship.page_id.toNumber(), privateFriendship.payload, privateFriendship.content_hash.toNumber())
-          .withGraphKeyPair(graphKeyType, graphKeyPair.publicKey, graphKeyPair.privateKey);
 
         if (dsnpKeys) {
           importBundleBuilder.withDsnpKeys(dsnpKeys);
         }
+
+        if (graphKeyPair.length > 0) {
+          // write each key to the graph
+          graphKeyPair.forEach((keyPair) => {
+            importBundleBuilder.withGraphKeyPair(GraphKeyType.X25519, keyPair.publicKey, keyPair.privateKey);
+          });
+        }
+
         return importBundleBuilder.build();
       }),
     );

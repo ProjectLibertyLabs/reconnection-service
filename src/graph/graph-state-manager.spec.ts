@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '.env.test' });
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   Action,
@@ -20,7 +21,6 @@ import { ConfigService } from '../config/config.service';
 import { configModuleOptions } from '../config/env.config';
 import { GraphManagerModule } from './graph-state.module';
 
-require('dotenv').config({ path: '.env.test' });
 
 type ProcessEnv = {
   REDIS_URL: string;
@@ -45,7 +45,7 @@ describe('GraphStateManager', () => {
   const PROVIDER_ACCESS_TOKEN = 'some-token';
   const BLOCKCHAIN_SCAN_INTERVAL_MINUTES = '60';
   const QUEUE_HIGH_WATER = '1000';
-  const PROVIDER_ACCOUNT_SEED_PHRASE = '';
+  const PROVIDER_ACCOUNT_SEED_PHRASE = 'some seed phrase';
   const GRAPH_ENVIRONMENT_TYPE = 'Mainnet';
   const GRAPH_ENVIRONMENT_CONFIG = '{}';
 
