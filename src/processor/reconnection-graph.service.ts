@@ -8,7 +8,7 @@ import { SkipTransitiveGraphs, createGraphUpdateJob } from '#app/interfaces/grap
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
 import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
 import { BlockchainService } from '#app/blockchain/blockchain.service';
-import { createKeys } from '#app/scaffolding/apiConnection';
+import { createKeys } from '#app/blockchain/create-keys';
 import { GraphKeyPair, KeyType, ProviderGraph } from '../interfaces/provider-graph.interface';
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { ConfigService } from '../config/config.service';
