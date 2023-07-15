@@ -9,6 +9,7 @@ import { BlockchainScannerService } from './blockchain-scanner.service';
 import { ConfigModule } from './config/config.module';
 import { ProcessorModule } from './processor/processor.module';
 import { DevelopmentController } from './development.controller';
+import { BlockchainModule } from './blockchain/blockchain.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { DevelopmentController } from './development.controller';
     }),
     ScheduleModule.forRoot(),
     ProcessorModule,
+    BlockchainModule,
   ],
   providers: [ConfigService, BlockchainScannerService],
   controllers: [

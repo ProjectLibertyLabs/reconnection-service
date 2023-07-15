@@ -2,6 +2,7 @@
 https://docs.nestjs.com/providers#services
 */
 
+import { ProviderId } from '@frequency-chain/api-augment/interfaces';
 import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
 
@@ -63,7 +64,7 @@ export class ConfigService {
     return this.nestConfigService.get('FREQUENCY_URL')!;
   }
 
-  public providerBaseUrl(id: bigint): URL {
+  public providerBaseUrl(id: ProviderId | string): URL {
     return this.providerMap.get(id.toString())?.baseUrl!;
   }
 

@@ -1,0 +1,92 @@
+/* eslint-disable import/no-cycle */
+/* eslint-disable no-use-before-define */
+/* eslint-disable new-cap */
+import { u16, u32, u64, u128 } from '@polkadot/types';
+import { Codec } from '@polkadot/types/types';
+import { u8aToHex, u8aWrapBytes } from '@polkadot/util';
+import { MessageSourceId, PageHash } from '@frequency-chain/api-augment/interfaces';
+import { firstValueFrom } from 'rxjs';
+import { ExtrinsicHelper, ItemizedSignaturePayload, PaginatedDeleteSignaturePayload, PaginatedUpsertSignaturePayload } from './extrinsicHelpers';
+
+export type Sr25519Signature = { Sr25519: `0x${string}` };
+
+export const CENTS = 1000000n;
+export const DOLLARS = 100n * CENTS;
+
+export function signPayloadSr25519(keys: KeyringPair, data: Codec): Sr25519Signature {
+  return { Sr25519: u8aToHex(keys.sign(u8aWrapBytes(data.toU8a()))) };
+}
+
+export async function getBlockNumber(): Promise<number> {
+  return (await ExtrinsicHelper.getLastBlock()).block.header.number.toNumber();
+}
+
+export async function generateItemizedSignaturePayload(payloadInputs: ItemizedSignaturePayload, expirationOffset?: number): Promise<ItemizedSignaturePayload> {
+  // eslint-disable-next-line prefer-const
+  let { expiration, ...payload } = payloadInputs;
+  if (!expiration) {
+    expiration = (await ExtrinsicHelper.getLastBlock()).block.header.number.toNumber() + (expirationOffset || 5);
+  }
+
+  return {
+    expiration,
+    ...payload,
+  };
+}
+
+export async function generatePaginatedUpsertSignaturePayload(payloadInputs: PaginatedUpsertSignaturePayload, expirationOffset?: number): Promise<PaginatedUpsertSignaturePayload> {
+  // eslint-disable-next-line prefer-const
+  let { expiration, ...payload } = payloadInputs;
+  if (!expiration) {
+    expiration = (await ExtrinsicHelper.getLastBlock()).block.header.number.toNumber() + (expirationOffset || 5);
+  }
+
+  return {
+    expiration,
+    ...payload,
+  };
+}
+
+export async function generatePaginatedDeleteSignaturePayload(payloadInputs: PaginatedDeleteSignaturePayload, expirationOffset?: number): Promise<PaginatedDeleteSignaturePayload> {
+  // eslint-disable-next-line prefer-const
+  let { expiration, ...payload } = payloadInputs;
+  if (!expiration) {
+    expiration = (await ExtrinsicHelper.getLastBlock()).block.header.number.toNumber() + (expirationOffset || 5);
+  }
+
+  return {
+    expiration,
+    ...payload,
+  };
+}
+
+export async function getCurrentItemizedHash(msaId: MessageSourceId, schemaId: u16): Promise<PageHash> {
+  const result = await ExtrinsicHelper.getItemizedStorage(msaId, schemaId);
+  return result.content_hash;
+}
+
+export async function getCurrentPaginatedHash(msaId: MessageSourceId, schemaId: u16, pageId: number): Promise<u32> {
+  const result = await ExtrinsicHelper.getPaginatedStorage(msaId, schemaId);
+  const pageResponse = result.filter((page) => page.page_id.toNumber() === pageId);
+  if (pageResponse.length <= 0) {
+    return new u32(ExtrinsicHelper.api.registry, 0);
+  }
+
+  return pageResponse[0].content_hash;
+}
+
+export async function getNextEpochBlock() {
+  const epochInfo = await firstValueFrom(ExtrinsicHelper.api.query.capacity.currentEpochInfo());
+  const actualEpochLength = await firstValueFrom(ExtrinsicHelper.api.query.capacity.epochLength());
+  return actualEpochLength.toNumber() + epochInfo.epochStart.toNumber() + 1;
+}
+
+export async function getRemainingCapacity(providerId: u64): Promise<u128> {
+  const capacityStaked = (await firstValueFrom(ExtrinsicHelper.api.query.capacity.capacityLedger(providerId))).unwrap();
+  return capacityStaked.remainingCapacity;
+}
+
+export async function getNonce(keys: KeyringPair): Promise<number> {
+  const nonce = await firstValueFrom(ExtrinsicHelper.api.call.accountNonceApi.accountNonce(keys.address));
+  return nonce.toNumber();
+}

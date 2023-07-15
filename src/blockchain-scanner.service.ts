@@ -11,32 +11,17 @@ import Redis from 'ioredis';
 import { MessageSourceId, ProviderId } from '@frequency-chain/api-augment/interfaces';
 import { ConfigService } from './config/config.service';
 import { UpdateTransitiveGraphs, createGraphUpdateJob } from './interfaces/graph-update-job.interface';
+import { BlockchainService } from './blockchain/blockchain.service';
 
 const LAST_SEEN_BLOCK_NUMBER_KEY = 'lastSeenBlockNumber';
 
 @Injectable()
-export class BlockchainScannerService implements OnApplicationBootstrap, OnApplicationShutdown {
-  private api: ApiPromise;
-
+export class BlockchainScannerService implements OnApplicationBootstrap {
   private logger: Logger;
 
   private scanInProgress = false;
 
   async onApplicationBootstrap() {
-    const providerUrl = this.configService.frequencyUrl!;
-    let provider: any;
-    if (/^ws/.test(providerUrl.toString())) {
-      provider = new WsProvider(providerUrl.toString());
-    } else if (/^http/.test(providerUrl.toString())) {
-      provider = new HttpProvider(providerUrl.toString());
-    } else {
-      this.logger.error(`Unrecognized chain URL type: ${providerUrl.toString()}`);
-      throw new Error('Unrecognized chain URL type');
-    }
-    this.api = await ApiPromise.create({ provider, ...options });
-    await this.api.isReady;
-    this.logger.log('Blockchain API ready.');
-
     // Set up recurring interval
     const interval = setInterval(() => this.scan(), this.configService.getBlockchainScanIntervalMinutes() * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND);
     this.schedulerRegistry.addInterval('blockchainScan', interval);
@@ -46,15 +31,12 @@ export class BlockchainScannerService implements OnApplicationBootstrap, OnAppli
     this.schedulerRegistry.addTimeout('initialScan', initialTimeout);
   }
 
-  async onApplicationShutdown() {
-    await this.api.disconnect();
-  }
-
   constructor(
     @InjectRedis() private cacheManager: Redis,
     @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
     private readonly configService: ConfigService,
     private schedulerRegistry: SchedulerRegistry,
+    private blockchainService: BlockchainService,
   ) {
     this.logger = new Logger(BlockchainScannerService.name);
   }
@@ -98,11 +80,9 @@ export class BlockchainScannerService implements OnApplicationBootstrap, OnAppli
       while (!currentBlockHash.isEmpty && queueSize < this.configService.getQueueHighWater()) {
         this.logger.debug(`Processing block #${currentBlockNumber} ${currentBlockHash.toHuman()}`);
         // eslint-disable-next-line no-await-in-loop
-        const currentApi = await this.api.at(currentBlockHash);
-        // eslint-disable-next-line no-await-in-loop
-        const events = (await currentApi.query.system.events()).toArray();
+        const events = (await this.blockchainService.queryAt(currentBlockHash, 'system', 'events')).toArray();
         const filteredEvents = events.reduce((jobs: Promise<any>[], { event }) => {
-          if (this.api.events.msa.DelegationGranted.is(event)) {
+          if (this.blockchainService.api.events.msa.DelegationGranted.is(event)) {
             const { key: jobId, data } = createGraphUpdateJob(event.data.delegatorId, event.data.providerId, UpdateTransitiveGraphs);
             jobs.push(this.graphUpdateQueue.add('graphUpdate', data, { jobId }));
             this.logger.debug(`Queued graph update for DSNP user ${data.dsnpId}, provider ${data.providerId}`);
@@ -150,7 +130,7 @@ export class BlockchainScannerService implements OnApplicationBootstrap, OnAppli
   }
 
   public async getBlockNumberForHash(hash: string): Promise<number | undefined> {
-    const block = await this.api.rpc.chain.getBlock(hash);
+    const block = await this.blockchainService.rpc('chain', 'getBlock', hash);
     if (block) {
       this.logger.debug(`Retrieved block number (${block.block.header.number.toNumber()} for hash ${hash})`);
       return block.block.header.number.toNumber();
@@ -161,6 +141,6 @@ export class BlockchainScannerService implements OnApplicationBootstrap, OnAppli
   }
 
   private getBlockHashForBlock(n: bigint): Promise<BlockHash> {
-    return this.api.rpc.chain.getBlockHash(n);
+    return this.blockchainService.rpc('chain', 'getBlockHash', n);
   }
 }
