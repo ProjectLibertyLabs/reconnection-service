@@ -48,7 +48,7 @@ import { BlockchainModule } from './blockchain/blockchain.module';
   providers: [ConfigService, BlockchainScannerService],
   controllers: [
     // Uncomment the following line to enable development/debug endpoints
-    DevelopmentController,
+    // DevelopmentController,
     ReconnectionServiceController,
   ],
   exports: [],

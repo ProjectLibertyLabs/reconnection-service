@@ -5,9 +5,9 @@ import { ApiPromise, ApiRx, HttpProvider, WsProvider } from '@polkadot/api';
 import { firstValueFrom } from 'rxjs';
 import { options } from '@frequency-chain/api-augment';
 import { KeyringPair } from '@polkadot/keyring/types';
-import { BlockHash, Call } from '@polkadot/types/interfaces';
+import { BlockHash, BlockNumber, Call } from '@polkadot/types/interfaces';
 import { SubmittableExtrinsic } from '@polkadot/api/types';
-import { ISubmittableResult } from '@polkadot/types/types';
+import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
 import { Extrinsic } from './extrinsic';
 
 @Injectable()
@@ -44,6 +44,20 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
   constructor(configService: ConfigService) {
     this.configService = configService;
     this.logger = new Logger(this.constructor.name);
+  }
+
+  public getBlockHash(block: BlockNumber | AnyNumber): Promise<BlockHash> {
+    return this.apiPromise.rpc.chain.getBlockHash(block);
+  }
+
+  public async getBlockNumberForHash(hash: string): Promise<number | undefined> {
+    const block = await this.apiPromise.rpc.chain.getBlock(hash);
+    if (block) {
+      return block.block.header.number.toNumber();
+    }
+
+    this.logger.error(`No block found corresponding to hash ${hash}`);
+    return undefined;
   }
 
   public createType(type: string, ...args: (any | undefined)[]) {

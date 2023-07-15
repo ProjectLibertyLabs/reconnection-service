@@ -1,6 +1,4 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
-import { options } from '@frequency-chain/api-augment';
-import { ApiPromise, HttpProvider, WsProvider } from '@polkadot/api';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { BlockHash } from '@polkadot/types/interfaces';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -8,12 +6,11 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { MILLISECONDS_PER_SECOND, SECONDS_PER_MINUTE } from 'time-constants';
 import { InjectRedis } from '@liaoliaots/nestjs-redis';
 import Redis from 'ioredis';
-import { MessageSourceId, ProviderId } from '@frequency-chain/api-augment/interfaces';
 import { ConfigService } from './config/config.service';
 import { UpdateTransitiveGraphs, createGraphUpdateJob } from './interfaces/graph-update-job.interface';
 import { BlockchainService } from './blockchain/blockchain.service';
 
-const LAST_SEEN_BLOCK_NUMBER_KEY = 'lastSeenBlockNumber';
+export const LAST_SEEN_BLOCK_NUMBER_KEY = 'lastSeenBlockNumber';
 
 @Injectable()
 export class BlockchainScannerService implements OnApplicationBootstrap {
@@ -73,12 +70,16 @@ export class BlockchainScannerService implements OnApplicationBootstrap {
 
       const lastSeenBlockNumber = await this.getLastSeenBlockNumber();
       currentBlockNumber = lastSeenBlockNumber + 1n;
-      currentBlockHash = await this.getBlockHashForBlock(currentBlockNumber);
+      currentBlockHash = await this.blockchainService.getBlockHash(currentBlockNumber);
 
+      if (!currentBlockHash.some((byte) => byte !== 0)) {
+        this.logger.log('No new blocks to read; no scan performed.');
+        this.scanInProgress = false;
+        return;
+      }
       this.logger.log(`Starting scan from block #${currentBlockNumber} (${currentBlockHash})`);
 
       while (!currentBlockHash.isEmpty && queueSize < this.configService.getQueueHighWater()) {
-        this.logger.debug(`Processing block #${currentBlockNumber} ${currentBlockHash.toHuman()}`);
         // eslint-disable-next-line no-await-in-loop
         const events = (await this.blockchainService.queryAt(currentBlockHash, 'system', 'events')).toArray();
         const filteredEvents = events.reduce((jobs: Promise<any>[], { event }) => {
@@ -90,7 +91,9 @@ export class BlockchainScannerService implements OnApplicationBootstrap {
           return jobs;
         }, []);
 
-        this.logger.debug(`Found ${filteredEvents.length} delegations at block #${currentBlockNumber}`);
+        if (filteredEvents.length > 0) {
+          this.logger.debug(`Found ${filteredEvents.length} delegations at block #${currentBlockNumber}`);
+        }
         // eslint-disable-next-line no-await-in-loop
         await Promise.all(filteredEvents);
         // eslint-disable-next-line no-await-in-loop
@@ -99,7 +102,7 @@ export class BlockchainScannerService implements OnApplicationBootstrap {
         // Move to the next block
         currentBlockNumber += 1n;
         // eslint-disable-next-line no-await-in-loop
-        currentBlockHash = await this.getBlockHashForBlock(currentBlockNumber);
+        currentBlockHash = await this.blockchainService.getBlockHash(currentBlockNumber);
         // eslint-disable-next-line no-await-in-loop
         queueSize = await this.graphUpdateQueue.count();
       }
@@ -127,20 +130,5 @@ export class BlockchainScannerService implements OnApplicationBootstrap {
 
   private async setLastSeenBlockNumber(b: bigint): Promise<void> {
     await this.cacheManager.set(LAST_SEEN_BLOCK_NUMBER_KEY, b.toString());
-  }
-
-  public async getBlockNumberForHash(hash: string): Promise<number | undefined> {
-    const block = await this.blockchainService.rpc('chain', 'getBlock', hash);
-    if (block) {
-      this.logger.debug(`Retrieved block number (${block.block.header.number.toNumber()} for hash ${hash})`);
-      return block.block.header.number.toNumber();
-    }
-
-    this.logger.error(`No block found corresponding to hash ${hash}`);
-    return undefined;
-  }
-
-  private getBlockHashForBlock(n: bigint): Promise<BlockHash> {
-    return this.blockchainService.rpc('chain', 'getBlockHash', n);
   }
 }
