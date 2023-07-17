@@ -11,14 +11,13 @@ import { ImportBundleBuilder, Config, ConnectAction, ConnectionType, DsnpKeys, G
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { SkipTransitiveGraphs, UpdateTransitiveGraphs, createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
+import { SubmittableExtrinsic } from '@polkadot/api-base/types';
+import { ISubmittableResult } from '@polkadot/types/types';
 import { GraphKeyPair as ProviderKeyPair, KeyType, ProviderGraph } from '../interfaces/provider-graph.interface';
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { ConfigService } from '../config/config.service';
 import { ExtrinsicHelper } from '../scaffolding/extrinsicHelpers';
-import { createKeys } from "../scaffolding/apiConnection";
-import { SubmittableExtrinsic } from '@polkadot/api-base/types';
-import { ISubmittableResult } from '@polkadot/types/types';
-
+import { createKeys } from '../scaffolding/apiConnection';
 
 @Injectable()
 export class ReconnectionGraphService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -62,7 +61,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const dsnpUserId: MessageSourceId = this.api.registry.createType('MessageSourceId', dsnpUserStr);
     const providerId: ProviderId = this.api.registry.createType('ProviderId', providerStr);
     const { key: jobId_nt, data: data_nt } = createGraphUpdateJob(dsnpUserId, providerId, SkipTransitiveGraphs);
-  
+
     let graphConnections: ProviderGraph[] = [];
     let graphKeyPairs: ProviderKeyPair[] = [];
     try {
@@ -71,17 +70,17 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       this.logger.error(`Error getting user graph from provider: ${e}`);
       throw e;
     }
-  
+
     try {
       // graph config and respective schema ids
       const graphSdkConfig = await this.graphStateManager.getGraphConfig();
-  
+
       // get the user's DSNP Graph from the blockchain and form import bundles
       // import bundles are used to import the user's DSNP Graph into the graph SDK
       await this.importBundles(dsnpUserId, providerId, graphSdkConfig, graphKeyPairs, graphConnections, updateConnections);
-  
+
       let exportedUpdates: Update[] = [];
-  
+
       if (updateConnections) {
         // using graphConnections form Action[] and update the user's DSNP Graph
         const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, graphSdkConfig, graphConnections);
@@ -95,9 +94,9 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       } else {
         exportedUpdates = await this.graphStateManager.forceCalculateGraphs(dsnpUserId.toString());
       }
-  
-      let providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
-      let calls: SubmittableExtrinsic<"rxjs", ISubmittableResult>[] = [];
+
+      const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
+      const calls: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
       const mapUserIdToUpdates = new Map<string, Update[]>();
       // loop over exportUpdates and collect Updates vs userId
       exportedUpdates.forEach((bundle) => {
@@ -112,25 +111,19 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       });
 
       for (const [userId, updates] of mapUserIdToUpdates.entries()) {
-        let batch: SubmittableExtrinsic<"rxjs", ISubmittableResult>[] = [];
+        let batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
         let batchCount = 0;
-        let promises: Promise<any>[] = [];
+        const promises: Promise<any>[] = [];
         updates.forEach((bundle) => {
           const ownerMsaId: MessageSourceId = this.api.registry.createType('MessageSourceId', userId);
           switch (bundle.type) {
             case 'PersistPage':
               const payload: any = Array.from(Array.prototype.slice.call(bundle.payload));
-              const upsertPageCall = ExtrinsicHelper.api.tx.statefulStorage.upsertPage(
-                ownerMsaId,
-                bundle.schemaId,
-                bundle.pageId,
-                bundle.prevHash,
-                payload,
-              );
-  
+              const upsertPageCall = ExtrinsicHelper.api.tx.statefulStorage.upsertPage(ownerMsaId, bundle.schemaId, bundle.pageId, bundle.prevHash, payload);
+
               batch.push(upsertPageCall);
               batchCount++;
-  
+
               // If the batch size exceeds the capacityBatchLimit, send the batch to the chain
               if (batchCount === this.capacityBatchLimit) {
                 const payWithCapacityBatchAllOp = ExtrinsicHelper.payWithCapacityBatchAll(providerKeys, batch);
@@ -140,17 +133,17 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
                 batchCount = 0;
               }
               break;
-  
+
             default:
               break;
           }
         });
-        
+
         if (batch.length > 0) {
           const payWithCapacityBatchAllOp = ExtrinsicHelper.payWithCapacityBatchAll(providerKeys, batch);
           promises.push(payWithCapacityBatchAllOp.signAndSend());
         }
-        
+
         await Promise.all(promises);
         // Check for BatchCompleted event after all promises are resolved
         for (const promise of promises) {
@@ -160,7 +153,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           }
         }
       }
-  
+
       // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
       // import bundles are used to import the user's DSNP Graph into the graph SDK
       // check if user graph exists in the graph SDK else queue a graph update job
@@ -171,7 +164,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           throw new Error(`User graph does not exist for ${dsnpUserId.toString()}`);
         }
       } else {
-        throw new Error(`Error re-importing bundles for ${dsnpUserId.toString()}`);       
+        throw new Error(`Error re-importing bundles for ${dsnpUserId.toString()}`);
       }
     } catch (err) {
       if (updateConnections) {
@@ -182,7 +175,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       }
     }
   }
-  
+
   async getUserGraphFromProvider(dsnpUserId: MessageSourceId, providerId: ProviderId): Promise<any> {
     const headers = {
       Authorization: 'Bearer <access_token>', // Replace with your actual access token if required
@@ -239,7 +232,14 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     }
   }
 
-  async importBundles(dsnpUserId: MessageSourceId, providerId: ProviderId, graphSdkConfig: Config, graphKeyPairs: ProviderKeyPair[], graphConnections: ProviderGraph[], updateConnections: boolean): Promise<boolean> {
+  async importBundles(
+    dsnpUserId: MessageSourceId,
+    providerId: ProviderId,
+    graphSdkConfig: Config,
+    graphKeyPairs: ProviderKeyPair[],
+    graphConnections: ProviderGraph[],
+    updateConnections: boolean,
+  ): Promise<boolean> {
     const importBundles = await this.formImportBundles(dsnpUserId, graphSdkConfig, graphKeyPairs);
     return this.graphStateManager.importUserData(importBundles);
   }
@@ -256,7 +256,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const privateFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(dsnpUserId, private_follow_schema_id);
     const privateFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(dsnpUserId, private_friendship_schema_id);
 
-    let importBundleBuilder = new ImportBundleBuilder();
+    const importBundleBuilder = new ImportBundleBuilder();
     // Only X25519 is supported for now
     // check if all keys are of type X25519
     const areKeysCorrectType = graphKeyPairs.every((keyPair) => keyPair.keyType === KeyType.X25519);
@@ -270,8 +270,9 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .withDsnpUserId(dsnpUserId.toString())
           .withSchemaId(public_follow_schema_id)
           .withPageData(publicFollow.page_id.toNumber(), publicFollow.payload, publicFollow.content_hash.toNumber())
-          .build()
-          ));
+          .build(),
+      ),
+    );
 
     importBundles.push(
       ...publicFriendships.map((publicFriendship) =>
@@ -279,16 +280,19 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .withDsnpUserId(dsnpUserId.toString())
           .withSchemaId(public_friendship_schema_id)
           .withPageData(publicFriendship.page_id.toNumber(), publicFriendship.payload, publicFriendship.content_hash.toNumber())
-          .build()
-          ));
+          .build(),
+      ),
+    );
 
-    if(privateFollows.length > 0 || privateFriendships.length > 0) {
+    if (privateFollows.length > 0 || privateFriendships.length > 0) {
       const dsnpKeys = await this.formDsnpKeys(dsnpUserId, graphSdkConfig);
-      const graphKeyPairsSdk = graphKeyPairs.map((keyPair: ProviderKeyPair): GraphKeyPair => ({
-        keyType: GraphKeyType.X25519,
-        publicKey: keyPair.publicKey,
-        secretKey: keyPair.privateKey,
-      }));
+      const graphKeyPairsSdk = graphKeyPairs.map(
+        (keyPair: ProviderKeyPair): GraphKeyPair => ({
+          keyType: GraphKeyType.X25519,
+          publicKey: keyPair.publicKey,
+          secretKey: keyPair.privateKey,
+        }),
+      );
 
       importBundles.push(
         ...privateFollows.map((privateFollow) =>
@@ -298,8 +302,9 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
             .withPageData(privateFollow.page_id.toNumber(), privateFollow.payload, privateFollow.content_hash.toNumber())
             .withDsnpKeys(dsnpKeys)
             .withGraphKeyPairs(graphKeyPairsSdk)
-            .build()
-            ));
+            .build(),
+        ),
+      );
 
       importBundles.push(
         ...privateFriendships.map((privateFriendship) =>
@@ -309,8 +314,9 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
             .withPageData(privateFriendship.page_id.toNumber(), privateFriendship.payload, privateFriendship.content_hash.toNumber())
             .withDsnpKeys(dsnpKeys)
             .withGraphKeyPairs(graphKeyPairsSdk)
-            .build()
-            ));
+            .build(),
+        ),
+      );
     }
     return importBundles;
   }
@@ -390,15 +396,15 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const public_key_schema_id = graphSdkConfig.graphPublicKeySchemaId;
     const publicKeys: ItemizedStoragePageResponse = await this.api.rpc.statefulStorage.getItemizedStorage(dsnpUserId, public_key_schema_id);
     const dsnpKeys = {
-          dsnpUserId: dsnpUserId.toString(),
-          keysHash: publicKeys.content_hash.toNumber(),
-          keys: publicKeys.items.map(
-            (item: ItemizedStorageResponse): KeyData => ({
-              index: item.index.toNumber(),
-              content: item.payload.toU8a(),
-            }),
-          ),
-      };
+      dsnpUserId: dsnpUserId.toString(),
+      keysHash: publicKeys.content_hash.toNumber(),
+      keys: publicKeys.items.map(
+        (item: ItemizedStorageResponse): KeyData => ({
+          index: item.index.toNumber(),
+          content: item.payload.toU8a(),
+        }),
+      ),
+    };
     return dsnpKeys;
   }
 }
