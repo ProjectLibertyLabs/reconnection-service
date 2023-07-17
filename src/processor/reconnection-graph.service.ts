@@ -123,8 +123,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       let payWithCapacityBatchAllOp = ExtrinsicHelper.payWithCapacityBatchAll(providerKeys, calls);
       const [batchCompletedEvent, eventMap] = await payWithCapacityBatchAllOp.signAndSend();
       if (batchCompletedEvent && !(ExtrinsicHelper.api.events.utility.BatchCompleted.is(batchCompletedEvent))) {
-        this.graphUpdateQueue.add('graphUpdate', data_nt, { jobId: jobId_nt });
-        return;
+        throw new Error('BatchCompleted event not found');
       }
   
       // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
@@ -134,10 +133,10 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       if (reImported) {
         const userGraphExists = await this.graphStateManager.graphContainsUser(dsnpUserId.toString());
         if (!userGraphExists) {
-          this.graphUpdateQueue.add('graphUpdate', data_nt, { jobId: jobId_nt });
+          throw new Error(`User graph does not exist for ${dsnpUserId.toString()}`);
         }
       } else {
-        this.graphUpdateQueue.add('graphUpdate', data_nt, { jobId: jobId_nt });
+        throw new Error(`Error re-importing bundles for ${dsnpUserId.toString()}`);       
       }
     } catch (err) {
       if (updateConnections) {
