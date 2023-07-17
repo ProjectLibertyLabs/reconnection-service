@@ -62,7 +62,6 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const dsnpUserId: MessageSourceId = this.api.registry.createType('MessageSourceId', dsnpUserStr);
     const providerId: ProviderId = this.api.registry.createType('ProviderId', providerStr);
     const { key: jobId_nt, data: data_nt } = createGraphUpdateJob(dsnpUserId, providerId, SkipTransitiveGraphs);
-    const { key: jobId_t, data: data_t } = createGraphUpdateJob(dsnpUserId, providerId, UpdateTransitiveGraphs);
   
     let graphConnections: ProviderGraph[] = [];
     let graphKeyPairs: ProviderKeyPair[] = [];
@@ -70,8 +69,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       [graphConnections, graphKeyPairs] = await this.getUserGraphFromProvider(dsnpUserId, providerId);
     } catch (e) {
       this.logger.error(`Error getting user graph from provider: ${e}`);
-      this.graphUpdateQueue.add('graphUpdate', data_t, { jobId: jobId_t });
-      return;
+      throw e;
     }
   
     try {
