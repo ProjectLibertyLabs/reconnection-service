@@ -7,11 +7,11 @@ import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } fro
 import { options } from '@frequency-chain/api-augment';
 import { ApiPromise, HttpProvider, WsProvider } from '@polkadot/api';
 import { ItemizedStoragePageResponse, ItemizedStorageResponse, MessageSourceId, PaginatedStorageResponse, ProviderId } from '@frequency-chain/api-augment/interfaces';
-import { ImportBundleBuilder, Config, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, Update } from '@dsnp/graph-sdk';
+import { ImportBundleBuilder, Config, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, Update, GraphKeyPair } from '@dsnp/graph-sdk';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { SkipTransitiveGraphs, createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
-import { GraphKeyPair, KeyType, ProviderGraph } from '../interfaces/provider-graph.interface';
+import { GraphKeyPair as ProviderKeyPair, KeyType, ProviderGraph } from '../interfaces/provider-graph.interface';
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { ConfigService } from '../config/config.service';
 import { ExtrinsicHelper } from '../scaffolding/extrinsicHelpers';
@@ -170,7 +170,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     }
   }
 
-  async formImportBundles(dsnpUserId: MessageSourceId, graphSdkConfig: Config, graphKeyPair: GraphKeyPair[]): Promise<ImportBundle[]> {
+  async formImportBundles(dsnpUserId: MessageSourceId, graphSdkConfig: Config, graphKeyPairs: ProviderKeyPair[]): Promise<ImportBundle[]> {
     const importBundles: ImportBundle[] = [];
     const public_follow_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
     const public_friendship_schema_id = await this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Public);
@@ -182,12 +182,10 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const privateFollows: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(dsnpUserId, private_follow_schema_id);
     const privateFriendships: PaginatedStorageResponse[] = await this.api.rpc.statefulStorage.getPaginatedStorage(dsnpUserId, private_friendship_schema_id);
 
-    const dsnpKeys = await this.formDsnpKeys(dsnpUserId, graphSdkConfig);
-
     let importBundleBuilder = new ImportBundleBuilder();
     // Only X25519 is supported for now
     // check if all keys are of type X25519
-    const areKeysCorrectType = graphKeyPair.every((keyPair) => keyPair.keyType === KeyType.X25519);
+    const areKeysCorrectType = graphKeyPairs.every((keyPair) => keyPair.keyType === KeyType.X25519);
     if (!areKeysCorrectType) {
       throw new Error('Only X25519 keys are supported for now');
     }
@@ -199,64 +197,47 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           .withSchemaId(public_follow_schema_id)
           .withPageData(publicFollow.page_id.toNumber(), publicFollow.payload, publicFollow.content_hash.toNumber())
           .build()
-      ));
+          ));
 
     importBundles.push(
-      ...publicFriendships.map((publicFriendship) => {
+      ...publicFriendships.map((publicFriendship) =>
         importBundleBuilder
           .withDsnpUserId(dsnpUserId.toString())
           .withSchemaId(public_friendship_schema_id)
-          .withPageData(publicFriendship.page_id.toNumber(), publicFriendship.payload, publicFriendship.content_hash.toNumber());
+          .withPageData(publicFriendship.page_id.toNumber(), publicFriendship.payload, publicFriendship.content_hash.toNumber())
+          .build()
+          ));
 
-        if (dsnpKeys) {
-          importBundleBuilder.withDsnpKeys(dsnpKeys);
-        }
-        return importBundleBuilder.build();
-      }),
-    );
+    if(privateFollows.length > 0 || privateFriendships.length > 0) {
+      const dsnpKeys = await this.formDsnpKeys(dsnpUserId, graphSdkConfig);
+      const graphKeyPairsSdk = graphKeyPairs.map((keyPair: ProviderKeyPair): GraphKeyPair => ({
+        keyType: GraphKeyType.X25519,
+        publicKey: keyPair.publicKey,
+        secretKey: keyPair.privateKey,
+      }));
 
-    importBundles.push(
-      ...privateFollows.map((privateFollow) => {
-        importBundleBuilder
-          .withDsnpUserId(dsnpUserId.toString())
-          .withSchemaId(private_follow_schema_id)
-          .withPageData(privateFollow.page_id.toNumber(), privateFollow.payload, privateFollow.content_hash.toNumber())
-          
-          if (dsnpKeys) {
-            importBundleBuilder.withDsnpKeys(dsnpKeys);
-          }
+      importBundles.push(
+        ...privateFollows.map((privateFollow) =>
+          importBundleBuilder
+            .withDsnpUserId(dsnpUserId.toString())
+            .withSchemaId(private_follow_schema_id)
+            .withPageData(privateFollow.page_id.toNumber(), privateFollow.payload, privateFollow.content_hash.toNumber())
+            .withDsnpKeys(dsnpKeys)
+            .withGraphKeyPairs(graphKeyPairsSdk)
+            .build()
+            ));
 
-          if (graphKeyPair.length > 0) {
-            // write each key to the graph
-            graphKeyPair.forEach((keyPair) => {
-              importBundleBuilder.withGraphKeyPair(GraphKeyType.X25519, keyPair.publicKey, keyPair.privateKey);
-            });
-          }
-          return importBundleBuilder.build();
-        }));
-
-    importBundles.push(
-      ...privateFriendships.map((privateFriendship) => {
-        importBundleBuilder
-          .withDsnpUserId(dsnpUserId.toString())
-          .withSchemaId(private_friendship_schema_id)
-          .withPageData(privateFriendship.page_id.toNumber(), privateFriendship.payload, privateFriendship.content_hash.toNumber())
-
-        if (dsnpKeys) {
-          importBundleBuilder.withDsnpKeys(dsnpKeys);
-        }
-
-        if (graphKeyPair.length > 0) {
-          // write each key to the graph
-          graphKeyPair.forEach((keyPair) => {
-            importBundleBuilder.withGraphKeyPair(GraphKeyType.X25519, keyPair.publicKey, keyPair.privateKey);
-          });
-        }
-
-        return importBundleBuilder.build();
-      }),
-    );
-
+      importBundles.push(
+        ...privateFriendships.map((privateFriendship) =>
+          importBundleBuilder
+            .withDsnpUserId(dsnpUserId.toString())
+            .withSchemaId(private_friendship_schema_id)
+            .withPageData(privateFriendship.page_id.toNumber(), privateFriendship.payload, privateFriendship.content_hash.toNumber())
+            .withDsnpKeys(dsnpKeys)
+            .withGraphKeyPairs(graphKeyPairsSdk)
+            .build()
+            ));
+    }
     return importBundles;
   }
 
@@ -331,26 +312,19 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     return actions;
   }
 
-  async formDsnpKeys(dsnpUserId: MessageSourceId, graphSdkConfig: Config): Promise<DsnpKeys | undefined> {
+  async formDsnpKeys(dsnpUserId: MessageSourceId, graphSdkConfig: Config): Promise<DsnpKeys> {
     const public_key_schema_id = graphSdkConfig.graphPublicKeySchemaId;
     const publicKeys: ItemizedStoragePageResponse = await this.api.rpc.statefulStorage.getItemizedStorage(dsnpUserId, public_key_schema_id);
-
-    let dsnpKeys: DsnpKeys | undefined;
-    if (publicKeys.items.length > 0) {
-      dsnpKeys = {
-        dsnpUserId: dsnpUserId.toString(),
-        keysHash: publicKeys.content_hash.toNumber(),
-        keys: publicKeys.items.map(
-          (item: ItemizedStorageResponse): KeyData => ({
-            index: item.index.toNumber(),
-            content: item.payload.toU8a(),
-          }),
-        ),
+    const dsnpKeys = {
+          dsnpUserId: dsnpUserId.toString(),
+          keysHash: publicKeys.content_hash.toNumber(),
+          keys: publicKeys.items.map(
+            (item: ItemizedStorageResponse): KeyData => ({
+              index: item.index.toNumber(),
+              content: item.payload.toU8a(),
+            }),
+          ),
       };
-    } else {
-      dsnpKeys = undefined;
-    }
-
     return dsnpKeys;
   }
 }
