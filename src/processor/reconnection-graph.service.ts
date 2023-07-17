@@ -10,7 +10,7 @@ import { ItemizedStoragePageResponse, ItemizedStorageResponse, MessageSourceId, 
 import { ImportBundleBuilder, Config, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, Update, GraphKeyPair } from '@dsnp/graph-sdk';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { SkipTransitiveGraphs, createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
+import { SkipTransitiveGraphs, UpdateTransitiveGraphs, createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
 import { GraphKeyPair as ProviderKeyPair, KeyType, ProviderGraph } from '../interfaces/provider-graph.interface';
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { ConfigService } from '../config/config.service';
@@ -62,7 +62,13 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const dsnpUserId: MessageSourceId = this.api.registry.createType('MessageSourceId', dsnpUserStr);
     const providerId: ProviderId = this.api.registry.createType('ProviderId', providerStr);
 
-    const [graphConnections, graphKeyPairs] = await this.getUserGraphFromProvider(dsnpUserId, providerId);
+    const [graphConnections, graphKeyPairs] = await this.getUserGraphFromProvider(dsnpUserId, providerId).catch((e) => {
+      this.logger.error(`Error getting user graph from provider: ${e}`);
+      const { key: jobId, data } = createGraphUpdateJob(dsnpUserId, providerId, UpdateTransitiveGraphs);
+      this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+      return;
+    });
+
     // graph config and respective schema ids
     const graphSdkConfig = await this.graphStateManager.getGraphConfig();
 
@@ -75,7 +81,9 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     if (updateConnections) {
       // using graphConnections form Action[] and update the user's DSNP Graph
       const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, graphSdkConfig, graphConnections);
-      await this.graphStateManager.applyActions(actions);
+      await this.graphStateManager.applyActions(actions).catch((e) => {
+        this.logger.error(`Error applying actions: ${e}`);
+      });
       exportedUpdates = await this.graphStateManager.exportGraphUpdates();
     } else {
       exportedUpdates = await this.graphStateManager.forceCalculateGraphs(dsnpUserId.toString());
@@ -83,7 +91,6 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
     let providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
     let calls: SubmittableExtrinsic<"rxjs", ISubmittableResult>[] = [];
-    let promises: Promise<any>[] = [];
 
     exportedUpdates.forEach((bundle) => {
       const ownerMsaId: MessageSourceId = this.api.registry.createType('MessageSourceId', bundle.ownerDsnpUserId);
@@ -108,10 +115,13 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
 
     let payWithCapacityBatchAllOp = ExtrinsicHelper.payWithCapacityBatchAll(providerKeys, calls);
     const [batchCompletedEvent, eventMap] = await payWithCapacityBatchAllOp.signAndSend();
-
-    // TODO
-    // Re-import DSNP Graph from chain & verify
-    //     (if updating connections as well, do the same for connections--but do not transitively update connections - of - connections)
+    if (batchCompletedEvent &&
+      !(ExtrinsicHelper.api.events.utility.BatchCompleted.is(batchCompletedEvent))) {
+        const { key: jobId, data } = createGraphUpdateJob(dsnpUserId, providerId, SkipTransitiveGraphs);
+        this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+      return;
+    }
+    
   }
 
   async getUserGraphFromProvider(dsnpUserId: MessageSourceId, providerId: ProviderId): Promise<any> {
