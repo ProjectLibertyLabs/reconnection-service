@@ -7,7 +7,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } fro
 import { options } from '@frequency-chain/api-augment';
 import { ApiPromise, HttpProvider, WsProvider } from '@polkadot/api';
 import { ItemizedStoragePageResponse, ItemizedStorageResponse, MessageSourceId, PaginatedStorageResponse, ProviderId } from '@frequency-chain/api-augment/interfaces';
-import { ImportBundleBuilder, Config, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, Update, GraphKeyPair } from '@dsnp/graph-sdk';
+import { ImportBundleBuilder, Config, ConnectAction, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, Update, GraphKeyPair } from '@dsnp/graph-sdk';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { SkipTransitiveGraphs, UpdateTransitiveGraphs, createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
@@ -18,7 +18,6 @@ import { ExtrinsicHelper } from '../scaffolding/extrinsicHelpers';
 import { createKeys } from "../scaffolding/apiConnection";
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
 import { ISubmittableResult } from '@polkadot/types/types';
-import { bool } from '@polkadot/types';
 
 
 @Injectable()
@@ -65,11 +64,15 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const { key: jobId_nt, data: data_nt } = createGraphUpdateJob(dsnpUserId, providerId, SkipTransitiveGraphs);
     const { key: jobId_t, data: data_t } = createGraphUpdateJob(dsnpUserId, providerId, UpdateTransitiveGraphs);
 
-    const [graphConnections, graphKeyPairs] = await this.getUserGraphFromProvider(dsnpUserId, providerId).catch((e) => {
+    let graphConnections: ProviderGraph[] = [];
+    let graphKeyPairs: ProviderKeyPair[] = [];
+    try {
+      [graphConnections, graphKeyPairs] = await this.getUserGraphFromProvider(dsnpUserId, providerId);
+    } catch (e) {
       this.logger.error(`Error getting user graph from provider: ${e}`);
       this.graphUpdateQueue.add('graphUpdate', data_t, { jobId: jobId_t });
       return;
-    });
+    }
 
     // graph config and respective schema ids
     const graphSdkConfig = await this.graphStateManager.getGraphConfig();
@@ -83,9 +86,12 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     if (updateConnections) {
       // using graphConnections form Action[] and update the user's DSNP Graph
       const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, graphSdkConfig, graphConnections);
-      await this.graphStateManager.applyActions(actions).catch((e) => {
+      try{
+        await this.graphStateManager.applyActions(actions);
+      } catch (e) {
+        // silenty fail graphsdk handles duplicate connections
         this.logger.error(`Error applying actions: ${e}`);
-      });
+      }
       exportedUpdates = await this.graphStateManager.exportGraphUpdates();
     } else {
       exportedUpdates = await this.graphStateManager.forceCalculateGraphs(dsnpUserId.toString());
