@@ -98,32 +98,71 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
   
       let providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
       let calls: SubmittableExtrinsic<"rxjs", ISubmittableResult>[] = [];
-  
+      const mapUserIdToUpdates = new Map<string, Update[]>();
+      // loop over exportUpdates and collect Updates vs userId
       exportedUpdates.forEach((bundle) => {
         const ownerMsaId: MessageSourceId = this.api.registry.createType('MessageSourceId', bundle.ownerDsnpUserId);
-        switch (bundle.type) {
-          case 'PersistPage':
-            const payload: any = Array.from(Array.prototype.slice.call(bundle.payload));
-            const upsertPageCall = ExtrinsicHelper.api.tx.statefulStorage.upsertPage(
-              ownerMsaId,
-              bundle.schemaId,
-              bundle.pageId,
-              bundle.prevHash,
-              payload,
-            );
-  
-            calls.push(upsertPageCall);
-            break;
-  
-          default:
-            break;
+        if (mapUserIdToUpdates.has(ownerMsaId.toString())) {
+          const updates = mapUserIdToUpdates.get(ownerMsaId.toString()) || [];
+          updates.push(bundle);
+          mapUserIdToUpdates.set(ownerMsaId.toString(), updates);
+        } else {
+          mapUserIdToUpdates.set(ownerMsaId.toString(), [bundle]);
         }
       });
+
+      for (const [userId, updates] of mapUserIdToUpdates.entries()) {
+        let batch: SubmittableExtrinsic<"rxjs", ISubmittableResult>[] = [];
+        let batchCount = 0;
+        let promises: Promise<any>[] = [];
+        updates.forEach((bundle) => {
+          const ownerMsaId: MessageSourceId = this.api.registry.createType('MessageSourceId', bundle.ownerDsnpUserId);
+          switch (bundle.type) {
+            case 'PersistPage':
+              const payload: any = Array.from(Array.prototype.slice.call(bundle.payload));
+              const upsertPageCall = ExtrinsicHelper.api.tx.statefulStorage.upsertPage(
+                ownerMsaId,
+                bundle.schemaId,
+                bundle.pageId,
+                bundle.prevHash,
+                payload,
+              );
   
-      let payWithCapacityBatchAllOp = ExtrinsicHelper.payWithCapacityBatchAll(providerKeys, calls);
-      const [batchCompletedEvent, eventMap] = await payWithCapacityBatchAllOp.signAndSend();
-      if (batchCompletedEvent && !(ExtrinsicHelper.api.events.utility.BatchCompleted.is(batchCompletedEvent))) {
-        throw new Error('BatchCompleted event not found');
+              batch.push(upsertPageCall);
+              batchCount++;
+  
+              // If the batch size exceeds the capacityBatchLimit, send the batch to the chain
+              if (batchCount === this.capacityBatchLimit) {
+                const payWithCapacityBatchAllOp = ExtrinsicHelper.payWithCapacityBatchAll(providerKeys, batch);
+                promises.push(payWithCapacityBatchAllOp.signAndSend());
+                // Reset the batch and count for the next batch
+                batch = [];
+                batchCount = 0;
+              }
+              break;
+  
+            default:
+              break;
+          }
+        });
+        
+        await Promise.all(promises);
+        // Check for BatchCompleted event after all promises are resolved
+        for (const promise of promises) {
+          const [batchCompletedEvent, eventMap] = await promise;
+          if (!(batchCompletedEvent && ExtrinsicHelper.api.events.utility.BatchCompleted.is(batchCompletedEvent))) {
+            throw new Error('BatchCompleted event not found');
+          }
+        }
+      
+        // Send the remaining batch to the chain if it's not empty
+        if (batch.length > 0) {
+          const payWithCapacityBatchAllOp = ExtrinsicHelper.payWithCapacityBatchAll(providerKeys, batch);
+          const [batchCompletedEvent, eventMap] = await payWithCapacityBatchAllOp.signAndSend();
+          if (batchCompletedEvent && !(ExtrinsicHelper.api.events.utility.BatchCompleted.is(batchCompletedEvent))) {
+            throw new Error('BatchCompleted event not found');
+          }
+        }
       }
   
       // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
