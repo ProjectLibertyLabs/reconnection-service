@@ -116,7 +116,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
         let batchCount = 0;
         let promises: Promise<any>[] = [];
         updates.forEach((bundle) => {
-          const ownerMsaId: MessageSourceId = this.api.registry.createType('MessageSourceId', bundle.ownerDsnpUserId);
+          const ownerMsaId: MessageSourceId = this.api.registry.createType('MessageSourceId', userId);
           switch (bundle.type) {
             case 'PersistPage':
               const payload: any = Array.from(Array.prototype.slice.call(bundle.payload));
