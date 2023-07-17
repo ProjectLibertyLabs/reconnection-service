@@ -18,6 +18,7 @@ import { ExtrinsicHelper } from '../scaffolding/extrinsicHelpers';
 import { createKeys } from "../scaffolding/apiConnection";
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
 import { ISubmittableResult } from '@polkadot/types/types';
+import { bool } from '@polkadot/types';
 
 
 @Injectable()
@@ -73,8 +74,8 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const graphSdkConfig = await this.graphStateManager.getGraphConfig();
 
     // get the user's DSNP Graph from the blockchain and form import bundles
-    const importBundles = await this.formImportBundles(dsnpUserId, graphSdkConfig, graphKeyPairs);
-    await this.graphStateManager.importUserData(importBundles);
+    // import bundles are used to import the user's DSNP Graph into the graph SDK
+    await this.importBundles(dsnpUserId, providerId, graphSdkConfig, graphKeyPairs, graphConnections, updateConnections);
 
     let exportedUpdates: Update[] = [];
 
@@ -121,7 +122,21 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
         this.graphUpdateQueue.add('graphUpdate', data, { jobId });
       return;
     }
-    
+
+    // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
+    // import bundles are used to import the user's DSNP Graph into the graph SDK
+    // check if user graph exists in the graph SDK else queue a graph update job
+    const reImported = await this.importBundles(dsnpUserId, providerId, graphSdkConfig, graphKeyPairs, graphConnections, updateConnections);
+    if (reImported) {
+      const userGraphExists = await this.graphStateManager.graphContainsUser(dsnpUserId.toString());
+      if (!userGraphExists) {
+        const { key: jobId, data } = createGraphUpdateJob(dsnpUserId, providerId, SkipTransitiveGraphs);
+        this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+      }
+    } else {
+      const { key: jobId, data } = createGraphUpdateJob(dsnpUserId, providerId, SkipTransitiveGraphs);
+      this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+    }
   }
 
   async getUserGraphFromProvider(dsnpUserId: MessageSourceId, providerId: ProviderId): Promise<any> {
@@ -178,6 +193,11 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
         throw e;
       }
     }
+  }
+
+  async importBundles(dsnpUserId: MessageSourceId, providerId: ProviderId, graphSdkConfig: Config, graphKeyPairs: ProviderKeyPair[], graphConnections: ProviderGraph[], updateConnections: boolean): Promise<boolean> {
+    const importBundles = await this.formImportBundles(dsnpUserId, graphSdkConfig, graphKeyPairs);
+    return this.graphStateManager.importUserData(importBundles);
   }
 
   async formImportBundles(dsnpUserId: MessageSourceId, graphSdkConfig: Config, graphKeyPairs: ProviderKeyPair[]): Promise<ImportBundle[]> {
