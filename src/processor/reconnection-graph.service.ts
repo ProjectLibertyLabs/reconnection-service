@@ -63,7 +63,7 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
     const providerId: ProviderId = this.api.registry.createType('ProviderId', providerStr);
     const { key: jobId_nt, data: data_nt } = createGraphUpdateJob(dsnpUserId, providerId, SkipTransitiveGraphs);
     const { key: jobId_t, data: data_t } = createGraphUpdateJob(dsnpUserId, providerId, UpdateTransitiveGraphs);
-
+  
     let graphConnections: ProviderGraph[] = [];
     let graphKeyPairs: ProviderKeyPair[] = [];
     try {
@@ -73,76 +73,84 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
       this.graphUpdateQueue.add('graphUpdate', data_t, { jobId: jobId_t });
       return;
     }
-
-    // graph config and respective schema ids
-    const graphSdkConfig = await this.graphStateManager.getGraphConfig();
-
-    // get the user's DSNP Graph from the blockchain and form import bundles
-    // import bundles are used to import the user's DSNP Graph into the graph SDK
-    await this.importBundles(dsnpUserId, providerId, graphSdkConfig, graphKeyPairs, graphConnections, updateConnections);
-
-    let exportedUpdates: Update[] = [];
-
-    if (updateConnections) {
-      // using graphConnections form Action[] and update the user's DSNP Graph
-      const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, graphSdkConfig, graphConnections);
-      try{
-        await this.graphStateManager.applyActions(actions);
-      } catch (e) {
-        // silenty fail graphsdk handles duplicate connections
-        this.logger.error(`Error applying actions: ${e}`);
+  
+    try {
+      // graph config and respective schema ids
+      const graphSdkConfig = await this.graphStateManager.getGraphConfig();
+  
+      // get the user's DSNP Graph from the blockchain and form import bundles
+      // import bundles are used to import the user's DSNP Graph into the graph SDK
+      await this.importBundles(dsnpUserId, providerId, graphSdkConfig, graphKeyPairs, graphConnections, updateConnections);
+  
+      let exportedUpdates: Update[] = [];
+  
+      if (updateConnections) {
+        // using graphConnections form Action[] and update the user's DSNP Graph
+        const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, graphSdkConfig, graphConnections);
+        try {
+          await this.graphStateManager.applyActions(actions);
+        } catch (e) {
+          // silenty fail graphsdk handles duplicate connections
+          this.logger.error(`Error applying actions: ${e}`);
+        }
+        exportedUpdates = await this.graphStateManager.exportGraphUpdates();
+      } else {
+        exportedUpdates = await this.graphStateManager.forceCalculateGraphs(dsnpUserId.toString());
       }
-      exportedUpdates = await this.graphStateManager.exportGraphUpdates();
-    } else {
-      exportedUpdates = await this.graphStateManager.forceCalculateGraphs(dsnpUserId.toString());
-    }
-
-    let providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
-    let calls: SubmittableExtrinsic<"rxjs", ISubmittableResult>[] = [];
-
-    exportedUpdates.forEach((bundle) => {
-      const ownerMsaId: MessageSourceId = this.api.registry.createType('MessageSourceId', bundle.ownerDsnpUserId);
-      switch (bundle.type) {
-        case 'PersistPage':
-          const payload: any = Array.from(Array.prototype.slice.call(bundle.payload));
-          const upsertPageCall = ExtrinsicHelper.api.tx.statefulStorage.upsertPage(
-            ownerMsaId,
-            bundle.schemaId,
-            bundle.pageId,
-            bundle.prevHash,
-            payload,
-          );
-
-          calls.push(upsertPageCall);
-          break;
-
-        default:
-          break;
-      }
-    });
-
-    let payWithCapacityBatchAllOp = ExtrinsicHelper.payWithCapacityBatchAll(providerKeys, calls);
-    const [batchCompletedEvent, eventMap] = await payWithCapacityBatchAllOp.signAndSend();
-    if (batchCompletedEvent &&
-      !(ExtrinsicHelper.api.events.utility.BatchCompleted.is(batchCompletedEvent))) {
+  
+      let providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
+      let calls: SubmittableExtrinsic<"rxjs", ISubmittableResult>[] = [];
+  
+      exportedUpdates.forEach((bundle) => {
+        const ownerMsaId: MessageSourceId = this.api.registry.createType('MessageSourceId', bundle.ownerDsnpUserId);
+        switch (bundle.type) {
+          case 'PersistPage':
+            const payload: any = Array.from(Array.prototype.slice.call(bundle.payload));
+            const upsertPageCall = ExtrinsicHelper.api.tx.statefulStorage.upsertPage(
+              ownerMsaId,
+              bundle.schemaId,
+              bundle.pageId,
+              bundle.prevHash,
+              payload,
+            );
+  
+            calls.push(upsertPageCall);
+            break;
+  
+          default:
+            break;
+        }
+      });
+  
+      let payWithCapacityBatchAllOp = ExtrinsicHelper.payWithCapacityBatchAll(providerKeys, calls);
+      const [batchCompletedEvent, eventMap] = await payWithCapacityBatchAllOp.signAndSend();
+      if (batchCompletedEvent && !(ExtrinsicHelper.api.events.utility.BatchCompleted.is(batchCompletedEvent))) {
         this.graphUpdateQueue.add('graphUpdate', data_nt, { jobId: jobId_nt });
-      return;
-    }
-
-    // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
-    // import bundles are used to import the user's DSNP Graph into the graph SDK
-    // check if user graph exists in the graph SDK else queue a graph update job
-    const reImported = await this.importBundles(dsnpUserId, providerId, graphSdkConfig, graphKeyPairs, graphConnections, updateConnections);
-    if (reImported) {
-      const userGraphExists = await this.graphStateManager.graphContainsUser(dsnpUserId.toString());
-      if (!userGraphExists) {
+        return;
+      }
+  
+      // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
+      // import bundles are used to import the user's DSNP Graph into the graph SDK
+      // check if user graph exists in the graph SDK else queue a graph update job
+      const reImported = await this.importBundles(dsnpUserId, providerId, graphSdkConfig, graphKeyPairs, graphConnections, updateConnections);
+      if (reImported) {
+        const userGraphExists = await this.graphStateManager.graphContainsUser(dsnpUserId.toString());
+        if (!userGraphExists) {
+          this.graphUpdateQueue.add('graphUpdate', data_nt, { jobId: jobId_nt });
+        }
+      } else {
         this.graphUpdateQueue.add('graphUpdate', data_nt, { jobId: jobId_nt });
       }
-    } else {
-      this.graphUpdateQueue.add('graphUpdate', data_nt, { jobId: jobId_nt });
+    } catch (err) {
+      if (updateConnections) {
+        this.graphUpdateQueue.add('graphUpdate', data_nt, { jobId: jobId_nt });
+      } else {
+        this.logger.error(err);
+        throw err;
+      }
     }
   }
-
+  
   async getUserGraphFromProvider(dsnpUserId: MessageSourceId, providerId: ProviderId): Promise<any> {
     const headers = {
       Authorization: 'Bearer <access_token>', // Replace with your actual access token if required
