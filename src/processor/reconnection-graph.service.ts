@@ -146,20 +146,16 @@ export class ReconnectionGraphService implements OnApplicationBootstrap, OnAppli
           }
         });
         
+        if (batch.length > 0) {
+          const payWithCapacityBatchAllOp = ExtrinsicHelper.payWithCapacityBatchAll(providerKeys, batch);
+          promises.push(payWithCapacityBatchAllOp.signAndSend());
+        }
+        
         await Promise.all(promises);
         // Check for BatchCompleted event after all promises are resolved
         for (const promise of promises) {
           const [batchCompletedEvent, eventMap] = await promise;
           if (!(batchCompletedEvent && ExtrinsicHelper.api.events.utility.BatchCompleted.is(batchCompletedEvent))) {
-            throw new Error('BatchCompleted event not found');
-          }
-        }
-      
-        // Send the remaining batch to the chain if it's not empty
-        if (batch.length > 0) {
-          const payWithCapacityBatchAllOp = ExtrinsicHelper.payWithCapacityBatchAll(providerKeys, batch);
-          const [batchCompletedEvent, eventMap] = await payWithCapacityBatchAllOp.signAndSend();
-          if (batchCompletedEvent && !(ExtrinsicHelper.api.events.utility.BatchCompleted.is(batchCompletedEvent))) {
             throw new Error('BatchCompleted event not found');
           }
         }
