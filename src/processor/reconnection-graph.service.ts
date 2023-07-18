@@ -391,12 +391,12 @@ export class ReconnectionGraphService {
   async processChainEvents(promises: Promise<ParsedEventResult>[], dsnpUserId: MessageSourceId): Promise<void> {
     for (const promise of promises) {
       const[event, eventMap] = await promise;
+      if (!event) {
+        throw new Error(`No event found for ${dsnpUserId.toString()} with ${eventMap}`);
+      }
       // if batch did not complete with a successful BatchCompleted event, handle various cases
-      if(event && this.blockchainService.api.events.utility.BatchCompleted.is(event)){
-      } else {
-        // this would only be an issue when chain connection is lost or 
-        // something went wrong while submitting transactions to the chain
-        throw new Error(`Batch did not complete successfully for ${dsnpUserId.toString()}`);
+      if(!this.blockchainService.api.events.utility.BatchCompleted.is(event)){
+        // check the event map for errors and handle them
       }
     }
   }
