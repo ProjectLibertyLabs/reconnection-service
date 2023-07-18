@@ -15,8 +15,8 @@
     "docker-stop:dev": "docker-compose -f docker-compose.dev.yaml stop",
     "clean": "rm -Rf dist",
     "lint": "tsc --noEmit --pretty && eslint \"**/*.ts\" --fix",
-    "pretest": "cp env.template .env.test",
-    "test": "set -a ; . env.template ; export NODE_ENV=test ; jest --detectOpenHandles --forceExit --coverage --verbose"
+    "pretest": "cp env.template .env",
+    "test": "jest --coverage --verbose"
   },
   "repository": {
     "type": "git",

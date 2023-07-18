@@ -1,6 +1,3 @@
-// ignore moving this to down to the bottom of the file, it will cause the test to fail
-// ignore linting this file, it will cause the test to fail
-// tslint:disable-next-line: no-var-requires
 import { Test, TestingModule } from '@nestjs/testing';
 import { Action, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyPair, GraphKeyType, ImportBundle, KeyData, PageData, PrivacyType } from '@dsnp/graph-sdk';
 import { ConfigModule } from '@nestjs/config';

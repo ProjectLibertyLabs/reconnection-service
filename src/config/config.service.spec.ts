@@ -11,6 +11,9 @@ import { configModuleOptions } from './env.config';
 
 const setupConfigService = async (envObj: any): Promise<ConfigService> => {
   jest.resetModules();
+  Object.keys(process.env).forEach((key) => {
+    delete process.env[key];
+  });
   process.env = {
     ...envObj,
   };
@@ -18,6 +21,7 @@ const setupConfigService = async (envObj: any): Promise<ConfigService> => {
     imports: [
       ConfigModule.forRoot({
         ...configModuleOptions,
+        ignoreEnvFile: true,
         load: [() => process.env],
       }),
     ],

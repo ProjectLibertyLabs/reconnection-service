@@ -1,6 +1,5 @@
 node_modules
 dist
-.env.dev
+.env*
 .vscode
 coverage
-.env.test
