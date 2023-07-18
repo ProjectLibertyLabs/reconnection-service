@@ -5,7 +5,7 @@ https://docs.nestjs.com/fundamentals/testing#unit-testing
 
 import { Test } from '@nestjs/testing';
 import { describe, it, expect, beforeAll, jest } from '@jest/globals';
-import { ConfigModule, ConfigService as NestConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { ConfigService } from './config.service';
 import { configModuleOptions } from './env.config';
 
@@ -31,31 +31,25 @@ const setupConfigService = async (envObj: any): Promise<ConfigService> => {
 };
 
 describe('ReconnectionConfigService', () => {
-  const REDIS_URL = 'redis://localhost:6389';
-  const FREQUENCY_URL = 'ws://localhost:9933';
-  const PROVIDER_ID = 1;
-  const PROVIDER_BASE_URL = 'https://some-provider';
-  const PROVIDER_USER_GRAPH_ENDPOINT = 'user-graph';
-  const PROVIDER_ACCESS_TOKEN = 'some-token';
-  const BLOCKCHAIN_SCAN_INTERVAL_MINUTES = 60;
-  const QUEUE_HIGH_WATER = 1000;
-  const PROVIDER_ACCOUNT_SEED_PHRASE = 'some seed phrase';
-  const GRAPH_ENVIRONMENT_TYPE = 'Mainnet';
-  const GRAPH_ENVIRONMENT_CONFIG = '{}';
-
-  const ALL_ENV = {
-    REDIS_URL,
-    FREQUENCY_URL,
-    PROVIDER_ID,
-    PROVIDER_BASE_URL,
-    PROVIDER_USER_GRAPH_ENDPOINT,
-    PROVIDER_ACCESS_TOKEN,
-    BLOCKCHAIN_SCAN_INTERVAL_MINUTES,
-    QUEUE_HIGH_WATER,
-    PROVIDER_ACCOUNT_SEED_PHRASE,
-    GRAPH_ENVIRONMENT_TYPE,
-    GRAPH_ENVIRONMENT_CONFIG,
+  const ALL_ENV: { [key: string]: string | undefined } = {
+    REDIS_URL: undefined,
+    FREQUENCY_URL: undefined,
+    PROVIDER_ID: undefined,
+    PROVIDER_BASE_URL: undefined,
+    PROVIDER_USER_GRAPH_ENDPOINT: undefined,
+    PROVIDER_ACCESS_TOKEN: undefined,
+    BLOCKCHAIN_SCAN_INTERVAL_MINUTES: undefined,
+    QUEUE_HIGH_WATER: undefined,
+    PROVIDER_ACCOUNT_SEED_PHRASE: undefined,
+    GRAPH_ENVIRONMENT_TYPE: undefined,
+    GRAPH_ENVIRONMENT_DEV_CONFIG: undefined,
   };
+
+  beforeAll(() => {
+    Object.keys(ALL_ENV).forEach((key) => {
+      ALL_ENV[key] = process.env[key];
+    });
+  });
 
   describe('invalid environment', () => {
     it('missing redis url should fail', async () => {
@@ -122,9 +116,34 @@ describe('ReconnectionConfigService', () => {
       await expect(setupConfigService({ QUEUE_HIGH_WATER: 'foo', ...env })).rejects.toBeDefined();
     });
 
+    it('missing provider account seed phrase should fail', async () => {
+      const { PROVIDER_ACCOUNT_SEED_PHRASE: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ PROVIDER_ACCOUNT_SEED_PHRASE: undefined, ...env })).rejects.toBeDefined();
+    });
+
     it('invalid provider account seed phrase should fail', async () => {
       const { PROVIDER_ACCOUNT_SEED_PHRASE: dummy, ...env } = ALL_ENV;
-      await expect(setupConfigService({ PROVIDER_ACCOUNT_SEED_PHRASE: '', ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ PROVIDER_ACCOUNT_SEED_PHRASE: 'hello, world', ...env })).rejects.toBeDefined();
+    });
+
+    it('missing graph environment type should fail', async () => {
+      const { GRAPH_ENVIRONMENT_TYPE: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ GRAPH_ENVIRONMENT_TYPE: undefined, ...env })).rejects.toBeDefined();
+    });
+
+    it('invalid graph environment type should fail', async () => {
+      const { GRAPH_ENVIRONMENT_TYPE: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ GRAPH_ENVIRONMENT_TYPE: 'bad', ...env })).rejects.toBeDefined();
+    });
+
+    it('missing graph environment dev config should fail', async () => {
+      const { GRAPH_ENVIRONMENT_TYPE: dummy, GRAPH_ENVIRONMENT_DEV_CONFIG: dummy2, ...env } = ALL_ENV;
+      await expect(setupConfigService({ GRAPH_ENVIRONMENT_TYPE: 'Dev', GRAPH_ENVIRONMENT_DEV_CONFIG: undefined, ...env })).rejects.toBeDefined();
+    });
+
+    it('invalid graph environment dev config should fail', async () => {
+      const { GRAPH_ENVIRONMENT_TYPE: dummy, GRAPH_ENVIRONMENT_DEV_CONFIG: dummy2, ...env } = ALL_ENV;
+      await expect(setupConfigService({ GRAPH_ENVIRONMENT_TYPE: 'Dev', GRAPH_ENVIRONMENT_DEV_CONFIG: 'invalid json', ...env })).rejects.toBeDefined();
     });
   });
 
@@ -139,23 +158,43 @@ describe('ReconnectionConfigService', () => {
     });
 
     it('should get redis url', () => {
-      expect(reconnectionConfigService.redisUrl?.toString()).toStrictEqual(REDIS_URL);
+      expect(reconnectionConfigService.redisUrl?.toString()).toStrictEqual(ALL_ENV.REDIS_URL?.toString());
     });
 
     it('should get frequency url', () => {
-      expect(reconnectionConfigService.frequencyUrl?.toString()).toStrictEqual(FREQUENCY_URL);
+      expect(reconnectionConfigService.frequencyUrl?.toString()).toStrictEqual(ALL_ENV.FREQUENCY_URL?.toString());
     });
 
     it('should get provider base url', () => {
-      expect(reconnectionConfigService.providerBaseUrl(BigInt(PROVIDER_ID))?.toString()).toStrictEqual(PROVIDER_BASE_URL);
+      expect(reconnectionConfigService.providerBaseUrl(ALL_ENV.PROVIDER_ID as string).toString()).toStrictEqual(ALL_ENV.PROVIDER_BASE_URL);
     });
 
     it('should get provider user graph endpoint', () => {
-      expect(reconnectionConfigService.providerUserGraphEndpoint(BigInt(PROVIDER_ID))?.toString()).toStrictEqual(PROVIDER_USER_GRAPH_ENDPOINT);
+      expect(reconnectionConfigService.providerUserGraphEndpoint(ALL_ENV.PROVIDER_ID as string).toString()).toStrictEqual(ALL_ENV.PROVIDER_USER_GRAPH_ENDPOINT);
     });
 
     it('should get provider api token', () => {
-      expect(reconnectionConfigService.providerApiToken(BigInt(PROVIDER_ID))?.toString()).toStrictEqual(PROVIDER_ACCESS_TOKEN);
+      expect(reconnectionConfigService.providerApiToken(ALL_ENV.PROVIDER_ID as string).toString()).toStrictEqual(ALL_ENV.PROVIDER_ACCESS_TOKEN);
+    });
+
+    it('should get scan interval', () => {
+      expect(reconnectionConfigService.getBlockchainScanIntervalMinutes()).toStrictEqual(parseInt(ALL_ENV.BLOCKCHAIN_SCAN_INTERVAL_MINUTES as string, 10));
+    });
+
+    it('should get queue high water mark', () => {
+      expect(reconnectionConfigService.getQueueHighWater()).toStrictEqual(parseInt(ALL_ENV.QUEUE_HIGH_WATER as string, 10));
+    });
+
+    it('should get provider seed phrase', () => {
+      expect(reconnectionConfigService.getProviderAccountSeedPhrase()).toStrictEqual(ALL_ENV.PROVIDER_ACCOUNT_SEED_PHRASE);
+    });
+
+    it('should get graph environment type', () => {
+      expect(reconnectionConfigService.getGraphEnvironmentType()).toStrictEqual(ALL_ENV.GRAPH_ENVIRONMENT_TYPE);
+    });
+
+    it('should get graph environment dev config', () => {
+      expect(reconnectionConfigService.getGraphEnvironmentConfig()).toStrictEqual(ALL_ENV.GRAPH_ENVIRONMENT_DEV_CONFIG);
     });
   });
 });

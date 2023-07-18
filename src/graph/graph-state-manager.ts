@@ -59,9 +59,9 @@ export class GraphStateManager implements OnApplicationBootstrap {
   }
 
   constructor(private configService: ConfigService) {
-    const environmentType = configService.graph_environment_type();
+    const environmentType = configService.getGraphEnvironmentType();
     if (environmentType === EnvironmentType.Dev.toString()) {
-      const configJson = configService.graph_environment_config();
+      const configJson = configService.getGraphEnvironmentConfig();
       const config: Config = JSON.parse(configJson);
       const devEnvironment: DevEnvironment = { environmentType: EnvironmentType.Dev, config };
       this.environment = devEnvironment;

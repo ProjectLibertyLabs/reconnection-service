@@ -1,71 +1,14 @@
 // ignore moving this to down to the bottom of the file, it will cause the test to fail
 // ignore linting this file, it will cause the test to fail
 // tslint:disable-next-line: no-var-requires
-require('dotenv').config({ path: '.env.test' });
-
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  Action,
-  ConnectAction,
-  Connection,
-  ConnectionType,
-  DsnpKeys,
-  EnvironmentType,
-  Graph,
-  GraphKeyPair,
-  GraphKeyType,
-  ImportBundle,
-  KeyData,
-  PageData,
-  PrivacyType,
-} from '@dsnp/graph-sdk';
+import { Action, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyPair, GraphKeyType, ImportBundle, KeyData, PageData, PrivacyType } from '@dsnp/graph-sdk';
 import { ConfigModule } from '@nestjs/config';
 import { GraphStateManager } from './graph-state-manager';
 import { ConfigService } from '../config/config.service';
-import { configModuleOptions } from '../config/env.config';
 import { GraphManagerModule } from './graph-state.module';
 
-
-type ProcessEnv = {
-  REDIS_URL: string;
-  FREQUENCY_URL: string;
-  PROVIDER_ID: string;
-  PROVIDER_BASE_URL: string;
-  PROVIDER_USER_GRAPH_ENDPOINT: string;
-  PROVIDER_ACCESS_TOKEN: string;
-  BLOCKCHAIN_SCAN_INTERVAL_MINUTES: string;
-  QUEUE_HIGH_WATER: string;
-  PROVIDER_ACCOUNT_SEED_PHRASE: string;
-  GRAPH_ENVIRONMENT_TYPE: string;
-  GRAPH_ENVIRONMENT_CONFIG: string;
-};
-
 describe('GraphStateManager', () => {
-  const REDIS_URL = 'redis://localhost:6389';
-  const FREQUENCY_URL = 'ws://localhost:9933';
-  const PROVIDER_ID = '1';
-  const PROVIDER_BASE_URL = 'https://some-provider';
-  const PROVIDER_USER_GRAPH_ENDPOINT = 'user-graph';
-  const PROVIDER_ACCESS_TOKEN = 'some-token';
-  const BLOCKCHAIN_SCAN_INTERVAL_MINUTES = '60';
-  const QUEUE_HIGH_WATER = '1000';
-  const PROVIDER_ACCOUNT_SEED_PHRASE = 'some seed phrase';
-  const GRAPH_ENVIRONMENT_TYPE = 'Mainnet';
-  const GRAPH_ENVIRONMENT_CONFIG = '{}';
-
-  const ALL_ENV = {
-    REDIS_URL,
-    FREQUENCY_URL,
-    PROVIDER_ID,
-    PROVIDER_BASE_URL,
-    PROVIDER_USER_GRAPH_ENDPOINT,
-    PROVIDER_ACCESS_TOKEN,
-    BLOCKCHAIN_SCAN_INTERVAL_MINUTES,
-    QUEUE_HIGH_WATER,
-    PROVIDER_ACCOUNT_SEED_PHRASE,
-    GRAPH_ENVIRONMENT_TYPE,
-    GRAPH_ENVIRONMENT_CONFIG,
-  };
   let graphStateManager: GraphStateManager;
 
   beforeAll(async () => {
@@ -73,7 +16,6 @@ describe('GraphStateManager', () => {
       imports: [
         GraphManagerModule,
         ConfigModule.forRoot({
-          ...configModuleOptions,
           isGlobal: true,
         }),
       ],
@@ -81,6 +23,7 @@ describe('GraphStateManager', () => {
     }).compile();
 
     graphStateManager = module.get<GraphStateManager>(GraphStateManager);
+    await graphStateManager.onApplicationBootstrap();
   });
 
   it('should be defined', () => {
