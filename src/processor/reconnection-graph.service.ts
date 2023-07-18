@@ -83,6 +83,9 @@ export class ReconnectionGraphService {
 
       const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
       const mapUserIdToUpdates = new Map<string, Update[]>();
+      /// Note: for now exporting updates for a single user
+      exportedUpdates = exportedUpdates.filter((update) => update.ownerDsnpUserId === dsnpUserStr);
+
       // loop over exportUpdates and collect Updates vs userId
       exportedUpdates.forEach((bundle) => {
         const ownerMsaId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', bundle.ownerDsnpUserId);
