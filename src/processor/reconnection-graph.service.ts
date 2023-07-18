@@ -82,28 +82,27 @@ export class ReconnectionGraphService {
       }
 
       const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
-      const mapUserIdToUpdates = new Map<string, Update[]>();
+      const mapUserIdToUpdates = new Map<MessageSourceId, Update[]>();
       /// Note: for now exporting updates for a single user
       exportedUpdates = exportedUpdates.filter((update) => update.ownerDsnpUserId === dsnpUserStr);
 
       // loop over exportUpdates and collect Updates vs userId
       exportedUpdates.forEach((bundle) => {
         const ownerMsaId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', bundle.ownerDsnpUserId);
-        if (mapUserIdToUpdates.has(ownerMsaId.toString())) {
-          const updates = mapUserIdToUpdates.get(ownerMsaId.toString()) || [];
+        if (mapUserIdToUpdates.has(ownerMsaId)) {
+          const updates = mapUserIdToUpdates.get(ownerMsaId) || [];
           updates.push(bundle);
-          mapUserIdToUpdates.set(ownerMsaId.toString(), updates);
+          mapUserIdToUpdates.set(ownerMsaId, updates);
         } else {
-          mapUserIdToUpdates.set(ownerMsaId.toString(), [bundle]);
+          mapUserIdToUpdates.set(ownerMsaId, [bundle]);
         }
       });
 
-      for (const [userId, updates] of mapUserIdToUpdates.entries()) {
+      for (const [ownerMsaId, updates] of mapUserIdToUpdates.entries()) {
         let batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
         let batchCount = 0;
         const promises: Promise<any>[] = [];
         updates.forEach((bundle) => {
-          const ownerMsaId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', userId);
           switch (bundle.type) {
             case 'PersistPage':
               batch.push(
@@ -140,13 +139,8 @@ export class ReconnectionGraphService {
         }
 
         await Promise.all(promises);
-        // Check for BatchCompleted event after all promises are resolved
-        for (const promise of promises) {
-          const [event, eventMap] = await promise;
-          if (!event) {
-            throw new Error('event not found');
-          }
-        }
+
+        //await this.processChainEvents(promises, ownerMsaId);
       }
 
       // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
