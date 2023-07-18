@@ -64,7 +64,7 @@ export class ReconnectionGraphService {
 
       // get the user's DSNP Graph from the blockchain and form import bundles
       // import bundles are used to import the user's DSNP Graph into the graph SDK
-      await this.importBundles(dsnpUserId, graphSdkConfig, graphKeyPairs);
+      await this.importBundles(dsnpUserId, graphKeyPairs);
 
       let exportedUpdates: Update[] = [];
 
@@ -115,7 +115,7 @@ export class ReconnectionGraphService {
       // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
       // import bundles are used to import the user's DSNP Graph into the graph SDK
       // check if user graph exists in the graph SDK else queue a graph update job
-      const reImported = await this.importBundles(dsnpUserId, graphSdkConfig, graphKeyPairs);
+      const reImported = await this.importBundles(dsnpUserId, graphKeyPairs);
       if (reImported) {
         const userGraphExists = await this.graphStateManager.graphContainsUser(dsnpUserId.toString());
         if (!userGraphExists) {
@@ -192,14 +192,13 @@ export class ReconnectionGraphService {
 
   async importBundles(
     dsnpUserId: MessageSourceId,
-    graphSdkConfig: Config,
     graphKeyPairs: ProviderKeyPair[],
   ): Promise<boolean> {
-    const importBundles = await this.formImportBundles(dsnpUserId, graphSdkConfig, graphKeyPairs);
+    const importBundles = await this.formImportBundles(dsnpUserId, graphKeyPairs);
     return this.graphStateManager.importUserData(importBundles);
   }
 
-  async formImportBundles(dsnpUserId: MessageSourceId, graphSdkConfig: Config, graphKeyPairs: ProviderKeyPair[]): Promise<ImportBundle[]> {
+  async formImportBundles(dsnpUserId: MessageSourceId, graphKeyPairs: ProviderKeyPair[]): Promise<ImportBundle[]> {
     const importBundles: ImportBundle[] = [];
     const publicFollowSchemaId = this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
     const publicFriendshipSchemaId = this.graphStateManager.getSchemaIdFromConfig(ConnectionType.Friendship, PrivacyType.Public);
