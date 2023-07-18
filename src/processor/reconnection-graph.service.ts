@@ -389,11 +389,10 @@ export class ReconnectionGraphService {
   }
 
   async processChainEvents(promises: Promise<ParsedEventResult>[], dsnpUserId: MessageSourceId): Promise<void> {
-    // loop over promises and wait for all to resolve
     for (const promise of promises) {
       const[event, eventMap] = await promise;
-      if (!event) {
-        throw new Error(`Error submitting extrinsic`);
+      // if batch did not complete with a successful BatchCompleted event, handle various cases
+      if(!event && this.blockchainService.api.events.utility.BatchCompleted.is(event)){
       }
     }
   }
