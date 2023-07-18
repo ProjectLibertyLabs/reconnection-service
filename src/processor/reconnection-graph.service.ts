@@ -17,14 +17,15 @@ import {
 } from '@dsnp/graph-sdk';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { SkipTransitiveGraphs, createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
+import { SkipTransitiveGraphs, createGraphUpdateJob } from '../interfaces/graph-update-job.interface';
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
 import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
-import { BlockchainService } from '#app/blockchain/blockchain.service';
-import { createKeys } from '#app/blockchain/create-keys';
+import { BlockchainService } from '../blockchain/blockchain.service';
+import { createKeys } from '../blockchain/create-keys';
 import { GraphKeyPair as ProviderKeyPair, KeyType, ProviderGraph } from '../interfaces/provider-graph.interface';
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { ConfigService } from '../config/config.service';
+import { ParsedEventResult } from '../blockchain/extrinsic';
 
 @Injectable()
 export class ReconnectionGraphService {
@@ -101,7 +102,7 @@ export class ReconnectionGraphService {
       for (const [ownerMsaId, updates] of mapUserIdToUpdates.entries()) {
         let batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
         let batchCount = 0;
-        const promises: Promise<any>[] = [];
+        const promises: Promise<ParsedEventResult>[] = [];
         updates.forEach((bundle) => {
           switch (bundle.type) {
             case 'PersistPage':
@@ -387,7 +388,7 @@ export class ReconnectionGraphService {
     return dsnpKeys;
   }
 
-  async processChainEvents(promises: Promise<any>[], dsnpUserId: MessageSourceId): Promise<void> {
+  async processChainEvents(promises: Promise<ParsedEventResult>[], dsnpUserId: MessageSourceId): Promise<void> {
     // loop over promises and wait for all to resolve
     for (const promise of promises) {
       const[event, eventMap] = await promise;
