@@ -392,7 +392,11 @@ export class ReconnectionGraphService {
     for (const promise of promises) {
       const[event, eventMap] = await promise;
       // if batch did not complete with a successful BatchCompleted event, handle various cases
-      if(!event && this.blockchainService.api.events.utility.BatchCompleted.is(event)){
+      if(event && this.blockchainService.api.events.utility.BatchCompleted.is(event)){
+      } else {
+        // this would only be an issue when chain connection is lost or 
+        // something went wrong while submitting transactions to the chain
+        throw new Error(`Batch did not complete successfully for ${dsnpUserId.toString()}`);
       }
     }
   }
