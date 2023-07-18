@@ -2,8 +2,10 @@
 https://docs.nestjs.com/providers#services
 */
 
+import { ProviderId } from '@frequency-chain/api-augment/interfaces';
 import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
+import { AnyNumber } from '@polkadot/types/types';
 
 export interface ConfigEnvironmentVariables {
   REDIS_URL: URL;
@@ -63,15 +65,15 @@ export class ConfigService {
     return this.nestConfigService.get('FREQUENCY_URL')!;
   }
 
-  public providerBaseUrl(id: bigint): URL {
+  public providerBaseUrl(id: ProviderId | AnyNumber): URL {
     return this.providerMap.get(id.toString())?.baseUrl!;
   }
 
-  public providerUserGraphEndpoint(id: bigint): string {
+  public providerUserGraphEndpoint(id: ProviderId | AnyNumber): string {
     return this.providerMap.get(id.toString())?.userGraphEndpoint!;
   }
 
-  public providerApiToken(id: bigint): string {
+  public providerApiToken(id: ProviderId | AnyNumber): string {
     return this.providerMap.get(id.toString())?.apiToken!;
   }
 
@@ -87,11 +89,11 @@ export class ConfigService {
     return this.nestConfigService.get<string>('PROVIDER_ACCOUNT_SEED_PHRASE')!;
   }
 
-  public graph_environment_type(): string {
+  public getGraphEnvironmentType(): string {
     return this.nestConfigService.get<string>('GRAPH_ENVIRONMENT_TYPE')!;
   }
 
-  public graph_environment_config(): string {
+  public getGraphEnvironmentConfig(): string {
     return this.nestConfigService.get<string>('GRAPH_ENVIRONMENT_DEV_CONFIG')!;
   }
 }

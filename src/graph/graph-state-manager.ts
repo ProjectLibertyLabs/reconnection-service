@@ -1,12 +1,32 @@
-import { Injectable } from '@nestjs/common';
-import { Action, Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, ImportBundle, Update, Config, DevEnvironment, EnvironmentType, DsnpKeys, DsnpPublicKey, DsnpGraphEdge, ConnectionType, PrivacyType } from '@dsnp/graph-sdk';
+import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
+import {
+  Action,
+  Graph,
+  EnvironmentInterface,
+  GraphKeyPair,
+  GraphKeyType,
+  ImportBundle,
+  Update,
+  Config,
+  DevEnvironment,
+  EnvironmentType,
+  DsnpKeys,
+  DsnpPublicKey,
+  DsnpGraphEdge,
+  ConnectionType,
+  PrivacyType,
+} from '@dsnp/graph-sdk';
 import { ConfigService } from '../config/config.service';
 
 @Injectable()
-export class GraphStateManager {
+export class GraphStateManager implements OnApplicationBootstrap {
   private graphState: Graph;
 
   private environment: EnvironmentInterface; // Environment details
+
+  private schemaIds: { [key: string]: { [key: string]: number } };
+
+  private graphKeySchemaId: number;
 
   private static graphStateFinalizer = new FinalizationRegistry((graphState: Graph) => {
     if (graphState) {
@@ -14,11 +34,35 @@ export class GraphStateManager {
     }
   });
 
+  public async onApplicationBootstrap() {
+    if (!this.graphState) {
+      throw new Error('Unable to initialize schema ids');
+    }
+
+    const publicFollow = await this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Public);
+    const publicFriend = await this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Friendship, PrivacyType.Public);
+    const privateFollow = await this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Private);
+    const privateFriend = await this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Friendship, PrivacyType.Private);
+
+    this.graphKeySchemaId = (await this.graphState.getGraphConfig(this.environment)).graphPublicKeySchemaId;
+
+    this.schemaIds = {
+      [ConnectionType.Follow]: {
+        [PrivacyType.Public]: publicFollow,
+        [PrivacyType.Private]: privateFollow,
+      },
+      [ConnectionType.Friendship]: {
+        [PrivacyType.Public]: publicFriend,
+        [PrivacyType.Private]: privateFriend,
+      },
+    };
+  }
+
   constructor(private configService: ConfigService) {
-    const environmentType = configService.graph_environment_type();
+    const environmentType = configService.getGraphEnvironmentType();
     if (environmentType === EnvironmentType.Dev.toString()) {
-      const config_json = configService.graph_environment_config();
-      let config: Config = JSON.parse(config_json);
+      const configJson = configService.getGraphEnvironmentConfig();
+      const config: Config = JSON.parse(configJson);
       const devEnvironment: DevEnvironment = { environmentType: EnvironmentType.Dev, config };
       this.environment = devEnvironment;
     } else {
@@ -43,11 +87,12 @@ export class GraphStateManager {
     return {} as Config;
   }
 
-  public async getSchemaIdFromConfig(connectionType: ConnectionType, privacyType: PrivacyType): Promise<number> {
-    if (this.graphState) {
-      return this.graphState.getSchemaIdFromConfig(this.environment, connectionType, privacyType);
-    }
-    return 0;
+  public getSchemaIdFromConfig(connectionType: ConnectionType, privacyType: PrivacyType): number {
+    return this.schemaIds[connectionType][privacyType] ?? 0;
+  }
+
+  public getGraphKeySchemaId(): number {
+    return this.graphKeySchemaId;
   }
 
   public static async generateKeyPair(keyType: GraphKeyType): Promise<GraphKeyPair> {

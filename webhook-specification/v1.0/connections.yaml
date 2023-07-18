@@ -145,7 +145,7 @@ components:
       properties:
         keyType:
           type: string
-            example: "X25519"
+          example: "X25519"
         publicKey:
           type: string
           example: "0xe5be9a5092b81bca64be81d212e7f2f9eba183bb7a90954f7b76361f6edb5c0a"
