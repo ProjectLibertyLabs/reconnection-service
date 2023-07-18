@@ -120,6 +120,14 @@ export class ReconnectionGraphService {
               // If the batch size exceeds the capacityBatchLimit, send the batch to the chain
               if (batchCount === this.capacityBatchLimit) {
                 // Reset the batch and count for the next batch
+                promises.push(
+                  this.blockchainService.createExtrinsic(
+                    { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' },
+                    {},
+                    providerKeys,
+                    batch,
+                  ).signAndSend(),
+                );
                 batch = [];
                 batchCount = 0;
               }
@@ -140,7 +148,7 @@ export class ReconnectionGraphService {
 
         await Promise.all(promises);
 
-        //await this.processChainEvents(promises, ownerMsaId);
+        await this.processChainEvents(promises, ownerMsaId);
       }
 
       // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
@@ -377,5 +385,15 @@ export class ReconnectionGraphService {
       ),
     };
     return dsnpKeys;
+  }
+
+  async processChainEvents(promises: Promise<any>[], dsnpUserId: MessageSourceId): Promise<void> {
+    // loop over promises and wait for all to resolve
+    for (const promise of promises) {
+      const[event, eventMap] = await promise;
+      if (!event) {
+        throw new Error(`Error submitting extrinsic`);
+      }
+    }
   }
 }
