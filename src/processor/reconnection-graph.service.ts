@@ -60,7 +60,6 @@ export class ReconnectionGraphService {
 
     try {
       // graph config and respective schema ids
-      const graphSdkConfig = await this.graphStateManager.getGraphConfig();
 
       // get the user's DSNP Graph from the blockchain and form import bundles
       // import bundles are used to import the user's DSNP Graph into the graph SDK
@@ -83,7 +82,6 @@ export class ReconnectionGraphService {
       }
 
       const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
-      const calls: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
       const mapUserIdToUpdates = new Map<string, Update[]>();
       // loop over exportUpdates and collect Updates vs userId
       exportedUpdates.forEach((bundle) => {
@@ -119,12 +117,6 @@ export class ReconnectionGraphService {
 
               // If the batch size exceeds the capacityBatchLimit, send the batch to the chain
               if (batchCount === this.capacityBatchLimit) {
-                const payWithCapacityBatchAllOp = 
-                promises.push(
-                  this.blockchainService.createExtrinsic(
-                    { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
-                    {}, providerKeys, batch).signAndSend()
-                );
                 // Reset the batch and count for the next batch
                 batch = [];
                 batchCount = 0;
