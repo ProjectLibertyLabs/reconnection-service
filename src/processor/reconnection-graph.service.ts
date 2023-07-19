@@ -26,6 +26,7 @@ import { GraphKeyPair as ProviderKeyPair, KeyType, ProviderGraph } from '../inte
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { ConfigService } from '../config/config.service';
 import { ParsedEventResult } from '../blockchain/extrinsic';
+import { EventError } from '../blockchain/event-error';
 
 @Injectable()
 export class ReconnectionGraphService {
@@ -396,7 +397,17 @@ export class ReconnectionGraphService {
       }
       // if batch did not complete with a successful BatchCompleted event, handle various cases
       if(!this.blockchainService.api.events.utility.BatchCompleted.is(event)){
-        // check the event map for errors and handle them
+        // check if event if of type `BatchInterrupted` expected if one of the extrinsics in the batch failed
+        if(this.blockchainService.api.events.utility.BatchInterrupted.is(event)){
+          // get index and error message from event to determine which extrinsic failed
+          const errorIndex = event.data.index.toNumber();
+          const eventError = new EventError(event.data.error);
+          this.logger.error(`Error index ${errorIndex} for ${dsnpUserId.toString()}`);
+          this.logger.error(`Error message ${eventError.toString()}`);
+          // TODO handle error
+        } else{
+          throw new Error(`Unexpected event ${event}`);
+        }
       }
     }
   }
