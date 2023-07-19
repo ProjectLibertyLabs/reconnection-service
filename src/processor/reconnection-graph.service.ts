@@ -142,7 +142,7 @@ export class ReconnectionGraphService {
         if (batch.length > 0) {
           promises.push(
             this.blockchainService.createExtrinsic(
-              { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
+              { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' },
               {}, providerKeys, batch).signAndSend()
           );
         }
@@ -205,9 +205,9 @@ export class ReconnectionGraphService {
         const { data }: { data: ProviderGraph[] } = response.data.connections;
         allConnections.push(...data);
 
-        const { graphKeypair }: { graphKeypair: GraphKeyPair[] } = response.data.graphKeyPairs;
-        if (graphKeypair) {
-          keyPairs.push(...graphKeypair);
+        const { graphKeyPairs }: { graphKeyPairs: GraphKeyPair[] } = response.data;
+        if (graphKeyPairs) {
+          keyPairs.push(...graphKeyPairs);
         }
 
         const { pagination } = response.data.connections;
