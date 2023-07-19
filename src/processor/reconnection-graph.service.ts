@@ -45,6 +45,11 @@ export class ReconnectionGraphService {
     return this.blockchainService.api.consts.frequencyTxPayment.maximumCapacityBatchLength.toNumber();
   }
 
+  public get capacityEpochLength(): Promise<number> {
+    const currentEpochLenght  = this.blockchainService.query('capacity', 'epochLength');
+    return currentEpochLenght;
+  }
+
   public async updateUserGraph(dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<void> {
     this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
     const dsnpUserId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', dsnpUserStr);
@@ -408,7 +413,8 @@ export class ReconnectionGraphService {
           switch(eventError.getName()){
             case 'InsufficientBalance':
               // pause the queue till next capacity epoch
-              // TODO get the epoch number from chain
+              // TODO get the epoch number from chain and do something
+              const epochLenght = await this.capacityEpochLength;
               await this.graphUpdateQueue.pause();
               break;
             case 'StalePageState':
