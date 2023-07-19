@@ -150,7 +150,7 @@ export class ReconnectionGraphService {
 
         await Promise.all(promises);
 
-        await this.processChainEvents(promises, ownerMsaId);
+        await this.processChainEvents(providerId, ownerMsaId, promises);
       }
 
       // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
@@ -389,7 +389,7 @@ export class ReconnectionGraphService {
     return dsnpKeys;
   }
 
-  async processChainEvents(promises: Promise<ParsedEventResult>[], dsnpUserId: MessageSourceId): Promise<void> {
+  async processChainEvents(providerId: MessageSourceId, dsnpUserId: MessageSourceId, promises: Promise<ParsedEventResult>[]): Promise<void> {
     for (const promise of promises) {
       const[event, eventMap] = await promise;
       if (!event) {
@@ -404,7 +404,26 @@ export class ReconnectionGraphService {
           const eventError = new EventError(event.data.error);
           this.logger.error(`Error index ${errorIndex} for ${dsnpUserId.toString()}`);
           this.logger.error(`Error message ${eventError.toString()}`);
-          // TODO handle error
+          
+          switch(eventError.getName()){
+            case 'InsufficientBalance':
+              // pause the queue till next capacity epoch
+              await this.graphUpdateQueue.pause();
+              break;
+            case 'StalePageState':
+              // requeue the job for a stale page state
+              // TODO: some dead letter queue for this case
+              this.logger.error(`StalePageState for ${dsnpUserId.toString()}`);
+              break;
+            case 'UnsupportedOperationForSchema':
+              // in this case, it should panic here ,however, Config has wrong schema ids, human intervention required
+              throw new Error(`UnsupportedOperationForSchema for ${dsnpUserId.toString()}`);
+            case 'PageIdExceedsMaxAllowed':
+              // in this case, the graph is bigger than the max allowed, update non-transitive graph
+              throw new Error(`PageIdExceedsMaxAllowed for ${dsnpUserId.toString()}`);
+            default:
+              throw new Error(`Unexpected error ${eventError.toString()} for ${dsnpUserId.toString()}`);
+          }
         } else{
           throw new Error(`Unexpected event ${event}`);
         }

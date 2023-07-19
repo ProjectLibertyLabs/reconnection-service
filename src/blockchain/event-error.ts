@@ -28,6 +28,10 @@ export class EventError extends Error {
     this.rawError = source;
   }
 
+  public getName() {
+    return this.name;
+  }
+  
   public toString() {
     return `${this.section}.${this.name}: ${this.message}`;
   }
