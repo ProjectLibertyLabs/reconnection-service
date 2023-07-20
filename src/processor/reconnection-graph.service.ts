@@ -310,9 +310,9 @@ export class ReconnectionGraphService {
       const privacyType = connection.privacyType.toLowerCase();
       const schemaId = this.graphStateManager.getSchemaIdFromConfig(connectionType as ConnectionType, privacyType as PrivacyType);
       /// make sure user has delegation for schemaId
-      const isDelegated = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
+      const isDelegated: { schema_id: number; revoked_at: number; }[] = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
       /// make sure incoming user connection is also delegated for queuing updates non-transitively
-      const isDelegatedConnection = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId',connection.dsnpId, providerId);
+      const isDelegatedConnection: { schema_id: number; revoked_at: number; }[] = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
       if (!isDelegated || isDelegated.some((delegated: { schema_id: number; }) => delegated.schema_id === schemaId)) {
         continue;
       }
