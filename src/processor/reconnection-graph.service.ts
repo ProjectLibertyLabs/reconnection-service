@@ -194,7 +194,7 @@ export class ReconnectionGraphService {
         const { data }: { data: ProviderGraph[] } = response.data.connections;
         allConnections.push(...data);
 
-        const { graphKeyPairs }: { graphKeyPairs: GraphKeyPair[] } = response.data;
+        const { graphKeyPairs }: { graphKeyPairs: GraphKeyPair[] } = response.data.graphKeyPairs;
         if (graphKeyPairs) {
           keyPairs.push(...graphKeyPairs);
         }
