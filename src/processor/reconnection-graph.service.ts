@@ -17,16 +17,16 @@ import {
 } from '@dsnp/graph-sdk';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { SkipTransitiveGraphs, createGraphUpdateJob } from '../interfaces/graph-update-job.interface';
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
 import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
+import { number } from 'joi';
+import { SkipTransitiveGraphs, createGraphUpdateJob } from '../interfaces/graph-update-job.interface';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { createKeys } from '../blockchain/create-keys';
 import { GraphKeyPair as ProviderKeyPair, KeyType, ProviderGraph } from '../interfaces/provider-graph.interface';
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { ConfigService } from '../config/config.service';
 import { ParsedEventResult } from '../blockchain/extrinsic';
-import { number } from 'joi';
 
 @Injectable()
 export class ReconnectionGraphService {
@@ -117,12 +117,7 @@ export class ReconnectionGraphService {
               if (batchCount === this.capacityBatchLimit) {
                 // Reset the batch and count for the next batch
                 promises.push(
-                  this.blockchainService.createExtrinsic(
-                    { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' },
-                    {},
-                    providerKeys,
-                    batch,
-                  ).signAndSend(),
+                  this.blockchainService.createExtrinsic({ pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, {}, providerKeys, batch).signAndSend(),
                 );
                 batch = [];
                 batchCount = 0;
@@ -135,11 +130,7 @@ export class ReconnectionGraphService {
         });
 
         if (batch.length > 0) {
-          promises.push(
-            this.blockchainService.createExtrinsic(
-              { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' },
-              {}, providerKeys, batch).signAndSend()
-          );
+          promises.push(this.blockchainService.createExtrinsic({ pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, {}, providerKeys, batch).signAndSend());
         }
 
         await Promise.all(promises);
@@ -225,10 +216,7 @@ export class ReconnectionGraphService {
     }
   }
 
-  async importBundles(
-    dsnpUserId: MessageSourceId,
-    graphKeyPairs: ProviderKeyPair[],
-  ): Promise<boolean> {
+  async importBundles(dsnpUserId: MessageSourceId, graphKeyPairs: ProviderKeyPair[]): Promise<boolean> {
     const importBundles = await this.formImportBundles(dsnpUserId, graphKeyPairs);
     return this.graphStateManager.importUserData(importBundles);
   }
@@ -310,23 +298,28 @@ export class ReconnectionGraphService {
     return importBundles;
   }
 
-  async formConnections(dsnpUserId: MessageSourceId | AnyNumber, providerId: MessageSourceId | AnyNumber, isTransitive: boolean, graphConnections: ProviderGraph[]): Promise<ConnectAction[]> {
+  async formConnections(
+    dsnpUserId: MessageSourceId | AnyNumber,
+    providerId: MessageSourceId | AnyNumber,
+    isTransitive: boolean,
+    graphConnections: ProviderGraph[],
+  ): Promise<ConnectAction[]> {
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId);
     const actions: ConnectAction[] = [];
-  
+
     for (const connection of graphConnections) {
       const connectionType = connection.connectionType.toLowerCase();
       const privacyType = connection.privacyType.toLowerCase();
       const schemaId = this.graphStateManager.getSchemaIdFromConfig(connectionType as ConnectionType, privacyType as PrivacyType);
       /// make sure user has delegation for schemaId
-      const isDelegated: [DelegatorId, boolean][] =  await this.blockchainService.rpc('msa', 'checkDelegations', dsnpUserId, providerId, schemaId);
+      const isDelegated: [DelegatorId, boolean][] = await this.blockchainService.rpc('msa', 'checkDelegations', dsnpUserId, providerId, schemaId);
       /// make sure incoming user connection is also delegated for queuing updates non-transitively
       const isDelegatedConnection: [DelegatorId, boolean][] = await this.blockchainService.rpc('msa', 'checkDelegations', connection.dsnpId, providerId, schemaId);
-      
-      if (!isDelegated || isDelegated.length ==0 || isDelegated[0][1] == false) {
+
+      if (!isDelegated || isDelegated.length == 0 || isDelegated[0][1] == false) {
         continue;
       }
-  
+
       switch (connection.direction) {
         case 'connectionTo': {
           const connectionAction: ConnectAction = {
@@ -337,11 +330,11 @@ export class ReconnectionGraphService {
               schemaId,
             },
           };
-  
+
           if (dsnpKeys) {
             connectionAction.dsnpKeys = dsnpKeys;
           }
-  
+
           actions.push(connectionAction);
           break;
         }
@@ -361,13 +354,13 @@ export class ReconnectionGraphService {
               schemaId,
             },
           };
-  
+
           if (dsnpKeys) {
             connectionAction.dsnpKeys = dsnpKeys;
           }
-  
+
           actions.push(connectionAction);
-  
+
           if (isTransitive && (isDelegatedConnection.length > 0 || isDelegatedConnection[0][1] == true)) {
             const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
             this.graphUpdateQueue.add('graphUpdate', data, { jobId });
@@ -378,7 +371,7 @@ export class ReconnectionGraphService {
           throw new Error(`Unrecognized connection direction: ${connection.direction}`);
       }
     }
-  
+
     return actions;
   }
 
@@ -401,7 +394,7 @@ export class ReconnectionGraphService {
   async processChainEvents(promises: Promise<ParsedEventResult>[], dsnpUserId: MessageSourceId): Promise<void> {
     // loop over promises and wait for all to resolve
     for (const promise of promises) {
-      const[event, eventMap] = await promise;
+      const [event, eventMap] = await promise;
       if (!event) {
         throw new Error(`Error submitting extrinsic`);
       }
