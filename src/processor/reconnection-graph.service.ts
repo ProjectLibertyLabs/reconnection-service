@@ -66,21 +66,15 @@ export class ReconnectionGraphService {
       // import bundles are used to import the user's DSNP Graph into the graph SDK
       await this.importBundles(dsnpUserId, graphKeyPairs);
 
-      let exportedUpdates: Update[] = [];
-
-      if (updateConnections) {
-        // using graphConnections form Action[] and update the user's DSNP Graph
-        const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, graphConnections);
-        try {
-          await this.graphStateManager.applyActions(actions);
-        } catch (e) {
-          // silenty fail graphsdk handles duplicate connections
-          this.logger.error(`Error applying actions: ${e}`);
-        }
-        exportedUpdates = await this.graphStateManager.exportGraphUpdates();
-      } else {
-        exportedUpdates = await this.graphStateManager.forceCalculateGraphs(dsnpUserId.toString());
+      // using graphConnections form Action[] and update the user's DSNP Graph
+      const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, updateConnections, graphConnections);
+      try {
+        await this.graphStateManager.applyActions(actions);
+      } catch (e) {
+        // silenty fail graphsdk handles duplicate connections
+        this.logger.error(`Error applying actions: ${e}`);
       }
+      let exportedUpdates = await this.graphStateManager.exportGraphUpdates();
 
       const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
       const mapUserIdToUpdates = new Map<MessageSourceId, Update[]>();
@@ -315,7 +309,7 @@ export class ReconnectionGraphService {
     return importBundles;
   }
 
-  async formConnections(dsnpUserId: MessageSourceId | AnyNumber, providerId: MessageSourceId | AnyNumber, graphConnections: ProviderGraph[]): Promise<ConnectAction[]> {
+  async formConnections(dsnpUserId: MessageSourceId | AnyNumber, providerId: MessageSourceId | AnyNumber, isTransitive: boolean, graphConnections: ProviderGraph[]): Promise<ConnectAction[]> {
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId);
 
     const actions: ConnectAction[] = [];
@@ -343,8 +337,11 @@ export class ReconnectionGraphService {
           break;
         }
         case 'connectionFrom': {
-          const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-          this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+          // non trasitive updates do not queue non transitive jobs
+          if(isTransitive) {
+            const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
+            this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+          }
           break;
         }
         case 'bidirectional': {
@@ -361,8 +358,12 @@ export class ReconnectionGraphService {
             connectionAction.dsnpKeys = dsnpKeys;
           }
           actions.push(connectionAction);
-          const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-          this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+
+          // non trasitive updates do not queue non transitive jobs
+          if(isTransitive) {
+            const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
+            this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+          }
           break;
         }
         default:
