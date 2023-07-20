@@ -303,7 +303,7 @@ export class ReconnectionGraphService {
   ): Promise<ConnectAction[]> {
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId);
     const actions: ConnectAction[] = [];
-
+    
     for (const connection of graphConnections) {
       const connectionType = connection.connectionType.toLowerCase();
       const privacyType = connection.privacyType.toLowerCase();
@@ -335,7 +335,7 @@ export class ReconnectionGraphService {
             connection: connect,
           };
 
-          if (dsnpKeys) {
+          if (dsnpKeys && dsnpKeys.keys.length > 0) {
             connectionAction.dsnpKeys = dsnpKeys;
           }
 
@@ -368,7 +368,7 @@ export class ReconnectionGraphService {
             connection: connect,
           };
 
-          if (dsnpKeys) {
+          if (dsnpKeys && dsnpKeys.keys.length > 0) {
             connectionAction.dsnpKeys = dsnpKeys;
           }
 
