@@ -64,7 +64,6 @@ export class ReconnectionGraphService {
       // get the user's DSNP Graph from the blockchain and form import bundles
       // import bundles are used to import the user's DSNP Graph into the graph SDK
       await this.importBundles(dsnpUserId, graphKeyPairs);
-
       // using graphConnections form Action[] and update the user's DSNP Graph
       const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, updateConnections, graphConnections);
       try {
@@ -134,19 +133,19 @@ export class ReconnectionGraphService {
         await Promise.all(promises);
 
         await this.processChainEvents(promises, ownerMsaId);
-      }
 
-      // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
-      // import bundles are used to import the user's DSNP Graph into the graph SDK
-      // check if user graph exists in the graph SDK else queue a graph update job
-      const reImported = await this.importBundles(dsnpUserId, graphKeyPairs);
-      if (reImported) {
-        const userGraphExists = await this.graphStateManager.graphContainsUser(dsnpUserId.toString());
-        if (!userGraphExists) {
-          throw new Error(`User graph does not exist for ${dsnpUserId.toString()}`);
+        // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
+        // import bundles are used to import the user's DSNP Graph into the graph SDK
+        // check if user graph exists in the graph SDK else queue a graph update job
+        const reImported = await this.importBundles(dsnpUserId, graphKeyPairs);
+        if (reImported) {
+          const userGraphExists = await this.graphStateManager.graphContainsUser(dsnpUserId.toString());
+          if (!userGraphExists) {
+            throw new Error(`User graph does not exist for ${dsnpUserId.toString()}`);
+          }
+        } else {
+          throw new Error(`Error re-importing bundles for ${dsnpUserId.toString()}`);
         }
-      } else {
-        throw new Error(`Error re-importing bundles for ${dsnpUserId.toString()}`);
       }
     } catch (err) {
       if (updateConnections) {
@@ -313,19 +312,27 @@ export class ReconnectionGraphService {
       const isDelegated = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
       /// make sure incoming user connection is also delegated for queuing updates non-transitively
       const isDelegatedConnection = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
-      if (!isDelegated.isSome || !isDelegated.unwrap().map((grant) => grant.schema_id.toNumber()).some((delegated) => delegated.schema_id === schemaId)) {
+      if (
+        !isDelegated.isSome ||
+        !isDelegated
+          .unwrap()
+          .map((grant) => grant.schema_id.toNumber())
+          .includes(schemaId)
+      ) {
         continue;
       }
-      
+
       switch (connection.direction) {
         case 'connectionTo': {
+          const connect: Connection = {
+            dsnpUserId: connection.dsnpId,
+            schemaId,
+          };
+
           const connectionAction: ConnectAction = {
             type: 'Connect',
             ownerDsnpUserId: dsnpUserId.toString(),
-            connection: {
-              dsnpUserId: connection.dsnpId.toString(),
-              schemaId,
-            },
+            connection: connect,
           };
 
           if (dsnpKeys) {
@@ -336,20 +343,29 @@ export class ReconnectionGraphService {
           break;
         }
         case 'connectionFrom': {
-          if (isTransitive && (isDelegatedConnection.isSome && isDelegatedConnection.unwrap().map((grant) => grant.schema_id.toNumber()).some((delegated) => delegated.schema_id === schemaId))) {
+          if (
+            isTransitive &&
+            isDelegatedConnection.isSome &&
+            isDelegatedConnection
+              .unwrap()
+              .map((grant) => grant.schema_id.toNumber())
+              .includes(schemaId)
+          ) {
             const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
             this.graphUpdateQueue.add('graphUpdate', data, { jobId });
           }
           break;
         }
         case 'bidirectional': {
+          const connect: Connection = {
+            dsnpUserId: connection.dsnpId,
+            schemaId,
+          };
+
           const connectionAction: ConnectAction = {
             type: 'Connect',
             ownerDsnpUserId: dsnpUserId.toString(),
-            connection: {
-              dsnpUserId: connection.dsnpId.toString(),
-              schemaId,
-            },
+            connection: connect,
           };
 
           if (dsnpKeys) {
@@ -358,7 +374,14 @@ export class ReconnectionGraphService {
 
           actions.push(connectionAction);
 
-          if (isTransitive && (isDelegatedConnection.isSome && isDelegatedConnection.unwrap().map((grant) => grant.schema_id.toNumber()).some((delegated) => delegated.schema_id === schemaId))) {
+          if (
+            isTransitive &&
+            isDelegatedConnection.isSome &&
+            isDelegatedConnection
+              .unwrap()
+              .map((grant) => grant.schema_id.toNumber())
+              .includes(schemaId)
+          ) {
             const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
             this.graphUpdateQueue.add('graphUpdate', data, { jobId });
           }
