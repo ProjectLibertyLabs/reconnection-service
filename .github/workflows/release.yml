@@ -1,0 +1,305 @@
+name: Release
+run-name: Cut Release ${{github.event.inputs.release-version || github.ref_name}}
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+" # ex. v1.0.0
+      - "v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+" # ex. v1.1.0-rc1
+      - "v0.0.1" # used for testing only
+      - "v0.0.1-rc[0-9]+" # used for testing only
+  workflow_dispatch:
+    inputs:
+      release-version:
+        description: "Release version (v#.#.#[-rc#])"
+        required: true
+
+env:
+  NEW_RELEASE_TAG_FROM_UI: ${{github.event.inputs.release-version}}
+  NEW_RELEASE_TAG: ${{github.event.inputs.release-version || github.ref_name}}
+  RELEASE_BRANCH_NAME: release-${{github.event.inputs.release-version || github.ref_name}}
+  LATEST_FULL_RELEASE_TAG: _LATEST-FULL-RELEASE
+  TEST_RUN: ${{startsWith(github.event.inputs.release-version || github.ref_name, 'v0.0.1')}}
+
+jobs:
+  validate-release-version:
+    name: Validate Release Version
+    runs-on: ubuntu-20.04
+    container: ghcr.io/libertydsnp/frequency/ci-base-image
+    steps:
+      - name: Validate
+        if: env.NEW_RELEASE_TAG_FROM_UI != ''
+        shell: bash
+        run: |
+          version=${{env.NEW_RELEASE_TAG_FROM_UI}}
+          echo "Release version entered in UI: $version"
+          regex='^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-rc[1-9]\d*)?$'
+          if [[ ! $version =~ $regex ]]; then
+            echo "ERROR: Entered version $version is not valid."
+            echo "Please use v#.#.#[-rc#] format."
+            exit 1
+          fi
+
+  # create-release-branch:
+  #   needs: validate-release-version
+  #   name: Create Release Branch
+  #   runs-on: ubuntu-20.04
+  #   container: ghcr.io/libertydsnp/frequency/ci-base-image
+  #   steps:
+  #     - name: Check Out Repo
+  #       uses: actions/checkout@v3
+  #       with:
+  #         token: ${{secrets.GHA_GIT_COMMIT || github.token}}
+  #         fetch-depth: 0
+  #     - name: Create Release Branch?
+  #       id: create-release-branch
+  #       run: |
+  #         set -x
+  #         full_branch=remotes/origin/${{env.RELEASE_BRANCH_NAME}}
+  #         branch_hash=$(git rev-parse --verify --quiet $full_branch || echo "")
+  #         create_branch=$([ -z $branch_hash ] && echo 'true' || echo 'false')
+  #         echo "create_branch: $create_branch"
+  #         echo "create=$create_branch" >> $GITHUB_OUTPUT
+  #     - name: Create Release Branch
+  #       if: steps.create-release-branch.outputs.create == 'true'
+  #       run: |
+  #         git status -s
+  #         git checkout -b ${{env.RELEASE_BRANCH_NAME}}
+  #         git push origin ${{env.RELEASE_BRANCH_NAME}} -u
+
+  # version-code:
+  #   needs: run-all-benchmarks
+  #   name: Version Code
+  #   runs-on: ubuntu-20.04
+  #   container: ghcr.io/libertydsnp/frequency/ci-base-image
+  #   steps:
+  #     - name: Check Out Repo
+  #       uses: actions/checkout@v3
+  #       with:
+  #         ref: ${{env.RELEASE_BRANCH_NAME}}
+  #         fetch-depth: 0
+  #     - name: Version Code
+  #       shell: bash
+  #       run: |
+  #         release_version=${{env.NEW_RELEASE_TAG}}
+  #         make version v=${release_version:1}
+  #     - name: Print Updated Version
+  #       run: |
+  #         git status
+  #         git diff
+  #     - name: Commit Updated Version
+  #       id: commit-updated-version
+  #       uses: stefanzweifel/git-auto-commit-action@3ea6ae190baf489ba007f7c92608f33ce20ef04a
+  #       with:
+  #         commit_message: "Update versions for release ${{env.NEW_RELEASE_TAG}}"
+  #         commit_user_name: Frequency CI [bot]
+  #         commit_user_email: do-not-reply@users.noreply.github.com
+  #         commit_author: Frequency CI [bot] <do-not-reply@users.noreply.github.com>
+  #     - name: Update Release Version Tag
+  #       uses: rickstaa/action-create-tag@84c90e6ba79b47b5147dcb11ff25d6a0e06238ba
+  #       with:
+  #         tag: ${{env.NEW_RELEASE_TAG}}
+  #         force_push_tag: true
+  #         message: "Release version tag"
+  #         commit_sha: ${{steps.commit-updated-version.outputs.commit_hash}}
+
+  # build-binaries:
+  #   needs: version-code
+  #   name: Build ${{matrix.arch}} Binary for ${{matrix.network}}
+  #   strategy:
+  #     fail-fast: true
+  #     matrix:
+  #       # This job intermittently fails on EKS runners and must be run on standalone until
+  #       # https://www.pivotaltracker.com/story/show/185045683 is resolved.
+  #       # os: [[self-hosted, Linux, X64, testing, v2], [self-hosted, Linux, ARM64,  testing, v2]]
+  #       os: [[self-hosted, Linux, X64, testing, v2]]
+  #       network: [dev, local, rococo, mainnet]
+  #       include:
+  #         - network: dev
+  #           spec: frequency-no-relay
+  #           build-profile: release
+  #           release-file-name-prefix: frequency-dev
+  #         - network: local
+  #           spec: frequency-rococo-local
+  #           build-profile: release
+  #           release-file-name-prefix: frequency-rococo-local
+  #         - network: rococo
+  #           spec: frequency-rococo-testnet
+  #           build-profile: release
+  #           release-file-name-prefix: frequency-rococo
+  #         - network: mainnet
+  #           spec: frequency
+  #           build-profile: release
+  #           release-file-name-prefix: frequency
+  #         - os: [self-hosted, Linux, X64, testing, v2]
+  #           arch: amd64
+  #         # - os: [self-hosted, Linux, ARM64]
+  #         #   arch: arm64
+  #   runs-on: ${{matrix.os}}
+  #   container: ghcr.io/libertydsnp/frequency/ci-base-image
+  #   steps:
+  #     - name: Check Out Repo
+  #       uses: actions/checkout@v3
+  #       with:
+  #         ref: ${{env.RELEASE_BRANCH_NAME}}
+  #     - name: Set Env Vars
+  #       run: |
+  #         echo "BIN_DIR=target/${{matrix.build-profile}}" >> $GITHUB_ENV
+  #         echo "BUILT_BIN_FILENAME=frequency" >> $GITHUB_ENV
+  #         echo "RELEASE_BIN_FILENAME=${{matrix.release-file-name-prefix}}.${{matrix.arch}}" >> $GITHUB_ENV
+  #     - name: Compile for ${{matrix.network}}
+  #       run: |
+  #         CARGO_INCREMENTAL=0 RUSTFLAGS="-D warnings" cargo build \
+  #           --locked \
+  #           --features ${{matrix.spec}} \
+  #           --profile ${{matrix.build-profile}}
+  #     - name: Run Sanity Checks
+  #       run: |
+  #         file ${{env.BIN_DIR}}/${{env.BUILT_BIN_FILENAME}} && \
+  #           ${{env.BIN_DIR}}/${{env.BUILT_BIN_FILENAME}} --version
+  #     - name: Rename Binary
+  #       run: |
+  #         cp -p ${{env.BIN_DIR}}/${{env.BUILT_BIN_FILENAME}} \
+  #           ${{env.BIN_DIR}}/${{env.RELEASE_BIN_FILENAME}}
+  #     - name: Generate Binary Hash
+  #       working-directory: ${{env.BIN_DIR}}
+  #       run: sha256sum ${{env.RELEASE_BIN_FILENAME}} > ${{env.RELEASE_BIN_FILENAME}}.sha256
+  #     - name: Import GPG key
+  #       id: import-gpg
+  #       uses: crazy-max/ghaction-import-gpg@111c56156bcc6918c056dbef52164cfa583dc549
+  #       with:
+  #         gpg_private_key: ${{secrets.FREQUENCY_PGP_SECRET_SUBKEYS}}
+  #         passphrase: ${{secrets.FREQUENCY_PGP_MASTER_KEY_PASSWORD}}
+  #         fingerprint: B6327D1474C6392032870E8EFA4FD1E73A0FE707 # signing subkey
+  #     - name: Generate Binary Signature
+  #       working-directory: ${{env.BIN_DIR}}
+  #       run: gpg --detach-sign --armor ${{env.RELEASE_BIN_FILENAME}}
+  #     - name: Verify Binary
+  #       working-directory: ${{env.BIN_DIR}}
+  #       run: gpg --verify ${{env.RELEASE_BIN_FILENAME}}.asc
+  #     - name: Upload Artifacts
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: artifacts-${{github.run_id}}
+  #         path: |
+  #           ${{env.BIN_DIR}}/${{env.RELEASE_BIN_FILENAME}}
+  #           ${{env.BIN_DIR}}/${{env.RELEASE_BIN_FILENAME}}.sha256
+  #           ${{env.BIN_DIR}}/${{env.RELEASE_BIN_FILENAME}}.asc
+  #         if-no-files-found: error
+
+  release-artifacts:
+    name: Release Built Artifacts
+    runs-on: ubuntu-20.04
+    container: ghcr.io/libertydsnp/frequency/ci-base-image
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v3
+        with:
+          ref: ${{env.RELEASE_BRANCH_NAME}}
+          fetch-depth: 0
+      - name: Full Release?
+        id: is-full-release
+        uses: ./.github/workflows/common/is-full-release
+        with:
+          version-tag: ${{env.NEW_RELEASE_TAG}}
+      - name: Get Previous Full Release Version
+        id: get-previous-full-release-version
+        uses: ./.github/workflows/common/get-previous-full-release-version
+        with:
+          full-release-version-tag: ${{env.LATEST_FULL_RELEASE_TAG}}
+      - name: Set Env Vars
+        run: |
+          echo "PREVIOUS_RELEASE_TAG=${{steps.get-previous-full-release-version.outputs.version}}" >> $GITHUB_ENV
+      - name: Get Latest Commit
+        id: get-latest-commit
+        run: |
+          set -x
+          latest_commit_sha=$(git rev-parse HEAD)
+          echo "sha=$latest_commit_sha" >> $GITHUB_OUTPUT
+      - name: Update Git Latest Tag
+        if: |
+          steps.is-full-release.outputs.is-full-release == 'true' &&
+          env.TEST_RUN != 'true'
+        uses: rickstaa/action-create-tag@84c90e6ba79b47b5147dcb11ff25d6a0e06238ba
+        with:
+          commit_sha: ${{steps.get-latest-commit.outputs.sha}}
+          tag: ${{env.LATEST_FULL_RELEASE_TAG}}
+          force_push_tag: true
+          message: Latest full release
+      # - name: Dispatch Auto-signer Workflow
+      #   if: env.TEST_RUN != 'true'
+      #   uses: actions/github-script@v6
+      #   with:
+      #     github-token: ${{secrets.GHA_WORKFLOW_TRIGGER}}
+      #     script: |
+      #       await github.rest.actions.createWorkflowDispatch({
+      #         owner: 'LibertyDSNP',
+      #         repo: 'metadata-portal',
+      #         workflow_id: 'auto-sign.yml',
+      #         ref: 'main'
+      #       })
+
+  release-node-images:
+    name: Release ${{matrix.arch}} Node Docker Image
+    strategy:
+      fail-fast: true
+      matrix:
+        arch: [amd64]
+        include:
+          - arch: amd64
+            docker-platform: linux/amd64
+    env:
+      DOCKER_HUB_PROFILE: frequencychain
+      IMAGE_NAME: graph-reconnection-service
+    runs-on: ubuntu-20.04
+    container: ghcr.io/libertydsnp/frequency/ci-base-image
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v3
+        with:
+          ref: ${{env.RELEASE_BRANCH_NAME}}
+      - name: Full Release?
+        id: is-full-release
+        uses: ./.github/workflows/common/is-full-release
+        with:
+          version-tag: ${{env.NEW_RELEASE_TAG}}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: ${{matrix.arch}}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{secrets.DOCKERHUB_USERNAME_FC}}
+          password: ${{secrets.DOCKERHUB_TOKEN_FC}}
+      - name: Build and Push Microservice Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: ${{matrix.docker-platform}}
+          push: ${{env.TEST_RUN != 'true'}}
+          file: ./Dockerfile
+          tags: |
+            ${{env.DOCKER_HUB_PROFILE}}/${{env.IMAGE_NAME}}:${{env.NEW_RELEASE_TAG}}
+      - name: Update DockerHub Latest Tag
+        if: steps.is-full-release.outputs.is-full-release == 'true'
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: ${{matrix.docker-platform}}
+          push: ${{env.TEST_RUN != 'true'}}
+          file: ./Dockerfile
+          tags: |
+            ${{env.DOCKER_HUB_PROFILE}}/${{env.IMAGE_NAME}}:latest
+      # - name: Update DockerHub Description
+      #   if: env.TEST_RUN != 'true'
+      #   uses: peter-evans/dockerhub-description@dc67fad7001ef9e8e3c124cb7a64e16d0a63d864
+      #   with:
+      #     username: ${{secrets.DOCKERHUB_USERNAME_FC}}
+      #     password: ${{secrets.DOCKERHUB_TOKEN_FC}}
+      #     repository: ${{env.DOCKER_HUB_PROFILE}}/${{env.IMAGE_NAME}}-${{matrix.network}}
+      #     readme-filepath: docker/${{env.IMAGE_NAME}}-${{matrix.network}}.overview.md

@@ -2,10 +2,10 @@
   "name": "reconnection-service",
   "version": "1.0.0",
   "description": "A microservice to reconnect graphs in DSNP/Frequency",
-  "main": "dist/main.js",
+  "main": "dist/src/main.js",
   "scripts": {
     "build": "npx tsc",
-    "start": "node dist/main.js",
+    "start": "env TS_NODE_BASEURL=./dist/src node -r tsconfig-paths/register dist/src/main.js",
     "start:dev": "set -a ; . .env.dev ; ts-node-dev -r tsconfig-paths/register src/main.ts",
     "start:dev:docker": "npm ci && ts-node-dev -r tsconfig-paths/register src/main.ts",
     "docker-build": "docker build -t reconnection-service .",
