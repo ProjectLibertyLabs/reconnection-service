@@ -53,20 +53,20 @@ export class DevelopmentController {
   }
 
   @Post('queue/pause')
-  async pauseQueue() {
-    await this.graphUpdateQueue.pause();
+  pauseQueue() {
+    this.graphUpdateQueue.pause();
   }
 
   @Post('queue/resume')
-  async resumeQueue() {
-    await this.graphUpdateQueue.resume();
+  resumeQueue() {
+    this.graphUpdateQueue.resume();
   }
 
   @Post('queue/retry')
   async retryJob(@Param('jobId') jobId: string) {
     const job = await this.graphUpdateQueue.getJob(jobId);
     if (job) {
-      await job.retry();
+      job.retry();
     } else {
       throw new HttpException('Job ID not found', HttpStatus.NOT_FOUND);
     }
@@ -109,9 +109,14 @@ export class DevelopmentController {
   }
 
   @Post('scan/:blockNumber')
-  async scanChain(@Param('blockNumber') blockNumber: string) {
+  async scanChainFromBlock(@Param('blockNumber') blockNumber: string) {
     const block = BigInt(blockNumber) - 1n;
     await this.cacheManager.set(LAST_SEEN_BLOCK_NUMBER_KEY, block.toString());
+    this.scannerService.scan();
+  }
+
+  @Post('scan')
+  scanChain() {
     this.scannerService.scan();
   }
 }
