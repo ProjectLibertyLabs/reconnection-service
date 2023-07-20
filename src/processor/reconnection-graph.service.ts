@@ -61,8 +61,6 @@ export class ReconnectionGraphService {
     }
 
     try {
-      // graph config and respective schema ids
-
       // get the user's DSNP Graph from the blockchain and form import bundles
       // import bundles are used to import the user's DSNP Graph into the graph SDK
       await this.importBundles(dsnpUserId, graphKeyPairs);
