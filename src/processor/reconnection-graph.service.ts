@@ -1,6 +1,6 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { Injectable, Logger } from '@nestjs/common';
-import { ItemizedStoragePageResponse, ItemizedStorageResponse, MessageSourceId, PaginatedStorageResponse, ProviderId } from '@frequency-chain/api-augment/interfaces';
+import { DelegatorId, ItemizedStoragePageResponse, ItemizedStorageResponse, MessageSourceId, PaginatedStorageResponse, ProviderId } from '@frequency-chain/api-augment/interfaces';
 import {
   ImportBundleBuilder,
   Config,
@@ -26,6 +26,7 @@ import { GraphKeyPair as ProviderKeyPair, KeyType, ProviderGraph } from '../inte
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { ConfigService } from '../config/config.service';
 import { ParsedEventResult } from '../blockchain/extrinsic';
+import { number } from 'joi';
 
 @Injectable()
 export class ReconnectionGraphService {
@@ -311,14 +312,21 @@ export class ReconnectionGraphService {
 
   async formConnections(dsnpUserId: MessageSourceId | AnyNumber, providerId: MessageSourceId | AnyNumber, isTransitive: boolean, graphConnections: ProviderGraph[]): Promise<ConnectAction[]> {
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId);
-
     const actions: ConnectAction[] = [];
-    graphConnections.forEach((connection) => {
+  
+    for (const connection of graphConnections) {
       const connectionType = connection.connectionType.toLowerCase();
       const privacyType = connection.privacyType.toLowerCase();
-
       const schemaId = this.graphStateManager.getSchemaIdFromConfig(connectionType as ConnectionType, privacyType as PrivacyType);
-
+      /// make sure user has delegation for schemaId
+      const isDelegated: [DelegatorId, boolean][] =  await this.blockchainService.rpc('msa', 'checkDelegations', dsnpUserId, providerId, schemaId);
+      /// make sure incoming user connection is also delegated for queuing updates non-transitively
+      const isDelegatedConnection: [DelegatorId, boolean][] = await this.blockchainService.rpc('msa', 'checkDelegations', connection.dsnpId, providerId, schemaId);
+      
+      if (!isDelegated || isDelegated.length ==0 || isDelegated[0][1] == false) {
+        continue;
+      }
+  
       switch (connection.direction) {
         case 'connectionTo': {
           const connectionAction: ConnectAction = {
@@ -329,16 +337,16 @@ export class ReconnectionGraphService {
               schemaId,
             },
           };
-
+  
           if (dsnpKeys) {
             connectionAction.dsnpKeys = dsnpKeys;
           }
+  
           actions.push(connectionAction);
           break;
         }
         case 'connectionFrom': {
-          // non trasitive updates do not queue non transitive jobs
-          if(isTransitive) {
+          if (isTransitive && (isDelegatedConnection.length > 0 || isDelegatedConnection[0][1] == true)) {
             const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
             this.graphUpdateQueue.add('graphUpdate', data, { jobId });
           }
@@ -353,14 +361,14 @@ export class ReconnectionGraphService {
               schemaId,
             },
           };
-
+  
           if (dsnpKeys) {
             connectionAction.dsnpKeys = dsnpKeys;
           }
+  
           actions.push(connectionAction);
-
-          // non trasitive updates do not queue non transitive jobs
-          if(isTransitive) {
+  
+          if (isTransitive && (isDelegatedConnection.length > 0 || isDelegatedConnection[0][1] == true)) {
             const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
             this.graphUpdateQueue.add('graphUpdate', data, { jobId });
           }
@@ -369,7 +377,8 @@ export class ReconnectionGraphService {
         default:
           throw new Error(`Unrecognized connection direction: ${connection.direction}`);
       }
-    });
+    }
+  
     return actions;
   }
 
