@@ -180,9 +180,15 @@ export class ReconnectionGraphService {
       while (hasNextPage) {
         // eslint-disable-next-line no-await-in-loop
         const response = await providerAPI.get(`/api/v1.0.0/connections/${dsnpUserId.toString()}`, { params });
-
         if (response.status !== 200) {
           throw new Error(`Bad status ${response.status} (${response.statusText} from Provider web hook.)`);
+        }
+        if (!response.data || !response.data.connections) {
+          throw new Error(`No connections found for ${dsnpUserId.toString()}`);
+        }
+        
+        if(response.data.dsnpId !== dsnpUserId.toString()) {
+          throw new Error(`DSNP ID mismatch in response for ${dsnpUserId.toString()}`);
         }
 
         const { data }: { data: ProviderGraph[] } = response.data.connections;
