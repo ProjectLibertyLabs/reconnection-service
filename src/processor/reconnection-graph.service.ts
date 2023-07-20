@@ -310,13 +310,13 @@ export class ReconnectionGraphService {
       const privacyType = connection.privacyType.toLowerCase();
       const schemaId = this.graphStateManager.getSchemaIdFromConfig(connectionType as ConnectionType, privacyType as PrivacyType);
       /// make sure user has delegation for schemaId
-      const isDelegated: { schema_id: number; revoked_at: number; }[] = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
+      const isDelegated = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
       /// make sure incoming user connection is also delegated for queuing updates non-transitively
-      const isDelegatedConnection: { schema_id: number; revoked_at: number; }[] = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
-      if (!isDelegated || isDelegated.some((delegated: { schema_id: number; }) => delegated.schema_id === schemaId)) {
+      const isDelegatedConnection = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
+      if (!isDelegated.isSome || !isDelegated.unwrap().map((grant) => grant.schema_id.toNumber()).some((delegated) => delegated.schema_id === schemaId)) {
         continue;
       }
-
+      
       switch (connection.direction) {
         case 'connectionTo': {
           const connectionAction: ConnectAction = {
@@ -336,7 +336,7 @@ export class ReconnectionGraphService {
           break;
         }
         case 'connectionFrom': {
-          if (isTransitive && (isDelegatedConnection && isDelegatedConnection.some((delegated: { schema_id: number; }) => delegated.schema_id === schemaId))) {
+          if (isTransitive && (isDelegatedConnection.isSome && isDelegatedConnection.unwrap().map((grant) => grant.schema_id.toNumber()).some((delegated) => delegated.schema_id === schemaId))) {
             const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
             this.graphUpdateQueue.add('graphUpdate', data, { jobId });
           }
@@ -358,7 +358,7 @@ export class ReconnectionGraphService {
 
           actions.push(connectionAction);
 
-          if (isTransitive && (isDelegatedConnection && isDelegatedConnection.some((delegated: { schema_id: number; }) => delegated.schema_id === schemaId))) {
+          if (isTransitive && (isDelegatedConnection.isSome && isDelegatedConnection.unwrap().map((grant) => grant.schema_id.toNumber()).some((delegated) => delegated.schema_id === schemaId))) {
             const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
             this.graphUpdateQueue.add('graphUpdate', data, { jobId });
           }
