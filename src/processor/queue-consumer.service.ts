@@ -26,9 +26,10 @@ export class QueueConsumerService extends WorkerHost {
     if (typeof job.data.debugDisposition !== 'undefined') {
       const debugData: any = job.data.debugDisposition;
       switch (debugData?.action) {
-        case 'abort':
-          this.logger.debug(`Forcing abort in order to generate stalled job: ${job.id}`);
-          process.exit(1);
+        // This is too dangerous to leave enabled unless you're doing serious debugging
+        // case 'abort':
+        //   this.logger.debug(`Forcing abort in order to generate stalled job: ${job.id}`);
+        //   process.exit(1);
 
         // eslint-disable-next-line no-fallthrough
         case 'fail':
@@ -51,6 +52,6 @@ export class QueueConsumerService extends WorkerHost {
       }
     }
 
-    this.graphSdkService.updateUserGraph(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
+    await this.graphSdkService.updateUserGraph(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
   }
 }
