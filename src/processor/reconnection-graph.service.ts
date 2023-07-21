@@ -1,6 +1,6 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { Injectable, Logger } from '@nestjs/common';
-import { ItemizedStoragePageResponse, ItemizedStorageResponse, MessageSourceId, PaginatedStorageResponse, ProviderId } from '@frequency-chain/api-augment/interfaces';
+import { DelegatorId, ItemizedStoragePageResponse, ItemizedStorageResponse, MessageSourceId, PaginatedStorageResponse, ProviderId } from '@frequency-chain/api-augment/interfaces';
 import {
   ImportBundleBuilder,
   Config,
@@ -17,14 +17,16 @@ import {
 } from '@dsnp/graph-sdk';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { SkipTransitiveGraphs, createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
 import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
-import { BlockchainService } from '#app/blockchain/blockchain.service';
-import { createKeys } from '#app/blockchain/create-keys';
+import { number } from 'joi';
+import { SkipTransitiveGraphs, createGraphUpdateJob } from '../interfaces/graph-update-job.interface';
+import { BlockchainService } from '../blockchain/blockchain.service';
+import { createKeys } from '../blockchain/create-keys';
 import { GraphKeyPair as ProviderKeyPair, KeyType, ProviderGraph } from '../interfaces/provider-graph.interface';
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { ConfigService } from '../config/config.service';
+import { ParsedEventResult } from '../blockchain/extrinsic';
 
 @Injectable()
 export class ReconnectionGraphService {
@@ -59,70 +61,104 @@ export class ReconnectionGraphService {
     }
 
     try {
-      // graph config and respective schema ids
-      const graphSdkConfig = await this.graphStateManager.getGraphConfig();
-
       // get the user's DSNP Graph from the blockchain and form import bundles
       // import bundles are used to import the user's DSNP Graph into the graph SDK
       await this.importBundles(dsnpUserId, graphKeyPairs);
-
-      let exportedUpdates: Update[] = [];
-
-      if (updateConnections) {
-        // using graphConnections form Action[] and update the user's DSNP Graph
-        const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, graphConnections);
-        try {
-          await this.graphStateManager.applyActions(actions);
-        } catch (e) {
-          // silenty fail graphsdk handles duplicate connections
-          this.logger.error(`Error applying actions: ${e}`);
+      // using graphConnections form Action[] and update the user's DSNP Graph
+      const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, updateConnections, graphConnections);
+      try {
+        await this.graphStateManager.applyActions(actions);
+      } catch (e: any) {
+        const errMessage = e instanceof Error ? e.message : ""
+        if (errMessage.includes('already exists')) {
+          this.logger.warn(`Error applying actions: ${e}`);
+        } else {
+          throw e;
         }
-        exportedUpdates = await this.graphStateManager.exportGraphUpdates();
-      } else {
-        exportedUpdates = await this.graphStateManager.forceCalculateGraphs(dsnpUserId.toString());
       }
+
+      let exportedUpdates = await this.graphStateManager.exportGraphUpdates();
 
       const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
-      const calls: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
+      const mapUserIdToUpdates = new Map<MessageSourceId, Update[]>();
+      /// Note: for now exporting updates for a single user
+      exportedUpdates = exportedUpdates.filter((update) => update.ownerDsnpUserId === dsnpUserStr);
+
+      // loop over exportUpdates and collect Updates vs userId
       exportedUpdates.forEach((bundle) => {
         const ownerMsaId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', bundle.ownerDsnpUserId);
-        switch (bundle.type) {
-          case 'PersistPage':
-            calls.push(
-              this.blockchainService.createExtrinsicCall(
-                { pallet: 'statefulStorage', extrinsic: 'upsertPage' },
-                ownerMsaId,
-                bundle.schemaId,
-                bundle.pageId,
-                bundle.prevHash,
-                Array.from(Array.prototype.slice.call(bundle.payload)),
-              ),
-            );
-            break;
-
-          default:
-            break;
+        if (mapUserIdToUpdates.has(ownerMsaId)) {
+          const updates = mapUserIdToUpdates.get(ownerMsaId) || [];
+          updates.push(bundle);
+          mapUserIdToUpdates.set(ownerMsaId, updates);
+        } else {
+          mapUserIdToUpdates.set(ownerMsaId, [bundle]);
         }
       });
-      
-      const [event, eventMap] = await this.blockchainService
-      .createExtrinsic({ pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, {}, providerKeys, calls)
-      .signAndSend();
-      if (!event) {
-        throw new Error('BatchCompleted event not found');
-      }
 
-      // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
-      // import bundles are used to import the user's DSNP Graph into the graph SDK
-      // check if user graph exists in the graph SDK else queue a graph update job
-      const reImported = await this.importBundles(dsnpUserId, graphKeyPairs);
-      if (reImported) {
-        const userGraphExists = await this.graphStateManager.graphContainsUser(dsnpUserId.toString());
-        if (!userGraphExists) {
-          throw new Error(`User graph does not exist for ${dsnpUserId.toString()}`);
+      for (const [ownerMsaId, updates] of mapUserIdToUpdates.entries()) {
+        let batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
+        let batchCount = 0;
+        const promises: Promise<ParsedEventResult>[] = [];
+        updates.forEach((bundle) => {
+          switch (bundle.type) {
+            case 'PersistPage':
+              batch.push(
+                this.blockchainService.createExtrinsicCall(
+                  { pallet: 'statefulStorage', extrinsic: 'upsertPage' },
+                  ownerMsaId,
+                  bundle.schemaId,
+                  bundle.pageId,
+                  bundle.prevHash,
+                  Array.from(Array.prototype.slice.call(bundle.payload)),
+                ),
+              );
+              batchCount++;
+
+              // If the batch size exceeds the capacityBatchLimit, send the batch to the chain
+              if (batchCount === this.capacityBatchLimit) {
+                // Reset the batch and count for the next batch
+                promises.push(
+                  this.blockchainService.createExtrinsic(
+                    { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
+                    { eventPallet: 'utility', event: 'BatchCompleted' },
+                    providerKeys, batch).signAndSend(),
+                );
+                batch = [];
+                batchCount = 0;
+              }
+              break;
+
+            default:
+              break;
+          }
+        });
+
+        if (batch.length > 0) {
+          promises.push(
+            this.blockchainService.createExtrinsic(
+              { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
+              { eventPallet: 'utility', event: 'BatchCompleted' },
+              providerKeys, batch).signAndSend(),
+          );
         }
-      } else {
-        throw new Error(`Error re-importing bundles for ${dsnpUserId.toString()}`);
+
+        await Promise.all(promises);
+
+        await this.processChainEvents(promises, ownerMsaId);
+
+        // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
+        // import bundles are used to import the user's DSNP Graph into the graph SDK
+        // check if user graph exists in the graph SDK else queue a graph update job
+        const reImported = await this.importBundles(dsnpUserId, graphKeyPairs);
+        if (reImported) {
+          const userGraphExists = await this.graphStateManager.graphContainsUser(dsnpUserId.toString());
+          if (!userGraphExists) {
+            throw new Error(`User graph does not exist for ${dsnpUserId.toString()}`);
+          }
+        } else {
+          throw new Error(`Error re-importing bundles for ${dsnpUserId.toString()}`);
+        }
       }
     } catch (err) {
       if (updateConnections) {
@@ -157,17 +193,23 @@ export class ReconnectionGraphService {
       while (hasNextPage) {
         // eslint-disable-next-line no-await-in-loop
         const response = await providerAPI.get(`/api/v1.0.0/connections/${dsnpUserId.toString()}`, { params });
-
         if (response.status !== 200) {
           throw new Error(`Bad status ${response.status} (${response.statusText} from Provider web hook.)`);
+        }
+        if (!response.data || !response.data.connections) {
+          throw new Error(`No connections found for ${dsnpUserId.toString()}`);
+        }
+        
+        if(response.data.dsnpId !== dsnpUserId.toString()) {
+          throw new Error(`DSNP ID mismatch in response for ${dsnpUserId.toString()}`);
         }
 
         const { data }: { data: ProviderGraph[] } = response.data.connections;
         allConnections.push(...data);
 
-        const { graphKeypair }: { graphKeypair: GraphKeyPair[] } = response.data.graphKeyPairs;
-        if (graphKeypair) {
-          keyPairs.push(...graphKeypair);
+        const { graphKeyPairs }: { graphKeyPairs: GraphKeyPair[] } = response.data.graphKeyPairs;
+        if (graphKeyPairs) {
+          keyPairs.push(...graphKeyPairs);
         }
 
         const { pagination } = response.data.connections;
@@ -190,10 +232,7 @@ export class ReconnectionGraphService {
     }
   }
 
-  async importBundles(
-    dsnpUserId: MessageSourceId,
-    graphKeyPairs: ProviderKeyPair[],
-  ): Promise<boolean> {
+  async importBundles(dsnpUserId: MessageSourceId, graphKeyPairs: ProviderKeyPair[]): Promise<boolean> {
     const importBundles = await this.formImportBundles(dsnpUserId, graphKeyPairs);
     return this.graphStateManager.importUserData(importBundles);
   }
@@ -275,60 +314,103 @@ export class ReconnectionGraphService {
     return importBundles;
   }
 
-  async formConnections(dsnpUserId: MessageSourceId | AnyNumber, providerId: MessageSourceId | AnyNumber, graphConnections: ProviderGraph[]): Promise<ConnectAction[]> {
+  async formConnections(
+    dsnpUserId: MessageSourceId | AnyNumber,
+    providerId: MessageSourceId | AnyNumber,
+    isTransitive: boolean,
+    graphConnections: ProviderGraph[],
+  ): Promise<ConnectAction[]> {
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId);
-
     const actions: ConnectAction[] = [];
-    graphConnections.forEach((connection) => {
+    
+    for (const connection of graphConnections) {
       const connectionType = connection.connectionType.toLowerCase();
       const privacyType = connection.privacyType.toLowerCase();
-
       const schemaId = this.graphStateManager.getSchemaIdFromConfig(connectionType as ConnectionType, privacyType as PrivacyType);
+      /// make sure user has delegation for schemaId
+      const isDelegated = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
+      /// make sure incoming user connection is also delegated for queuing updates non-transitively
+      const isDelegatedConnection = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
+      if (
+        !isDelegated.isSome ||
+        !isDelegated
+          .unwrap()
+          .map((grant) => grant.schema_id.toNumber())
+          .includes(schemaId)
+      ) {
+        continue;
+      }
 
       switch (connection.direction) {
         case 'connectionTo': {
+          const connect: Connection = {
+            dsnpUserId: connection.dsnpId,
+            schemaId,
+          };
+
           const connectionAction: ConnectAction = {
             type: 'Connect',
             ownerDsnpUserId: dsnpUserId.toString(),
-            connection: {
-              dsnpUserId: connection.dsnpId.toString(),
-              schemaId,
-            },
+            connection: connect,
           };
 
-          if (dsnpKeys) {
+          if (dsnpKeys && dsnpKeys.keys.length > 0) {
             connectionAction.dsnpKeys = dsnpKeys;
           }
+
           actions.push(connectionAction);
           break;
         }
         case 'connectionFrom': {
-          const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-          this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+          if (
+            isTransitive &&
+            isDelegatedConnection.isSome &&
+            isDelegatedConnection
+              .unwrap()
+              .map((grant) => grant.schema_id.toNumber())
+              .includes(schemaId)
+          ) {
+            const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
+            this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+          }
           break;
         }
         case 'bidirectional': {
+          const connect: Connection = {
+            dsnpUserId: connection.dsnpId,
+            schemaId,
+          };
+
           const connectionAction: ConnectAction = {
             type: 'Connect',
             ownerDsnpUserId: dsnpUserId.toString(),
-            connection: {
-              dsnpUserId: connection.dsnpId.toString(),
-              schemaId,
-            },
+            connection: connect,
           };
 
-          if (dsnpKeys) {
+          if (dsnpKeys && dsnpKeys.keys.length > 0) {
             connectionAction.dsnpKeys = dsnpKeys;
           }
+
           actions.push(connectionAction);
-          const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-          this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+
+          if (
+            isTransitive &&
+            isDelegatedConnection.isSome &&
+            isDelegatedConnection
+              .unwrap()
+              .map((grant) => grant.schema_id.toNumber())
+              .includes(schemaId)
+          ) {
+            const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
+            this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+          }
           break;
         }
         default:
           throw new Error(`Unrecognized connection direction: ${connection.direction}`);
       }
-    });
+    }
+
     return actions;
   }
 
@@ -346,5 +428,15 @@ export class ReconnectionGraphService {
       ),
     };
     return dsnpKeys;
+  }
+
+  async processChainEvents(promises: Promise<ParsedEventResult>[], dsnpUserId: MessageSourceId): Promise<void> {
+    // loop over promises and wait for all to resolve
+    for (const promise of promises) {
+      const [event, eventMap] = await promise;
+      if (!event) {
+        throw new Error(`Error submitting extrinsic`);
+      }
+    }
   }
 }
