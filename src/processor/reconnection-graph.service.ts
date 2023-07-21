@@ -68,10 +68,15 @@ export class ReconnectionGraphService {
       const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, updateConnections, graphConnections);
       try {
         await this.graphStateManager.applyActions(actions);
-      } catch (e) {
-        // silenty fail graphsdk handles duplicate connections
-        this.logger.error(`Error applying actions: ${e}`);
+      } catch (e: any) {
+        const errMessage = e instanceof Error ? e.message : ""
+        if (errMessage.includes('already exists')) {
+          this.logger.warn(`Error applying actions: ${e}`);
+        } else {
+          throw e;
+        }
       }
+
       let exportedUpdates = await this.graphStateManager.exportGraphUpdates();
 
       const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
