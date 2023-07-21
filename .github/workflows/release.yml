@@ -243,6 +243,7 @@ jobs:
 
   release-node-images:
     name: Release ${{matrix.arch}} Node Docker Image
+    needs: create-release-branch
     strategy:
       fail-fast: true
       matrix:
