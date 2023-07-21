@@ -119,7 +119,10 @@ export class ReconnectionGraphService {
               if (batchCount === this.capacityBatchLimit) {
                 // Reset the batch and count for the next batch
                 promises.push(
-                  this.blockchainService.createExtrinsic({ pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, {}, providerKeys, batch).signAndSend(),
+                  this.blockchainService.createExtrinsic(
+                    { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
+                    { eventPallet: 'utility', event: 'BatchCompleted' },
+                    providerKeys, batch).signAndSend(),
                 );
                 batch = [];
                 batchCount = 0;
@@ -132,7 +135,12 @@ export class ReconnectionGraphService {
         });
 
         if (batch.length > 0) {
-          promises.push(this.blockchainService.createExtrinsic({ pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, {}, providerKeys, batch).signAndSend());
+          promises.push(
+            this.blockchainService.createExtrinsic(
+              { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
+              { eventPallet: 'utility', event: 'BatchCompleted' },
+              providerKeys, batch).signAndSend(),
+          );
         }
 
         await Promise.all(promises);
