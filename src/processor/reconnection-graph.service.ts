@@ -101,7 +101,7 @@ export class ReconnectionGraphService {
         let batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
         let batchItemCount = 0;
         let batchCount = 0;
-        const batchesMap = new Map<number, SubmittableExtrinsic<'rxjs', ISubmittableResult>[]>();
+        const batches: SubmittableExtrinsic<'rxjs', ISubmittableResult>[][] = [];
         updates.forEach((bundle) => {
           switch (bundle.type) {
             case 'PersistPage':
@@ -119,7 +119,7 @@ export class ReconnectionGraphService {
               // If the batch size exceeds the capacityBatchLimit, send the batch to the chain
               if (batchItemCount === this.capacityBatchLimit) {
                 // Reset the batch and count for the next batch
-                batchesMap.set(batchCount, batch);
+                batches.push(batch);
                 batchCount++;
                 batch = [];
                 batchItemCount = 0;
@@ -132,10 +132,10 @@ export class ReconnectionGraphService {
         });
 
         if (batch.length > 0) {
-          batchesMap.set(batchCount, batch);
+          batches.push(batch);
         }
 
-        await this.sendAndProcessChainEvents(ownerMsaId, providerKeys, batchesMap);
+        await this.sendAndProcessChainEvents(ownerMsaId, providerKeys, batches);
 
         // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
         // import bundles are used to import the user's DSNP Graph into the graph SDK
@@ -423,7 +423,7 @@ export class ReconnectionGraphService {
   async sendAndProcessChainEvents(
     dsnpUserId: MessageSourceId,
     providerKeys: KeyringPair,
-    batchesMap: Map<number, SubmittableExtrinsic<'rxjs', ISubmittableResult>[]>,
+    batchesMap: SubmittableExtrinsic<'rxjs', ISubmittableResult>[][],
     ): Promise<void> {
     try {
       // iterate over batches and send them to the chain
@@ -466,10 +466,10 @@ export class ReconnectionGraphService {
   }
 
   async process_batch_completed_event(event: any, eventMap: any, dsnpUserId: MessageSourceId): Promise<void> {
-    this.logger.log(`BatchCompleted event found for ${dsnpUserId.toString()}`);
+    this.logger.debug(`BatchCompleted event found for ${dsnpUserId.toString()}`);
   }
 
   async process_batch_interrupted_event(event: any, eventMap: any, dsnpUserId: MessageSourceId): Promise<void> {
-    this.logger.log(`BatchInterrupted event found for ${dsnpUserId.toString()}`);
+    this.logger.debug(`BatchInterrupted event found for ${dsnpUserId.toString()}`);
   }
 }
