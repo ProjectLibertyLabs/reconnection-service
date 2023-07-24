@@ -440,11 +440,10 @@ export class ReconnectionGraphService {
           throw new Error(`No events were found for ${dsnpUserId.toString()}`);
         }
 
-        if(this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
-          this.logger.debug(`BatchInterrupted event found for ${dsnpUserId.toString()}`);
-        } else {
+        if(!this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
+          this.logger.warn(`Batch failed event found for ${dsnpUserId.toString()}: ${event}`);
           if(this.blockchainService.api.events.utility.BatchInterrupted.is(event)) {
-            await this.process_batch_interrupted_event(dsnpUserId, batch, event, eventMap);
+            await this.process_batch_interrupted_event(dsnpUserId, providerKeys, batch, event, eventMap);
           } else {
             this.logger.warn(`Unexpected event found for ${dsnpUserId.toString()}`);
             this.logger.warn(event);
@@ -465,11 +464,33 @@ export class ReconnectionGraphService {
     }
   }
 
-  async process_batch_interrupted_event(dsnpUserId: MessageSourceId, batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[], event: any, eventMap:any): Promise<void> {
-    this.logger.log(`BatchCompleted event found for ${dsnpUserId.toString()}`);
+  async process_batch_interrupted_event(
+    dsnpUserId: MessageSourceId,
+    providerKeys: KeyringPair,
+    batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[], 
+    event: any, eventMap:any): Promise<void> {
+    this.logger.log(`BatchInterrupted event found for ${dsnpUserId.toString()}`);
     this.logger.log(`Retrying each extrinsic call in batch separately for ${dsnpUserId.toString()}`);
     // iterate over each extrinsic call in batch and retry
     batch.forEach(async (extrinsic, extrinsicIndex) => {
+      try{
+        const [event, eventMap] = await this.blockchainService.createExtrinsic(
+          { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
+          { eventPallet: 'utility', event: 'BatchCompleted' },
+          providerKeys, [extrinsic]).signAndSend();
+
+        if (!event) {
+          throw new Error(`No events were found for ${dsnpUserId.toString()}`);
+        }
+
+        if(!this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
+        } else{
+          
+        }
+      } catch (e) {
+        this.logger.error(`Error processing extrinsic ${extrinsicIndex} in batch for ${dsnpUserId.toString()}: ${e}`);
+        throw e;
+      }
     });
   }
 }
