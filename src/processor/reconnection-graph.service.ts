@@ -433,6 +433,27 @@ export class ReconnectionGraphService {
     try {
       await Promise.all(promises);
       this.logger.debug(`Successfully processed chain events for ${dsnpUserId.toString()}`);
+
+      // iterate over promises and check for `BatchCompleted` event
+      for (const promise of promises) {
+        const [event, eventMap] = await promise;
+        if (!event) {
+          // if we dont get any events, covering any unexpected connection errors
+          throw new Error(`No events were found for ${dsnpUserId.toString()}`);
+        }
+        if(this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
+          await this.process_batch_completed_event(event, eventMap, dsnpUserId);
+        } else {
+          if(this.blockchainService.api.events.utility.BatchInterrupted.is(event)) {
+            this.logger.log(`BatchInterrupted event found for ${dsnpUserId.toString()}`);
+            await this.process_batch_interrupted_event(event, eventMap, dsnpUserId);
+          } else {
+            this.logger.warn(`Unexpected event found for ${dsnpUserId.toString()}`);
+            this.logger.warn(event);
+            this.logger.warn(eventMap);
+          }
+        }
+      }
     } catch (e) {
       this.logger.error(`Error processing chain events for ${dsnpUserId.toString()}: ${e}`);
       // check if error is due to insufficient funds
@@ -444,5 +465,11 @@ export class ReconnectionGraphService {
         throw e;
       }
     }
+  }
+
+  async process_batch_completed_event(event: any, eventMap: any, dsnpUserId: MessageSourceId): Promise<void> {
+  }
+
+  async process_batch_interrupted_event(event: any, eventMap: any, dsnpUserId: MessageSourceId): Promise<void> {
   }
 }
