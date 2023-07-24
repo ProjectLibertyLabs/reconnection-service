@@ -143,8 +143,6 @@ export class ReconnectionGraphService {
           );
         }
 
-        await Promise.all(promises);
-
         await this.processChainEvents(promises, ownerMsaId);
 
         // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
@@ -431,12 +429,12 @@ export class ReconnectionGraphService {
   }
 
   async processChainEvents(promises: Promise<ParsedEventResult>[], dsnpUserId: MessageSourceId): Promise<void> {
-    // loop over promises and wait for all to resolve
-    for (const promise of promises) {
-      const [event, eventMap] = await promise;
-      if (!event) {
-        throw new Error(`Error submitting extrinsic`);
-      }
+    // iterate over promises and wait for all to resolve
+    try {
+      await Promise.all(promises);
+    } catch (e) {
+      this.logger.error(`Error processing chain events for ${dsnpUserId.toString()}: ${e}`);
+      throw e;
     }
   }
 }
