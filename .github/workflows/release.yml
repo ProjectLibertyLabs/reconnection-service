@@ -22,8 +22,8 @@ env:
   RELEASE_BRANCH_NAME: release-${{github.event.inputs.release-version || github.ref_name}}
   LATEST_FULL_RELEASE_TAG: _LATEST-FULL-RELEASE
   TEST_RUN: false
-  DOCKER_HUB_PROFILE: frequencychain
-  IMAGE_NAME: graph-reconnection-service
+  DOCKER_HUB_PROFILE: amplicalabs
+  IMAGE_NAME: reconnection-service
 
 #  ${{startsWith(github.event.inputs.release-version || github.ref_name, 'v0.0.1')}}
 
