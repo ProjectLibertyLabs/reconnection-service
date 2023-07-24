@@ -431,12 +431,11 @@ export class ReconnectionGraphService {
   async processChainEvents(promises: Promise<ParsedEventResult>[], dsnpUserId: MessageSourceId): Promise<void> {
     // iterate over promises and wait for all to resolve
     try {
-      await Promise.all(promises);
+      const chainResults = await Promise.all(promises);
       this.logger.debug(`Successfully processed chain events for ${dsnpUserId.toString()}`);
 
       // iterate over promises and check for `BatchCompleted` event
-      for (const promise of promises) {
-        const [event, eventMap] = await promise;
+      for (const [event, eventMap] of chainResults) {
         if (!event) {
           // if we dont get any events, covering any unexpected connection errors
           throw new Error(`No events were found for ${dsnpUserId.toString()}`);
@@ -445,7 +444,6 @@ export class ReconnectionGraphService {
           await this.process_batch_completed_event(event, eventMap, dsnpUserId);
         } else {
           if(this.blockchainService.api.events.utility.BatchInterrupted.is(event)) {
-            this.logger.log(`BatchInterrupted event found for ${dsnpUserId.toString()}`);
             await this.process_batch_interrupted_event(event, eventMap, dsnpUserId);
           } else {
             this.logger.warn(`Unexpected event found for ${dsnpUserId.toString()}`);
@@ -468,8 +466,10 @@ export class ReconnectionGraphService {
   }
 
   async process_batch_completed_event(event: any, eventMap: any, dsnpUserId: MessageSourceId): Promise<void> {
+    this.logger.log(`BatchCompleted event found for ${dsnpUserId.toString()}`);
   }
 
   async process_batch_interrupted_event(event: any, eventMap: any, dsnpUserId: MessageSourceId): Promise<void> {
+    this.logger.log(`BatchInterrupted event found for ${dsnpUserId.toString()}`);
   }
 }
