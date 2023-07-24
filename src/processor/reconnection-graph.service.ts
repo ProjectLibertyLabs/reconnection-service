@@ -27,6 +27,7 @@ import { GraphKeyPair as ProviderKeyPair, KeyType, ProviderGraph } from '../inte
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { ConfigService } from '../config/config.service';
 import { ParsedEventResult } from '../blockchain/extrinsic';
+import { KeyringPair } from '@polkadot/keyring/types';
 
 @Injectable()
 export class ReconnectionGraphService {
@@ -98,8 +99,9 @@ export class ReconnectionGraphService {
 
       for (const [ownerMsaId, updates] of mapUserIdToUpdates.entries()) {
         let batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
+        let batchItemCount = 0;
         let batchCount = 0;
-        const promises: Promise<ParsedEventResult>[] = [];
+        const batchesMap = new Map<number, SubmittableExtrinsic<'rxjs', ISubmittableResult>[]>();
         updates.forEach((bundle) => {
           switch (bundle.type) {
             case 'PersistPage':
@@ -113,19 +115,14 @@ export class ReconnectionGraphService {
                   Array.from(Array.prototype.slice.call(bundle.payload)),
                 ),
               );
-              batchCount++;
-
+              batchItemCount++;
               // If the batch size exceeds the capacityBatchLimit, send the batch to the chain
-              if (batchCount === this.capacityBatchLimit) {
+              if (batchItemCount === this.capacityBatchLimit) {
                 // Reset the batch and count for the next batch
-                promises.push(
-                  this.blockchainService.createExtrinsic(
-                    { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
-                    { eventPallet: 'utility', event: 'BatchCompleted' },
-                    providerKeys, batch).signAndSend(),
-                );
+                batchesMap.set(batchCount, batch);
+                batchCount++;
                 batch = [];
-                batchCount = 0;
+                batchItemCount = 0;
               }
               break;
 
@@ -135,15 +132,10 @@ export class ReconnectionGraphService {
         });
 
         if (batch.length > 0) {
-          promises.push(
-            this.blockchainService.createExtrinsic(
-              { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
-              { eventPallet: 'utility', event: 'BatchCompleted' },
-              providerKeys, batch).signAndSend(),
-          );
+          batchesMap.set(batchCount, batch);
         }
 
-        await this.processChainEvents(promises, ownerMsaId);
+        await this.sendAndProcessChainEvents(ownerMsaId, providerKeys, batchesMap);
 
         // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
         // import bundles are used to import the user's DSNP Graph into the graph SDK
@@ -428,18 +420,26 @@ export class ReconnectionGraphService {
     return dsnpKeys;
   }
 
-  async processChainEvents(promises: Promise<ParsedEventResult>[], dsnpUserId: MessageSourceId): Promise<void> {
-    // iterate over promises and wait for all to resolve
+  async sendAndProcessChainEvents(
+    dsnpUserId: MessageSourceId,
+    providerKeys: KeyringPair,
+    batchesMap: Map<number, SubmittableExtrinsic<'rxjs', ISubmittableResult>[]>,
+    ): Promise<void> {
     try {
-      const chainResults = await Promise.all(promises);
-      this.logger.debug(`Successfully processed chain events for ${dsnpUserId.toString()}`);
-
-      // iterate over promises and check for `BatchCompleted` event
-      for (const [event, eventMap] of chainResults) {
+      // iterate over batches and send them to the chain
+      batchesMap.forEach(async (batch, batchIndex) => {
+        this.logger.debug(`Sending batch ${batchIndex} for ${dsnpUserId.toString()}`);
+        
+        const [event, eventMap] = await this.blockchainService.createExtrinsic(
+          { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
+          { eventPallet: 'utility', event: 'BatchCompleted' },
+          providerKeys, batch).signAndSend();
+        
         if (!event) {
           // if we dont get any events, covering any unexpected connection errors
           throw new Error(`No events were found for ${dsnpUserId.toString()}`);
         }
+
         if(this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
           await this.process_batch_completed_event(event, eventMap, dsnpUserId);
         } else {
@@ -451,7 +451,7 @@ export class ReconnectionGraphService {
             this.logger.warn(eventMap);
           }
         }
-      }
+      });
     } catch (e) {
       this.logger.error(`Error processing chain events for ${dsnpUserId.toString()}: ${e}`);
       // check if error is due to insufficient funds
