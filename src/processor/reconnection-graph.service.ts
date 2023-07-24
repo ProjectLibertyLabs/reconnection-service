@@ -432,9 +432,17 @@ export class ReconnectionGraphService {
     // iterate over promises and wait for all to resolve
     try {
       await Promise.all(promises);
+      this.logger.debug(`Successfully processed chain events for ${dsnpUserId.toString()}`);
     } catch (e) {
       this.logger.error(`Error processing chain events for ${dsnpUserId.toString()}: ${e}`);
-      throw e;
+      // check if error is due to insufficient funds
+      if (e instanceof Error && e.message.includes('Inability to pay some fees')) {
+        // in case capacity is low pause the queue 
+        // Todo: do something better here
+        this.graphUpdateQueue.pause();
+      } else {
+        throw e;
+      }
     }
   }
 }
