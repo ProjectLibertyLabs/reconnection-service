@@ -441,10 +441,10 @@ export class ReconnectionGraphService {
         }
 
         if(this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
-          await this.process_batch_completed_event(event, eventMap, dsnpUserId);
+          this.logger.debug(`BatchInterrupted event found for ${dsnpUserId.toString()}`);
         } else {
           if(this.blockchainService.api.events.utility.BatchInterrupted.is(event)) {
-            await this.process_batch_interrupted_event(event, eventMap, dsnpUserId);
+            await this.process_batch_interrupted_event(dsnpUserId, batch, event, eventMap);
           } else {
             this.logger.warn(`Unexpected event found for ${dsnpUserId.toString()}`);
             this.logger.warn(event);
@@ -465,11 +465,11 @@ export class ReconnectionGraphService {
     }
   }
 
-  async process_batch_completed_event(event: any, eventMap: any, dsnpUserId: MessageSourceId): Promise<void> {
-    this.logger.debug(`BatchCompleted event found for ${dsnpUserId.toString()}`);
-  }
-
-  async process_batch_interrupted_event(event: any, eventMap: any, dsnpUserId: MessageSourceId): Promise<void> {
-    this.logger.debug(`BatchInterrupted event found for ${dsnpUserId.toString()}`);
+  async process_batch_interrupted_event(dsnpUserId: MessageSourceId, batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[], event: any, eventMap:any): Promise<void> {
+    this.logger.log(`BatchCompleted event found for ${dsnpUserId.toString()}`);
+    this.logger.log(`Retrying each extrinsic call in batch separately for ${dsnpUserId.toString()}`);
+    // iterate over each extrinsic call in batch and retry
+    batch.forEach(async (extrinsic, extrinsicIndex) => {
+    });
   }
 }
