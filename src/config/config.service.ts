@@ -16,6 +16,10 @@ export interface ConfigEnvironmentVariables {
   PROVIDER_ACCESS_TOKEN: string;
   BLOCKCHAIN_SCAN_INTERVAL_MINUTES: number;
   QUEUE_HIGH_WATER: number;
+  WEBHOOK_FAILURE_THRESHOLD: number;
+  HEALTH_CHECK_SUCCESS_THRESHOLD: number;
+  WEBHOOK_RETRY_INTERVAL_SECONDS: number;
+  HEALTH_CHECK_RETRY_INTERVAL_SECONDS: number;
   GRAPH_ENVIRONMENT_TYPE: string;
   GRAPH_ENVIRONMENT_DEV_CONFIG: string;
   PROVIDER_ACCOUNT_SEED_PHRASE: string;
@@ -83,6 +87,22 @@ export class ConfigService {
 
   public getQueueHighWater(): number {
     return this.nestConfigService.get<number>('QUEUE_HIGH_WATER')!;
+  }
+
+  public getWebhookFailureThreshold(): number {
+    return this.nestConfigService.get<number>('WEBHOOK_FAILURE_THRESHOLD')!;
+  }
+
+  public getHealthCheckSuccessThreshold(): number {
+    return this.nestConfigService.get<number>('HEALTH_CHECK_SUCCESS_THRESHOLD')!;
+  }
+
+  public getWebhookRetryIntervalSeconds(): number {
+    return this.nestConfigService.get<number>('WEBHOOK_RETRY_INTERVAL_SECONDS')!;
+  }
+
+  public getHealthCheckRetryIntervalSeconds(): number {
+    return this.nestConfigService.get<number>('HEALTH_CHECK_RETRY_INTERVAL_SECONDS')!;
   }
 
   public getProviderAccountSeedPhrase(): string {

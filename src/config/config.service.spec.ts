@@ -45,6 +45,10 @@ describe('ReconnectionConfigService', () => {
     BLOCKCHAIN_SCAN_INTERVAL_MINUTES: undefined,
     QUEUE_HIGH_WATER: undefined,
     PROVIDER_ACCOUNT_SEED_PHRASE: undefined,
+    WEBHOOK_FAILURE_THRESHOLD: undefined,
+    HEALTH_CHECK_SUCCESS_THRESHOLD: undefined,
+    WEBHOOK_RETRY_INTERVAL_SECONDS: undefined,
+    HEALTH_CHECK_RETRY_INTERVAL_SECONDS: undefined,
     GRAPH_ENVIRONMENT_TYPE: undefined,
     GRAPH_ENVIRONMENT_DEV_CONFIG: undefined,
   };
@@ -130,6 +134,34 @@ describe('ReconnectionConfigService', () => {
       await expect(setupConfigService({ PROVIDER_ACCOUNT_SEED_PHRASE: 'hello, world', ...env })).rejects.toBeDefined();
     });
 
+    it('invalid webhook failure threshold should fail', async () => {
+      const { WEBHOOK_FAILURE_THRESHOLD: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ WEBHOOK_FAILURE_THRESHOLD: -1, ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ WEBHOOK_FAILURE_THRESHOLD: 0, ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ WEBHOOK_FAILURE_THRESHOLD: 'foo', ...env })).rejects.toBeDefined();
+    });
+
+    it('invalid health check success threshold should fail', async () => {
+      const { HEALTH_CHECK_SUCCESS_THRESHOLD: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ HEALTH_CHECK_SUCCESS_THRESHOLD: -1, ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ HEALTH_CHECK_SUCCESS_THRESHOLD: 0, ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ HEALTH_CHECK_SUCCESS_THRESHOLD: 'foo', ...env })).rejects.toBeDefined();
+    });
+
+    it('invalid webhook retry interval should fail', async () => {
+      const { WEBHOOK_RETRY_INTERVAL_SECONDS: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ WEBHOOK_RETRY_INTERVAL_SECONDS: -1, ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ WEBHOOK_RETRY_INTERVAL_SECONDS: 0, ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ WEBHOOK_RETRY_INTERVAL_SECONDS: 'foo', ...env })).rejects.toBeDefined();
+    });
+
+    it('invalid health check retry interval should fail', async () => {
+      const { HEALTH_CHECK_RETRY_INTERVAL_SECONDS: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ HEALTH_CHECK_RETRY_INTERVAL_SECONDS: -1, ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ HEALTH_CHECK_RETRY_INTERVAL_SECONDS: 0, ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ HEALTH_CHECK_RETRY_INTERVAL_SECONDS: 'foo', ...env })).rejects.toBeDefined();
+    });
+
     it('missing graph environment type should fail', async () => {
       const { GRAPH_ENVIRONMENT_TYPE: dummy, ...env } = ALL_ENV;
       await expect(setupConfigService({ GRAPH_ENVIRONMENT_TYPE: undefined, ...env })).rejects.toBeDefined();
@@ -187,6 +219,22 @@ describe('ReconnectionConfigService', () => {
 
     it('should get queue high water mark', () => {
       expect(reconnectionConfigService.getQueueHighWater()).toStrictEqual(parseInt(ALL_ENV.QUEUE_HIGH_WATER as string, 10));
+    });
+
+    it('should get webhook failure threshold', () => {
+      expect(reconnectionConfigService.getWebhookFailureThreshold()).toStrictEqual(parseInt(ALL_ENV.WEBHOOK_FAILURE_THRESHOLD as string, 10));
+    });
+
+    it('should get health check success threshold', () => {
+      expect(reconnectionConfigService.getHealthCheckSuccessThreshold()).toStrictEqual(parseInt(ALL_ENV.HEALTH_CHECK_SUCCESS_THRESHOLD as string, 10));
+    });
+
+    it('should get webhook retry interval', () => {
+      expect(reconnectionConfigService.getWebhookRetryIntervalSeconds()).toStrictEqual(parseInt(ALL_ENV.WEBHOOK_RETRY_INTERVAL_SECONDS as string, 10));
+    });
+
+    it('should get health check retry interval', () => {
+      expect(reconnectionConfigService.getHealthCheckRetryIntervalSeconds()).toStrictEqual(parseInt(ALL_ENV.HEALTH_CHECK_RETRY_INTERVAL_SECONDS as string, 10));
     });
 
     it('should get provider seed phrase', () => {
