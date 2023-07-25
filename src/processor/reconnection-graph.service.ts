@@ -458,7 +458,7 @@ export class ReconnectionGraphService {
       if(!this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
         this.logger.warn(`Batch failed event found for ${dsnpUserId.toString()}: ${event}`);
         if(this.blockchainService.api.events.utility.BatchInterrupted.is(event)) {
-          // Since frequency extrinsics does on flight checks via signed extension, we should not see any other events
+          // Since frequency extrinsics does pre-flight checks via signed extension, we should not see any other events
           // Any error from such pre-flight checks are caught in the catch block
           // BatchInterrupted is caused during tx execution and any error arising from
           // stateful storage would mean our configuration is wrong
@@ -485,6 +485,7 @@ export class ReconnectionGraphService {
         // once state is updated we do a non-transitive graph update
         await this.importBundles(dsnpUserId, graphKeyPairs);
         // refresh state and queue a non-transitive graph update
+        // this is safe to do as we are only updating single user's graph
         const { key: jobId, data } = createGraphUpdateJob(dsnpUserId, provideId, SkipTransitiveGraphs);
         this.graphUpdateQueue.add('graphUpdate', data, { jobId });
       }
