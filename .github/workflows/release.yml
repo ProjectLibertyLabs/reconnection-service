@@ -50,8 +50,8 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           flavor: |
-            latest: auto
-            prefix: standalone,onlatest=true
+            latest=auto
+            prefix=standalone,onlatest=true
           images: |
             ${{env.DOCKER_HUB_PROFILE}}/${{env.IMAGE_NAME}}
           tags: |
@@ -61,8 +61,8 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           flavor: |
-            latest: true
-            prefix: apponly,onlatest=true
+            latest=true
+            prefix=apponly,onlatest=true
           images: |
               ${{env.DOCKER_HUB_PROFILE}}/${{env.IMAGE_NAME}}
           tags: |
