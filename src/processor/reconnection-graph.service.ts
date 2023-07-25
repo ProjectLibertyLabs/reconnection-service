@@ -120,7 +120,7 @@ export class ReconnectionGraphService {
                 // Reset the batch and count for the next batch
                 promises.push(
                   this.blockchainService.createExtrinsic(
-                    { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
+                    { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' },
                     { eventPallet: 'utility', event: 'BatchCompleted' },
                     providerKeys, batch).signAndSend(),
                 );
@@ -137,7 +137,7 @@ export class ReconnectionGraphService {
         if (batch.length > 0) {
           promises.push(
             this.blockchainService.createExtrinsic(
-              { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
+              { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' },
               { eventPallet: 'utility', event: 'BatchCompleted' },
               providerKeys, batch).signAndSend(),
           );
@@ -171,35 +171,40 @@ export class ReconnectionGraphService {
   }
 
   async getUserGraphFromProvider(dsnpUserId: MessageSourceId | string, providerId: ProviderId | string): Promise<any> {
-    const headers = {
-      Authorization: 'Bearer <access_token>', // Replace with your actual access token if required
-    };
-    const baseUrl = this.configService.providerBaseUrl(providerId);
+    const providerAPI = this.getProviderAPI(providerId);
 
     const params = {
       pageNumber: 1,
       pageSize: 10, // This likely should be increased for production values
     };
 
-    const providerAPI: AxiosInstance = axios.create({
-      baseURL: baseUrl.toString(),
-      headers,
-    });
-
     const allConnections: ProviderGraph[] = [];
     const keyPairs: GraphKeyPair[] = [];
     try {
       let hasNextPage = true;
+      let webhookFailures: number = 0;
+      const webhookFailureThreshold: number = this.configService.getWebhookFailureThreshold();
+
       while (hasNextPage) {
         // eslint-disable-next-line no-await-in-loop
         const response = await providerAPI.get(`/api/v1.0.0/connections/${dsnpUserId.toString()}`, { params });
         if (response.status !== 200) {
-          throw new Error(`Bad status ${response.status} (${response.statusText} from Provider web hook.)`);
+          // TODO: Remove next line or add logic to determine when the job should fail vs retry
+          // throw new Error(`Bad status ${response.status} (${response.statusText} from Provider web hook.)`);
+          webhookFailures++;
+          if (webhookFailures === webhookFailureThreshold) {
+            await this.graphUpdateQueue.pause();
+            await this.waitForProviderWebhookRecovery(providerId);
+            await this.graphUpdateQueue.resume();
+          } else {
+            await new Promise(r => setTimeout(r, this.configService.getWebhookRetryIntervalSeconds()));
+            continue;
+          }
         }
         if (!response.data || !response.data.connections) {
           throw new Error(`No connections found for ${dsnpUserId.toString()}`);
         }
-        
+
         if(response.data.dsnpId !== dsnpUserId.toString()) {
           throw new Error(`DSNP ID mismatch in response for ${dsnpUserId.toString()}`);
         }
@@ -322,7 +327,7 @@ export class ReconnectionGraphService {
   ): Promise<ConnectAction[]> {
     const dsnpKeys = await this.formDsnpKeys(dsnpUserId);
     const actions: ConnectAction[] = [];
-    
+
     for (const connection of graphConnections) {
       const connectionType = connection.connectionType.toLowerCase();
       const privacyType = connection.privacyType.toLowerCase();
@@ -438,5 +443,36 @@ export class ReconnectionGraphService {
         throw new Error(`Error submitting extrinsic`);
       }
     }
+  }
+
+  async waitForProviderWebhookRecovery(providerId: ProviderId | string): Promise<void> {
+    const providerAPI = this.getProviderAPI(providerId);
+    const healthCheckSuccessesThreshold: number = this.configService.getHealthCheckSuccessThreshold();
+
+    let healthCheckSuccesses: number = 0;
+
+    while (healthCheckSuccesses < healthCheckSuccessesThreshold) {
+      const response = await providerAPI.get(`/api/v1.0.0/health`);
+
+      if (response.status === 200) {
+        healthCheckSuccesses++;
+      }
+
+      await new Promise(r => setTimeout(r, this.configService.getHealthCheckRetryIntervalSeconds()));
+    }
+  }
+
+  getProviderAPI(providerId: ProviderId | string): AxiosInstance {
+    const headers = {
+      Authorization: 'Bearer <access_token>', // Replace with your actual access token if required
+    };
+    const baseUrl = this.configService.providerBaseUrl(providerId);
+
+    const providerAPI: AxiosInstance = axios.create({
+      baseURL: baseUrl.toString(),
+      headers,
+    });
+
+    return providerAPI;
   }
 }
