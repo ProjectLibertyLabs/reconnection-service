@@ -134,8 +134,7 @@ export class ReconnectionGraphService {
         if (batch.length > 0) {
           batches.push(batch);
         }
-
-        await this.sendAndProcessChainEvents(ownerMsaId, providerKeys, batches);
+        await this.sendAndProcessChainEvents(ownerMsaId, providerId, providerKeys, graphKeyPairs, batches);
 
         // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
         // import bundles are used to import the user's DSNP Graph into the graph SDK
@@ -422,75 +421,73 @@ export class ReconnectionGraphService {
 
   async sendAndProcessChainEvents(
     dsnpUserId: MessageSourceId,
+    providerId: ProviderId,
     providerKeys: KeyringPair,
+    graphKeyPairs: ProviderKeyPair[],
     batchesMap: SubmittableExtrinsic<'rxjs', ISubmittableResult>[][],
     ): Promise<void> {
     try {
       // iterate over batches and send them to the chain
       batchesMap.forEach(async (batch, batchIndex) => {
-        this.logger.debug(`Sending batch ${batchIndex} for ${dsnpUserId.toString()}`);
-        
-        const [event, eventMap] = await this.blockchainService.createExtrinsic(
-          { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
-          { eventPallet: 'utility', event: 'BatchCompleted' },
-          providerKeys, batch).signAndSend();
-        
-        if (!event) {
-          // if we dont get any events, covering any unexpected connection errors
-          throw new Error(`No events were found for ${dsnpUserId.toString()}`);
-        }
-
-        if(!this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
-          this.logger.warn(`Batch failed event found for ${dsnpUserId.toString()}: ${event}`);
-          if(this.blockchainService.api.events.utility.BatchInterrupted.is(event)) {
-            await this.process_batch_interrupted_event(dsnpUserId, providerKeys, batch, event, eventMap);
-          } else {
-            this.logger.warn(`Unexpected event found for ${dsnpUserId.toString()}`);
-            this.logger.warn(event);
-            this.logger.warn(eventMap);
-          }
-        }
+        await this.processSingleBatch(dsnpUserId, providerId, providerKeys, graphKeyPairs, batch);
       });
     } catch (e) {
-      this.logger.error(`Error processing chain events for ${dsnpUserId.toString()}: ${e}`);
-      // check if error is due to insufficient funds
-      if (e instanceof Error && e.message.includes('Inability to pay some fees')) {
-        // in case capacity is low pause the queue 
-        // Todo: do something better here
-        this.graphUpdateQueue.pause();
-      } else {
-        throw e;
-      }
+      this.logger.error(`Error processing batches for ${dsnpUserId.toString()}: ${e}`);
+      throw e;
     }
   }
 
-  async process_batch_interrupted_event(
+  async processSingleBatch(
     dsnpUserId: MessageSourceId,
+    provideId: ProviderId,
     providerKeys: KeyringPair,
-    batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[], 
-    event: any, eventMap:any): Promise<void> {
-    this.logger.log(`BatchInterrupted event found for ${dsnpUserId.toString()}`);
-    this.logger.log(`Retrying each extrinsic call in batch separately for ${dsnpUserId.toString()}`);
-    // iterate over each extrinsic call in batch and retry
-    batch.forEach(async (extrinsic, extrinsicIndex) => {
-      try{
-        const [event, eventMap] = await this.blockchainService.createExtrinsic(
-          { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
-          { eventPallet: 'utility', event: 'BatchCompleted' },
-          providerKeys, [extrinsic]).signAndSend();
-
-        if (!event) {
-          throw new Error(`No events were found for ${dsnpUserId.toString()}`);
-        }
-
-        if(!this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
-        } else{
-          
-        }
-      } catch (e) {
-        this.logger.error(`Error processing extrinsic ${extrinsicIndex} in batch for ${dsnpUserId.toString()}: ${e}`);
-        throw e;
+    graphKeyPairs: ProviderKeyPair[],
+    batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]
+    ): Promise<void> {
+    try {
+      const [event, eventMap] = await this.blockchainService.createExtrinsic(
+        { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, 
+        { eventPallet: 'utility', event: 'BatchCompleted' },
+        providerKeys, batch).signAndSend();
+      
+      if (!event) {
+        // if we dont get any events, covering any unexpected connection errors
+        throw new Error(`No events were found for ${dsnpUserId.toString()}`);
       }
-    });
+
+      if(!this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
+        this.logger.warn(`Batch failed event found for ${dsnpUserId.toString()}: ${event}`);
+        if(this.blockchainService.api.events.utility.BatchInterrupted.is(event)) {
+          // Since frequency extrinsics does on flight checks via signed extension, we should not see any other events
+          // Any error from such pre-flight checks are caught in the catch block
+          // BatchInterrupted is caused during tx execution and any error arising from
+          // stateful storage would mean our configuration is wrong
+          this.logger.warn(`Unexpected event found for ${dsnpUserId.toString()}`);
+          this.logger.warn(event);
+          this.logger.warn(eventMap);
+          throw new Error(`Batch interrupted event found for ${dsnpUserId.toString()}`);
+        }
+      }
+    } catch (e) {
+      this.logger.error(`Error processing batch for ${dsnpUserId.toString()}: ${e}`);
+      //Following errors includes are checked against
+      // 1. Inability to pay some fees`
+      // 2. Transaction is not valid due to `Target page hash does not match current page hash`
+
+      if (e instanceof Error && e.message.includes('Inability to pay some fees')) {
+        // in case capacity is low pause the queue
+        this.graphUpdateQueue.pause();
+        throw e;
+      } else if (e instanceof Error && e.message.includes('Target page hash does not match current page hash')) {
+        // in case page hash does not match, re-import the user's DSNP Graph from the blockchain and form import bundles
+        // import bundles are used to import the user's DSNP Graph into the graph SDK
+        // here we update the state of the graph with the latest data from the chain
+        // once state is updated we do a non-transitive graph update
+        await this.importBundles(dsnpUserId, graphKeyPairs);
+        // refresh state and queue a non-transitive graph update
+        const { key: jobId, data } = createGraphUpdateJob(dsnpUserId, provideId, SkipTransitiveGraphs);
+        this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+      }
+    }
   }
 }
