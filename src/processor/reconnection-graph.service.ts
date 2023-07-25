@@ -458,10 +458,8 @@ export class ReconnectionGraphService {
       if(!this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
         this.logger.warn(`Batch failed event found for ${dsnpUserId.toString()}: ${event}`);
         if(this.blockchainService.api.events.utility.BatchInterrupted.is(event)) {
-          // Since frequency extrinsics does pre-flight checks via signed extension, we should not see any other events
-          // Any error from such pre-flight checks are caught in the catch block
-          // BatchInterrupted is caused during tx execution and any error arising from
-          // stateful storage would mean our configuration is wrong
+          // this event should not occur given we are filtering target event in extrinsic
+          // call to be `BatchCompleted`
           this.logger.warn(`Unexpected event found for ${dsnpUserId.toString()}`);
           this.logger.warn(event);
           this.logger.warn(eventMap);
@@ -479,11 +477,6 @@ export class ReconnectionGraphService {
         this.graphUpdateQueue.pause();
         throw e;
       } else if (e instanceof Error && e.message.includes('Target page hash does not match current page hash')) {
-        // in case page hash does not match, re-import the user's DSNP Graph from the blockchain and form import bundles
-        // import bundles are used to import the user's DSNP Graph into the graph SDK
-        // here we update the state of the graph with the latest data from the chain
-        // once state is updated we do a non-transitive graph update
-        await this.importBundles(dsnpUserId, graphKeyPairs);
         // refresh state and queue a non-transitive graph update
         // this is safe to do as we are only updating single user's graph
         const { key: jobId, data } = createGraphUpdateJob(dsnpUserId, provideId, SkipTransitiveGraphs);
