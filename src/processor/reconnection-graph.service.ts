@@ -134,7 +134,7 @@ export class ReconnectionGraphService {
         if (batch.length > 0) {
           batches.push(batch);
         }
-        await this.sendAndProcessChainEvents(ownerMsaId, providerId, providerKeys, graphKeyPairs, batches);
+        await this.sendAndProcessChainEvents(ownerMsaId, providerId, providerKeys, batches);
 
         // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
         // import bundles are used to import the user's DSNP Graph into the graph SDK
@@ -423,13 +423,12 @@ export class ReconnectionGraphService {
     dsnpUserId: MessageSourceId,
     providerId: ProviderId,
     providerKeys: KeyringPair,
-    graphKeyPairs: ProviderKeyPair[],
     batchesMap: SubmittableExtrinsic<'rxjs', ISubmittableResult>[][],
     ): Promise<void> {
     try {
       // iterate over batches and send them to the chain
       batchesMap.forEach(async (batch, batchIndex) => {
-        await this.processSingleBatch(dsnpUserId, providerId, providerKeys, graphKeyPairs, batch);
+        await this.processSingleBatch(dsnpUserId, providerId, providerKeys, batch);
       });
     } catch (e) {
       this.logger.error(`Error processing batches for ${dsnpUserId.toString()}: ${e}`);
@@ -441,7 +440,6 @@ export class ReconnectionGraphService {
     dsnpUserId: MessageSourceId,
     provideId: ProviderId,
     providerKeys: KeyringPair,
-    graphKeyPairs: ProviderKeyPair[],
     batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]
     ): Promise<void> {
     try {
