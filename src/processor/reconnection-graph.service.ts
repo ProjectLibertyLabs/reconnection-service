@@ -479,7 +479,11 @@ export class ReconnectionGraphService {
         // this is safe to do as we are only updating single user's graph
         const { key: jobId, data } = createGraphUpdateJob(dsnpUserId, provideId, SkipTransitiveGraphs);
         this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+        return;
       }
+      /// any errors we dont recognize, such as bad schema_id, etc
+      /// in such cases we should not retry the job
+      throw e;
     }
   }
 }
