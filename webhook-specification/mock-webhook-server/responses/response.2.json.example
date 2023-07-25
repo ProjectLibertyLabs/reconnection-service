@@ -1,0 +1,27 @@
+{
+    "dsnpId": 2,
+    "connections": {
+      "data": [
+        {
+          "dsnpId": 3,
+          "privacyType": "Public",
+          "direction": "connectionTo",
+          "connectionType": "Follow"
+        }
+      ]
+    },
+    "graphKeyPairs": {
+      "data": [
+        {
+          "keyType": "<string>",
+          "publicKey": "<string>",
+          "privateKey": "<string>"
+        },
+        {
+          "keyType": "<string>",
+          "publicKey": "<string>",
+          "privateKey": "<string>"
+        }
+      ]
+    }
+  }
