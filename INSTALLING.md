@@ -9,7 +9,7 @@ The application requires a Redis server that is configured with `Append-only fil
 
 ### Standalone (complete) image
 
-The standalone container image is meant to be a complete solution for a provider. It contains a single instance of the main application, plus a pre-configured Redis server. Simply download the latest [container image](link) and deploy using your favorite container management system.
+The standalone container image is meant to be a complete solution for a provider. It contains a single instance of the main application, plus a pre-configured Redis server. Simply download the latest [container image](https://hub.docker.com/r/amplicalabs/reconnection-service/) and deploy using your favorite container management system.
 
 The internal Redis server included in the complete image is already configured for persistence; it is simply necessary to configure your container pod to map the directory `/var/lib/redis` to a persistent storage volume.
 
