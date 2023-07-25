@@ -16,17 +16,17 @@ export class MockWebhookController {
     this.logger = new Logger(this.constructor.name);
   }
 
-  @Get('/health')
+  @Get('/api/v1.0.0/health')
   public health() {
     return this.healthResponse;
   }
 
-  @Post('/health/toggleResponse')
+  @Post('/api/v1.0.0/health/toggleResponse')
   public toggleHealth() {
     this.healthResponse = this.healthResponse === HttpStatus.OK ? HttpStatus.GONE : HttpStatus.OK;
   }
 
-  @Get('/connections/:dsnpId')
+  @Get('/api/v1.0.0/connections/:dsnpId')
   public getConnections(@Param('dsnpId') dsnpId: string) {
     let filename: string = '';
     if (fs.existsSync(`./responses/response.${dsnpId}.json`)) {
