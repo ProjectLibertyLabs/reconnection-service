@@ -196,7 +196,7 @@ export class ReconnectionGraphService {
         webhookFailures = 0;
 
         if (!response.data || !response.data.connections) {
-          throw new Error(`No connections found for ${dsnpUserId.toString()}`);
+          throw new Error(`Invalid response from provider: No connections found for ${dsnpUserId.toString()}`);
         }
 
         if (response.data.dsnpId !== dsnpUserId.toString()) {
