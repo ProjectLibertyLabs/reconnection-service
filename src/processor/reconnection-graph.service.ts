@@ -427,9 +427,14 @@ export class ReconnectionGraphService {
     ): Promise<void> {
     try {
       // iterate over batches and send them to the chain
-      batchesMap.forEach(async (batch, batchIndex) => {
-        await this.processSingleBatch(dsnpUserId, providerId, providerKeys, batch);
+      let batchPromises: Promise<void>[] = [];
+
+      batchesMap.forEach(async (batch) => {
+        batchPromises.push(this.processSingleBatch(dsnpUserId, providerId, providerKeys, batch));
       });
+
+      await Promise.all(batchPromises);
+
     } catch (e) {
       this.logger.error(`Error processing batches for ${dsnpUserId.toString()}: ${e}`);
       throw e;
