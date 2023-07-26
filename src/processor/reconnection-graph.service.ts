@@ -180,32 +180,26 @@ export class ReconnectionGraphService {
 
     const allConnections: ProviderGraph[] = [];
     const keyPairs: GraphKeyPair[] = [];
-    try {
-      let hasNextPage = true;
-      let webhookFailures: number = 0;
-      const webhookFailureThreshold: number = this.configService.getWebhookFailureThreshold();
 
-      while (hasNextPage) {
-        // eslint-disable-next-line no-await-in-loop
+    let hasNextPage = true;
+    let webhookFailures: number = 0;
+    const webhookFailureThreshold: number = this.configService.getWebhookFailureThreshold();
+    const webhookRetryIntervalMilliseconds: number = this.configService.getWebhookRetryIntervalSeconds() * 1000;
+
+    while (hasNextPage) {
+      // eslint-disable-next-line no-await-in-loop
+      try {
         const response = await providerAPI.get(`/api/v1.0.0/connections/${dsnpUserId.toString()}`, { params });
-        if (response.status !== 200) {
-          // TODO: Remove next line or add logic to determine when the job should fail vs retry
-          // throw new Error(`Bad status ${response.status} (${response.statusText} from Provider web hook.)`);
-          webhookFailures++;
-          if (webhookFailures === webhookFailureThreshold) {
-            await this.graphUpdateQueue.pause();
-            await this.waitForProviderWebhookRecovery(providerId);
-            await this.graphUpdateQueue.resume();
-          } else {
-            await new Promise(r => setTimeout(r, this.configService.getWebhookRetryIntervalSeconds()));
-            continue;
-          }
-        }
+
+        // Reset webhook failures to 0 on a success. We don't go into waiting for recovery unless
+        // a sequential number failures occur equalling webhookFailureThreshold.
+        webhookFailures = 0;
+
         if (!response.data || !response.data.connections) {
           throw new Error(`No connections found for ${dsnpUserId.toString()}`);
         }
 
-        if(response.data.dsnpId !== dsnpUserId.toString()) {
+        if (response.data.dsnpId !== dsnpUserId.toString()) {
           throw new Error(`DSNP ID mismatch in response for ${dsnpUserId.toString()}`);
         }
 
@@ -225,16 +219,35 @@ export class ReconnectionGraphService {
           // No more pages available, exit the loop
           hasNextPage = false;
         }
-      }
+      } catch (error) {
+        if (error instanceof AxiosError) {
+          if (error.response) {
+            webhookFailures++;
+            if (webhookFailures >= webhookFailureThreshold) {
+              await this.graphUpdateQueue.pause();
+              this.logger.error("Provider Webhook Failing: job processing queue paused.");
+              await this.waitForProviderWebhookRecovery(providerId);
 
-      return [allConnections, keyPairs];
-    } catch (e) {
-      if (e instanceof AxiosError) {
-        throw new Error(JSON.stringify(e));
-      } else {
-        throw e;
+              // When webhook becomes healthy again, reset webhook failures,
+              // resume the queue, and continue
+              webhookFailures = 0;
+              await this.graphUpdateQueue.resume();
+              this.logger.log("Provider Webhook Healthy: job processing queue resumed.");
+
+            } else {
+              await new Promise(r => setTimeout(r, webhookRetryIntervalMilliseconds));
+            }
+          }
+          else {
+            throw new Error(JSON.stringify(error));
+          }
+        } else {
+          throw error;
+        }
       }
     }
+
+    return [allConnections, keyPairs];
   }
 
   async importBundles(dsnpUserId: MessageSourceId, graphKeyPairs: ProviderKeyPair[]): Promise<boolean> {
@@ -448,17 +461,20 @@ export class ReconnectionGraphService {
   async waitForProviderWebhookRecovery(providerId: ProviderId | string): Promise<void> {
     const providerAPI = this.getProviderAPI(providerId);
     const healthCheckSuccessesThreshold: number = this.configService.getHealthCheckSuccessThreshold();
-
+    const healthCheckRetryIntervalMilliseconds: number = this.configService.getHealthCheckRetryIntervalSeconds() * 1000;
     let healthCheckSuccesses: number = 0;
 
     while (healthCheckSuccesses < healthCheckSuccessesThreshold) {
-      const response = await providerAPI.get(`/api/v1.0.0/health`);
-
-      if (response.status === 200) {
+      try {
+        await providerAPI.get(`/api/v1.0.0/health`);
         healthCheckSuccesses++;
+      } catch {
+        // Reset healthCheckSuccesses to 0 on failure. We will not go out of waitinf for recovery until there
+        // are a number of sequential healthy responses equalling healthCheckSuccessesThreshold.
+        healthCheckSuccesses = 0;
       }
 
-      await new Promise(r => setTimeout(r, this.configService.getHealthCheckRetryIntervalSeconds()));
+      await new Promise(r => setTimeout(r, healthCheckRetryIntervalMilliseconds));
     }
   }
 

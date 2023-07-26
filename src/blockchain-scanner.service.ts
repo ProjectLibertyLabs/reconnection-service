@@ -26,6 +26,11 @@ export class BlockchainScannerService implements OnApplicationBootstrap {
     // Kick off initial scan
     const initialTimeout = setTimeout(() => this.scan(), 0);
     this.schedulerRegistry.addTimeout('initialScan', initialTimeout);
+
+    const graphUpdateQueueIsPaused = await this.graphUpdateQueue.isPaused();
+    if (graphUpdateQueueIsPaused) {
+      this.graphUpdateQueue.resume();
+    }
   }
 
   constructor(
