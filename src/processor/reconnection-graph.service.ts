@@ -192,7 +192,7 @@ export class ReconnectionGraphService {
         const response = await providerAPI.get(`/api/v1.0.0/connections/${dsnpUserId.toString()}`, { params });
 
         // Reset webhook failures to 0 on a success. We don't go into waiting for recovery unless
-        // a sequential number failures occur equalling webhookFailureThreshold.
+        // a sequential number failures occur equaling webhookFailureThreshold.
         webhookFailures = 0;
 
         if (!response.data || !response.data.connections) {
@@ -469,8 +469,8 @@ export class ReconnectionGraphService {
         await providerAPI.get(`/api/v1.0.0/health`);
         healthCheckSuccesses++;
       } catch {
-        // Reset healthCheckSuccesses to 0 on failure. We will not go out of waitinf for recovery until there
-        // are a number of sequential healthy responses equalling healthCheckSuccessesThreshold.
+        // Reset healthCheckSuccesses to 0 on failure. We will not go out of waiting for recovery until there
+        // are a number of sequential healthy responses equaling healthCheckSuccessesThreshold.
         healthCheckSuccesses = 0;
       }
 
