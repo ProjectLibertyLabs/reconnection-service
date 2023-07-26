@@ -77,8 +77,8 @@ export class ConfigService {
     return this.providerMap.get(id.toString())?.userGraphEndpoint!;
   }
 
-  public providerAccessToken(): string {
-    return this.nestConfigService.get<string>('PROVIDER_ACCESS_TOKEN')!;
+  public providerApiToken(id: ProviderId | AnyNumber): string {
+    return this.providerMap.get(id.toString())?.apiToken!;
   }
 
   public getBlockchainScanIntervalMinutes(): number {

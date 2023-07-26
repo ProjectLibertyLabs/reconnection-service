@@ -204,9 +204,8 @@ describe('ReconnectionConfigService', () => {
       expect(reconnectionConfigService.providerUserGraphEndpoint(ALL_ENV.PROVIDER_ID as string).toString()).toStrictEqual(ALL_ENV.PROVIDER_USER_GRAPH_ENDPOINT);
     });
 
-    it('should allow missing provider access token', async () => {
-      const { PROVIDER_ACCESS_TOKEN: dummy, ...env } = ALL_ENV;
-      expect(reconnectionConfigService.providerAccessToken()).toBeUndefined();
+    it('should get provider api token', () => {
+      expect(reconnectionConfigService.providerApiToken(ALL_ENV.PROVIDER_ID as string).toString()).toStrictEqual(ALL_ENV.PROVIDER_ACCESS_TOKEN);
     });
 
     it('should get scan interval', () => {

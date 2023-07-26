@@ -480,10 +480,10 @@ export class ReconnectionGraphService {
 
   getProviderAPI(providerId: ProviderId | string): AxiosInstance {
     let headers = {};
-    const providerAccessToken = this.configService.providerAccessToken();
+    const providerApiToken = this.configService.providerApiToken(providerId);
 
-    if (providerAccessToken !== undefined) {
-      headers['Authorization'] = `Bearer ${providerAccessToken}`;
+    if (providerApiToken !== undefined) {
+      headers['Authorization'] = `Bearer ${providerApiToken}`;
     }
 
     const baseUrl = this.configService.providerBaseUrl(providerId);
