@@ -100,11 +100,6 @@ describe('ReconnectionConfigService', () => {
       await expect(setupConfigService({ PROVIDER_USER_GRAPH_ENDPOINT: '', ...env })).rejects.toBeDefined();
     });
 
-    it('missing provider access token should fail', async () => {
-      const { PROVIDER_ACCESS_TOKEN: dummy, ...env } = ALL_ENV;
-      await expect(setupConfigService({ ...env })).rejects.toBeDefined();
-    });
-
     it('empty provider access token should fail', async () => {
       const { PROVIDER_ACCESS_TOKEN: dummy, ...env } = ALL_ENV;
       await expect(setupConfigService({ PROVIDER_ACCESS_TOKEN: '', ...env })).rejects.toBeDefined();
@@ -209,8 +204,9 @@ describe('ReconnectionConfigService', () => {
       expect(reconnectionConfigService.providerUserGraphEndpoint(ALL_ENV.PROVIDER_ID as string).toString()).toStrictEqual(ALL_ENV.PROVIDER_USER_GRAPH_ENDPOINT);
     });
 
-    it('should get provider api token', () => {
-      expect(reconnectionConfigService.providerAccessToken().toString()).toStrictEqual(ALL_ENV.PROVIDER_ACCESS_TOKEN);
+    it('should allow missing provider access token', async () => {
+      const { PROVIDER_ACCESS_TOKEN: dummy, ...env } = ALL_ENV;
+      expect(reconnectionConfigService.providerAccessToken()).toBeUndefined();
     });
 
     it('should get scan interval', () => {
