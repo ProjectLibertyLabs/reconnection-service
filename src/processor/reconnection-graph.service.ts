@@ -479,11 +479,14 @@ export class ReconnectionGraphService {
   }
 
   getProviderAPI(providerId: ProviderId | string): AxiosInstance {
-    const headers = {
-      Authorization: 'Bearer <access_token>', // Replace with your actual access token if required
-    };
-    const baseUrl = this.configService.providerBaseUrl(providerId);
+    let headers = {};
+    const providerAccessToken = this.configService.providerAccessToken();
 
+    if (providerAccessToken !== undefined) {
+      headers['Authorization'] = `Bearer ${providerAccessToken}`;
+    }
+
+    const baseUrl = this.configService.providerBaseUrl(providerId);
     const providerAPI: AxiosInstance = axios.create({
       baseURL: baseUrl.toString(),
       headers,

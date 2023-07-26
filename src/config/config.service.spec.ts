@@ -210,7 +210,7 @@ describe('ReconnectionConfigService', () => {
     });
 
     it('should get provider api token', () => {
-      expect(reconnectionConfigService.providerApiToken(ALL_ENV.PROVIDER_ID as string).toString()).toStrictEqual(ALL_ENV.PROVIDER_ACCESS_TOKEN);
+      expect(reconnectionConfigService.providerAccessToken().toString()).toStrictEqual(ALL_ENV.PROVIDER_ACCESS_TOKEN);
     });
 
     it('should get scan interval', () => {

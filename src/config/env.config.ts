@@ -9,7 +9,7 @@ export const configModuleOptions: ConfigModuleOptions = {
     FREQUENCY_URL: Joi.string().uri().required(),
     PROVIDER_BASE_URL: Joi.string().uri().required(),
     PROVIDER_USER_GRAPH_ENDPOINT: Joi.string().required(),
-    PROVIDER_ACCESS_TOKEN: Joi.string().required(),
+    PROVIDER_ACCESS_TOKEN: Joi.string(),
     BLOCKCHAIN_SCAN_INTERVAL_MINUTES: Joi.number()
       .min(1)
       .default(3 * 60),
