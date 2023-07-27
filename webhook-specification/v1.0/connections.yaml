@@ -62,6 +62,16 @@ paths:
         - api_key: []
         - connections_auth:
             - read:connections
+  /health:
+    get:
+      tags:
+        - health
+      summary: Check if the provider webhook is alive
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Provider webhook is alive
+      security: []  # No security required for health check
 components:
   schemas:
     ConnectionsApiResponse:
