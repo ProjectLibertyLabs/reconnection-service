@@ -40,7 +40,6 @@ describe('ReconnectionConfigService', () => {
     FREQUENCY_URL: undefined,
     PROVIDER_ID: undefined,
     PROVIDER_BASE_URL: undefined,
-    PROVIDER_USER_GRAPH_ENDPOINT: undefined,
     PROVIDER_ACCESS_TOKEN: undefined,
     BLOCKCHAIN_SCAN_INTERVAL_MINUTES: undefined,
     QUEUE_HIGH_WATER: undefined,
@@ -90,14 +89,9 @@ describe('ReconnectionConfigService', () => {
       await expect(setupConfigService({ PROVIDER_BASE_URL: 'invalid url', ...env })).rejects.toBeDefined();
     });
 
-    it('missing provider user graph endpoint should fail', async () => {
-      const { PROVIDER_USER_GRAPH_ENDPOINT: dummy, ...env } = ALL_ENV;
-      await expect(setupConfigService({ ...env })).rejects.toBeDefined();
-    });
-
-    it('empty provider user graph endpoint should fail', async () => {
-      const { PROVIDER_USER_GRAPH_ENDPOINT: dummy, ...env } = ALL_ENV;
-      await expect(setupConfigService({ PROVIDER_USER_GRAPH_ENDPOINT: '', ...env })).rejects.toBeDefined();
+    it('missing provider access token should be ok', async () => {
+      const { PROVIDER_ACCESS_TOKEN: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ ...env })).resolves.toBeDefined();
     });
 
     it('empty provider access token should fail', async () => {
@@ -198,10 +192,6 @@ describe('ReconnectionConfigService', () => {
 
     it('should get provider base url', () => {
       expect(reconnectionConfigService.providerBaseUrl(ALL_ENV.PROVIDER_ID as string).toString()).toStrictEqual(ALL_ENV.PROVIDER_BASE_URL);
-    });
-
-    it('should get provider user graph endpoint', () => {
-      expect(reconnectionConfigService.providerUserGraphEndpoint(ALL_ENV.PROVIDER_ID as string).toString()).toStrictEqual(ALL_ENV.PROVIDER_USER_GRAPH_ENDPOINT);
     });
 
     it('should get provider api token', () => {

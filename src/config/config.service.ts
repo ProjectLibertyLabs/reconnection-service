@@ -12,7 +12,6 @@ export interface ConfigEnvironmentVariables {
   FREQUENCY_URL: URL;
   PROVIDER_ID: bigint;
   PROVIDER_BASE_URL: URL;
-  PROVIDER_USER_GRAPH_ENDPOINT: string;
   PROVIDER_ACCESS_TOKEN: string;
   BLOCKCHAIN_SCAN_INTERVAL_MINUTES: number;
   QUEUE_HIGH_WATER: number;
@@ -27,11 +26,8 @@ export interface ConfigEnvironmentVariables {
 
 interface ProviderDetails {
   baseUrl: URL;
-  userGraphEndpoint: string;
   apiToken: string;
 }
-
-const REDIS_RE = 'redis://(?:([^:]+)(?::([^@]+))?@)?([^:]+):(d+)(?:/(d+))?';
 
 /// Config service to get global app and provider-specific config values.
 /// Though this is currently designed to take a single environment-injected
@@ -46,7 +42,6 @@ export class ConfigService {
   constructor(private nestConfigService: NestConfigService<ConfigEnvironmentVariables>) {
     const providerId: bigint = nestConfigService.get<bigint>('PROVIDER_ID') ?? 0n;
     const baseUrl = nestConfigService.get('PROVIDER_BASE_URL');
-    const userGraphEndpoint = nestConfigService.get('PROVIDER_USER_GRAPH_ENDPOINT');
     const apiToken = this.nestConfigService.get('PROVIDER_ACCESS_TOKEN');
 
     this.providerMap = new Map<string, ProviderDetails>([
@@ -54,7 +49,6 @@ export class ConfigService {
         providerId.toString(),
         {
           baseUrl,
-          userGraphEndpoint,
           apiToken,
         },
       ],
@@ -71,10 +65,6 @@ export class ConfigService {
 
   public providerBaseUrl(id: ProviderId | AnyNumber): URL {
     return this.providerMap.get(id.toString())?.baseUrl!;
-  }
-
-  public providerUserGraphEndpoint(id: ProviderId | AnyNumber): string {
-    return this.providerMap.get(id.toString())?.userGraphEndpoint!;
   }
 
   public providerApiToken(id: ProviderId | AnyNumber): string {
