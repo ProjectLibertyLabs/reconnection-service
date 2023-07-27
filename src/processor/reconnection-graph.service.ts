@@ -189,7 +189,7 @@ export class ReconnectionGraphService {
     while (hasNextPage) {
       // eslint-disable-next-line no-await-in-loop
       try {
-        const response = await providerAPI.get(`/api/v1.0.0/connections/${dsnpUserId.toString()}`, { params });
+        const response = await providerAPI.get(`/connections/${dsnpUserId.toString()}`, { params });
 
         // Reset webhook failures to 0 on a success. We don't go into waiting for recovery unless
         // a sequential number failures occur equaling webhookFailureThreshold.
@@ -466,7 +466,7 @@ export class ReconnectionGraphService {
 
     while (healthCheckSuccesses < healthCheckSuccessesThreshold) {
       try {
-        await providerAPI.get(`/api/v1.0.0/health`);
+        await providerAPI.get(`/health`);
         healthCheckSuccesses++;
       } catch {
         // Reset healthCheckSuccesses to 0 on failure. We will not go out of waiting for recovery until there
