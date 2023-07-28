@@ -69,7 +69,7 @@ export class ReconnectionGraphService {
       // using graphConnections form Action[] and update the user's DSNP Graph
       const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, updateConnections, graphConnections);
       try {
-        await this.graphStateManager.applyActions(actions);
+        await this.graphStateManager.applyActions(actions, true);
       } catch (e: any) {
         const errMessage = e instanceof Error ? e.message : ""
         if (errMessage.includes('already exists')) {

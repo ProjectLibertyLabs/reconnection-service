@@ -110,9 +110,9 @@ export class GraphStateManager implements OnApplicationBootstrap {
     return false;
   }
 
-  public async applyActions(actions: Action[]): Promise<boolean> {
+  public async applyActions(actions: Action[], ignoreExistingConnection: boolean): Promise<boolean> {
     if (this.graphState) {
-      return this.graphState.applyActions(actions);
+      return this.graphState.applyActions(actions, { ignoreExistingConnections: ignoreExistingConnection });
     }
     return false;
   }
