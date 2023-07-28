@@ -2,6 +2,7 @@
 https://docs.nestjs.com/providers#services
 */
 
+import type { EnvironmentType } from '@dsnp/graph-sdk';
 import { ProviderId } from '@frequency-chain/api-augment/interfaces';
 import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
@@ -19,7 +20,7 @@ export interface ConfigEnvironmentVariables {
   HEALTH_CHECK_SUCCESS_THRESHOLD: number;
   WEBHOOK_RETRY_INTERVAL_SECONDS: number;
   HEALTH_CHECK_RETRY_INTERVAL_SECONDS: number;
-  GRAPH_ENVIRONMENT_TYPE: string;
+  GRAPH_ENVIRONMENT_TYPE: keyof EnvironmentType;
   GRAPH_ENVIRONMENT_DEV_CONFIG: string;
   PROVIDER_ACCOUNT_SEED_PHRASE: string;
 }
@@ -99,8 +100,8 @@ export class ConfigService {
     return this.nestConfigService.get<string>('PROVIDER_ACCOUNT_SEED_PHRASE')!;
   }
 
-  public getGraphEnvironmentType(): string {
-    return this.nestConfigService.get<string>('GRAPH_ENVIRONMENT_TYPE')!;
+  public getGraphEnvironmentType(): keyof EnvironmentType {
+    return this.nestConfigService.get<keyof EnvironmentType>('GRAPH_ENVIRONMENT_TYPE')!;
   }
 
   public getGraphEnvironmentConfig(): string {
