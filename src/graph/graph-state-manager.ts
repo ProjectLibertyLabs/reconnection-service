@@ -66,7 +66,7 @@ export class GraphStateManager implements OnApplicationBootstrap {
       const devEnvironment: DevEnvironment = { environmentType: EnvironmentType.Dev, config };
       this.environment = devEnvironment;
     } else {
-      this.environment = { environmentType: EnvironmentType[environmentType as keyof typeof EnvironmentType] };
+      this.environment = { environmentType: EnvironmentType[environmentType] };
     }
     this.graphState = new Graph(this.environment);
 
