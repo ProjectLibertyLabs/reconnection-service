@@ -442,7 +442,6 @@ export class ReconnectionGraphService {
     let keyData: KeyData[] = [];
     if (publicKeys.items.length > 0) {
       for (const item of publicKeys.items) {
-        console.log(item.payload.toHex());
         const data: KeyData = {
           index: item.index.toNumber(),
           content: hexToU8a(item.payload.toHex()),
