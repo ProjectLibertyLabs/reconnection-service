@@ -28,6 +28,7 @@ import { GraphStateManager } from '../graph/graph-state-manager';
 import { ConfigService } from '../config/config.service';
 import { ParsedEventResult } from '../blockchain/extrinsic';
 import { KeyringPair } from '@polkadot/keyring/types';
+import { hexToU8a } from '@polkadot/util';
 
 @Injectable()
 export class ReconnectionGraphService {
@@ -151,6 +152,7 @@ export class ReconnectionGraphService {
       }
     } catch (err) {
       if (updateConnections) {
+        this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${err}`);
         this.graphUpdateQueue.add('graphUpdate', data_nt, { jobId: jobId_nt });
       } else {
         this.logger.error(err);
@@ -195,8 +197,7 @@ export class ReconnectionGraphService {
 
         const { data }: { data: ProviderGraph[] } = response.data.connections;
         allConnections.push(...data);
-
-        const { graphKeyPairs }: { graphKeyPairs: GraphKeyPair[] } = response.data.graphKeyPairs;
+        const { graphKeyPairs }: { graphKeyPairs: GraphKeyPair[] } = response.data;
         if (graphKeyPairs) {
           keyPairs.push(...graphKeyPairs);
         }
@@ -237,7 +238,14 @@ export class ReconnectionGraphService {
     const publicFriendships: PaginatedStorageResponse[] = await this.blockchainService.rpc('statefulStorage', 'getPaginatedStorage', dsnpUserId, publicFriendshipSchemaId);
     const privateFollows: PaginatedStorageResponse[] = await this.blockchainService.rpc('statefulStorage', 'getPaginatedStorage', dsnpUserId, privateFollowSchemaId);
     const privateFriendships: PaginatedStorageResponse[] = await this.blockchainService.rpc('statefulStorage', 'getPaginatedStorage', dsnpUserId, privateFriendshipSchemaId);
-
+    const dsnpKeys = await this.formDsnpKeys(dsnpUserId);
+    const graphKeyPairsSdk = graphKeyPairs.map(
+      (keyPair: ProviderKeyPair): GraphKeyPair => ({
+        keyType: GraphKeyType.X25519,
+        publicKey: hexToU8a(keyPair.publicKey),
+        secretKey: hexToU8a(keyPair.privateKey),
+      }),
+    );
     const importBundleBuilder = new ImportBundleBuilder();
     // Only X25519 is supported for now
     // check if all keys are of type X25519
@@ -245,7 +253,25 @@ export class ReconnectionGraphService {
     if (!areKeysCorrectType) {
       throw new Error('Only X25519 keys are supported for now');
     }
-
+    if(dsnpKeys && dsnpKeys.keys.length > 0 && graphKeyPairs && graphKeyPairs.length > 0) {
+      // an empty page is created to store the public keys
+      importBundles.push(
+        importBundleBuilder
+          .withDsnpUserId(dsnpUserId.toString())
+          .withSchemaId(privateFollowSchemaId )
+          .withDsnpKeys(dsnpKeys)
+          .withGraphKeyPairs(graphKeyPairsSdk)
+          .build(),
+      );
+      importBundles.push(
+        importBundleBuilder
+          .withDsnpUserId(dsnpUserId.toString())
+          .withSchemaId(privateFriendshipSchemaId)
+          .withDsnpKeys(dsnpKeys)
+          .withGraphKeyPairs(graphKeyPairsSdk)
+          .build(),
+      );
+    }
     importBundles.push(
       ...publicFollows.map((publicFollow) =>
         importBundleBuilder
@@ -265,41 +291,30 @@ export class ReconnectionGraphService {
           .build(),
       ),
     );
+    
+    importBundles.push(
+      ...privateFollows.map((privateFollow) =>
+        importBundleBuilder
+          .withDsnpUserId(dsnpUserId.toString())
+          .withSchemaId(privateFollowSchemaId)
+          .withPageData(privateFollow.page_id.toNumber(), privateFollow.payload, privateFollow.content_hash.toNumber())
+          .withDsnpKeys(dsnpKeys)
+          .withGraphKeyPairs(graphKeyPairsSdk)
+          .build(),
+      ),
+    );
 
-    if (privateFollows.length > 0 || privateFriendships.length > 0) {
-      const dsnpKeys = await this.formDsnpKeys(dsnpUserId);
-      const graphKeyPairsSdk = graphKeyPairs.map(
-        (keyPair: ProviderKeyPair): GraphKeyPair => ({
-          keyType: GraphKeyType.X25519,
-          publicKey: keyPair.publicKey,
-          secretKey: keyPair.privateKey,
-        }),
-      );
-
-      importBundles.push(
-        ...privateFollows.map((privateFollow) =>
-          importBundleBuilder
-            .withDsnpUserId(dsnpUserId.toString())
-            .withSchemaId(privateFollowSchemaId)
-            .withPageData(privateFollow.page_id.toNumber(), privateFollow.payload, privateFollow.content_hash.toNumber())
-            .withDsnpKeys(dsnpKeys)
-            .withGraphKeyPairs(graphKeyPairsSdk)
-            .build(),
-        ),
-      );
-
-      importBundles.push(
-        ...privateFriendships.map((privateFriendship) =>
-          importBundleBuilder
-            .withDsnpUserId(dsnpUserId.toString())
-            .withSchemaId(privateFriendshipSchemaId)
-            .withPageData(privateFriendship.page_id.toNumber(), privateFriendship.payload, privateFriendship.content_hash.toNumber())
-            .withDsnpKeys(dsnpKeys)
-            .withGraphKeyPairs(graphKeyPairsSdk)
-            .build(),
-        ),
-      );
-    }
+    importBundles.push(
+      ...privateFriendships.map((privateFriendship) =>
+        importBundleBuilder
+          .withDsnpUserId(dsnpUserId.toString())
+          .withSchemaId(privateFriendshipSchemaId)
+          .withPageData(privateFriendship.page_id.toNumber(), privateFriendship.payload, privateFriendship.content_hash.toNumber())
+          .withDsnpKeys(dsnpKeys)
+          .withGraphKeyPairs(graphKeyPairsSdk)
+          .build(),
+      ),
+    );
     return importBundles;
   }
 
@@ -406,15 +421,21 @@ export class ReconnectionGraphService {
   async formDsnpKeys(dsnpUserId: MessageSourceId | AnyNumber): Promise<DsnpKeys> {
     const publicKeySchemaId = this.graphStateManager.getGraphKeySchemaId();
     const publicKeys: ItemizedStoragePageResponse = await this.blockchainService.rpc('statefulStorage', 'getItemizedStorage', dsnpUserId, publicKeySchemaId);
-    const dsnpKeys = {
+    let keyData: KeyData[] = [];
+    if (publicKeys.items.length > 0) {
+      for (const item of publicKeys.items) {
+        console.log(item.payload.toHex());
+        const data: KeyData = {
+          index: item.index.toNumber(),
+          content: hexToU8a(item.payload.toHex()),
+        }
+        keyData.push(data);
+      }
+    }
+    const dsnpKeys: DsnpKeys = {
       dsnpUserId: dsnpUserId.toString(),
       keysHash: publicKeys.content_hash.toNumber(),
-      keys: publicKeys.items.map(
-        (item: ItemizedStorageResponse): KeyData => ({
-          index: item.index.toNumber(),
-          content: item.payload.toU8a(),
-        }),
-      ),
+      keys: keyData,
     };
     return dsnpKeys;
   }
