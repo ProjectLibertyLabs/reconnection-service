@@ -99,7 +99,7 @@ describe('GraphStateManager', () => {
 
     actions.push(action_1);
 
-    const applyActionsResult = await graphStateManager.applyActions(actions);
+    const applyActionsResult = await graphStateManager.applyActions(actions, true);
     expect(applyActionsResult).toBe(true);
 
     const exportUpdates = await graphStateManager.exportGraphUpdates();
