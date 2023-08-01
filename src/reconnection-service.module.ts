@@ -10,6 +10,7 @@ import { ConfigModule } from './config/config.module';
 import { ProcessorModule } from './processor/processor.module';
 import { DevelopmentController } from './development.controller';
 import { BlockchainModule } from './blockchain/blockchain.module';
+import { RedisHealthCheckService } from './reconnection-redis.service';
 
 @Module({
   imports: [
@@ -45,7 +46,7 @@ import { BlockchainModule } from './blockchain/blockchain.module';
     ProcessorModule,
     BlockchainModule,
   ],
-  providers: [ConfigService, BlockchainScannerService],
+  providers: [RedisHealthCheckService, ConfigService, BlockchainScannerService],
   controllers: [
     // Uncomment the following line to enable development/debug endpoints
     // DevelopmentController,
