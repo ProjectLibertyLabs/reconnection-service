@@ -152,8 +152,11 @@ export class ReconnectionGraphService {
       }
     } catch (err) {
       if (updateConnections) {
+        /// if updateConnections is true, we want to queue a graph update job and pause the queue
         this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${err}`);
         this.graphUpdateQueue.add('graphUpdate', data_nt, { jobId: jobId_nt });
+        this.graphUpdateQueue.pause();
+        throw err;
       } else {
         this.logger.error(err);
         throw err;
@@ -503,10 +506,8 @@ export class ReconnectionGraphService {
       const { key: jobId, data } = createGraphUpdateJob(dsnpUserId, provideId, SkipTransitiveGraphs);
       if (e instanceof Error && e.message.includes('Inability to pay some fees')) {
         // in case capacity is low pause the queue
-        this.graphUpdateQueue.add('graphUpdate', data, { jobId });
-        this.graphUpdateQueue.pause();
         this.logger.error("Capacity is low: job processing queue paused.");
-        return;
+        throw e;
       } else if (e instanceof Error && e.message.includes('Target page hash does not match current page hash')) {
         // refresh state and queue a non-transitive graph update
         // this is safe to do as we are only updating single user's graph
