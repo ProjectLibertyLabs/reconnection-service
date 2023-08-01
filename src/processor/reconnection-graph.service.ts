@@ -491,21 +491,9 @@ export class ReconnectionGraphService {
         { eventPallet: 'utility', event: 'BatchCompleted' },
         providerKeys, batch).signAndSend();
       
-      if (!event) {
+      if (!event|| !this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
         // if we dont get any events, covering any unexpected connection errors
         throw new Error(`No events were found for ${dsnpUserId.toString()}`);
-      }
-
-      if(!this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
-        this.logger.warn(`Batch failed event found for ${dsnpUserId.toString()}: ${event}`);
-        if(this.blockchainService.api.events.utility.BatchInterrupted.is(event)) {
-          // this event should not occur given we are filtering target event in extrinsic
-          // call to be `BatchCompleted`
-          this.logger.warn(`Unexpected event found for ${dsnpUserId.toString()}`);
-          this.logger.warn(event);
-          this.logger.warn(eventMap);
-          throw new Error(`Batch interrupted event found for ${dsnpUserId.toString()}`);
-        }
       }
     } catch (e) {
       this.logger.error(`Error processing batch for ${dsnpUserId.toString()}: ${e}`);
@@ -516,7 +504,8 @@ export class ReconnectionGraphService {
       if (e instanceof Error && e.message.includes('Inability to pay some fees')) {
         // in case capacity is low pause the queue
         this.graphUpdateQueue.pause();
-        throw e;
+        this.logger.error("Capacity is low: job processing queue paused.");
+        return;
       } else if (e instanceof Error && e.message.includes('Target page hash does not match current page hash')) {
         // refresh state and queue a non-transitive graph update
         // this is safe to do as we are only updating single user's graph
