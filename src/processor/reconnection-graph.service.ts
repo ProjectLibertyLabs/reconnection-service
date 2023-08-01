@@ -500,16 +500,16 @@ export class ReconnectionGraphService {
       //Following errors includes are checked against
       // 1. Inability to pay some fees`
       // 2. Transaction is not valid due to `Target page hash does not match current page hash`
-
+      const { key: jobId, data } = createGraphUpdateJob(dsnpUserId, provideId, SkipTransitiveGraphs);
       if (e instanceof Error && e.message.includes('Inability to pay some fees')) {
         // in case capacity is low pause the queue
+        this.graphUpdateQueue.add('graphUpdate', data, { jobId });
         this.graphUpdateQueue.pause();
         this.logger.error("Capacity is low: job processing queue paused.");
         return;
       } else if (e instanceof Error && e.message.includes('Target page hash does not match current page hash')) {
         // refresh state and queue a non-transitive graph update
         // this is safe to do as we are only updating single user's graph
-        const { key: jobId, data } = createGraphUpdateJob(dsnpUserId, provideId, SkipTransitiveGraphs);
         this.graphUpdateQueue.add('graphUpdate', data, { jobId });
         return;
       }
