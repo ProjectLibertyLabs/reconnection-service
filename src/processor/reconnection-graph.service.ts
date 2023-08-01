@@ -151,22 +151,16 @@ export class ReconnectionGraphService {
         }
       }
     } catch (err) {
+      this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${err}`);
       if (updateConnections) {
         /// if updateConnections is true, we want to queue a graph update job and pause the queue
-        this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${err}`);
         this.graphUpdateQueue.add('graphUpdate', data_nt, { jobId: jobId_nt });
-        // if we have unknwon error, capacity error we want to pause the queue
-        if (err instanceof errors.UnknownError || 
-            err instanceof errors.CapacityLowError ||
-            err instanceof errors.GetUserGraphError
-          ) {
-            this.graphUpdateQueue.pause();
-        }
-        throw err;
-      } else {
-        this.logger.error(err);
-        throw err;
       }
+      // if we have unknwon error, capacity error we want to pause the queue
+      if (err instanceof errors.UnknownError || err instanceof errors.CapacityLowError || err instanceof errors.GetUserGraphError) {
+        this.graphUpdateQueue.pause();
+      }
+      throw err;
     }
   }
 
