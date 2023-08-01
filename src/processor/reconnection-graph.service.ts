@@ -156,8 +156,11 @@ export class ReconnectionGraphService {
         this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${err}`);
         this.graphUpdateQueue.add('graphUpdate', data_nt, { jobId: jobId_nt });
         // if we have unknwon error, capacity error we want to pause the queue
-        if (err instanceof errors.UnknownError || err instanceof errors.CapacityLowError) {
-          this.graphUpdateQueue.pause();
+        if (err instanceof errors.UnknownError || 
+            err instanceof errors.CapacityLowError ||
+            err instanceof errors.GetUserGraphError
+          ) {
+            this.graphUpdateQueue.pause();
         }
         throw err;
       } else {
