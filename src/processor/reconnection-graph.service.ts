@@ -75,7 +75,7 @@ export class ReconnectionGraphService {
         if (errMessage.includes('already exists')) {
           this.logger.warn(`Error applying actions: ${e}`);
         } else {
-          throw e;
+          throw new errors.ApplyActionsError(`Error applying actions: ${e}`);
         }
       }
 
