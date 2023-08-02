@@ -47,9 +47,11 @@ describe('ReconnectionConfigService', () => {
     WEBHOOK_FAILURE_THRESHOLD: undefined,
     HEALTH_CHECK_SUCCESS_THRESHOLD: undefined,
     WEBHOOK_RETRY_INTERVAL_SECONDS: undefined,
-    HEALTH_CHECK_RETRY_INTERVAL_SECONDS: undefined,
+    HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS: undefined,
+    HEALTH_CHECK_MAX_RETRIES: undefined,
     GRAPH_ENVIRONMENT_TYPE: undefined,
     GRAPH_ENVIRONMENT_DEV_CONFIG: undefined,
+    CAPACITY_LIMIT: undefined,
   };
 
   beforeAll(() => {
@@ -77,6 +79,17 @@ describe('ReconnectionConfigService', () => {
     it('invalid frequency url should fail', async () => {
       const { FREQUENCY_URL: dummy, ...env } = ALL_ENV;
       await expect(setupConfigService({ FREQUENCY_URL: 'invalid url', ...env })).rejects.toBeDefined();
+    });
+
+    it('missing provider id should fail', async () => {
+      const { PROVIDER_ID: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ ...env })).rejects.toBeDefined();
+    });
+
+    it('invalid provider id should fail', async () => {
+      const { PROVIDER_ID: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ PROVIDER_ID: 'bad string', ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ PROVIDER_ID: '-1', ...env })).rejects.toBeDefined();
     });
 
     it('missing provider base url should fail', async () => {
@@ -144,11 +157,17 @@ describe('ReconnectionConfigService', () => {
       await expect(setupConfigService({ WEBHOOK_RETRY_INTERVAL_SECONDS: 'foo', ...env })).rejects.toBeDefined();
     });
 
-    it('invalid health check retry interval should fail', async () => {
-      const { HEALTH_CHECK_RETRY_INTERVAL_SECONDS: dummy, ...env } = ALL_ENV;
-      await expect(setupConfigService({ HEALTH_CHECK_RETRY_INTERVAL_SECONDS: -1, ...env })).rejects.toBeDefined();
-      await expect(setupConfigService({ HEALTH_CHECK_RETRY_INTERVAL_SECONDS: 0, ...env })).rejects.toBeDefined();
-      await expect(setupConfigService({ HEALTH_CHECK_RETRY_INTERVAL_SECONDS: 'foo', ...env })).rejects.toBeDefined();
+    it('invalid health check max retry interval should fail', async () => {
+      const { HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS: -1, ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS: 0, ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS: 'foo', ...env })).rejects.toBeDefined();
+    });
+
+    it('invalid health check max retry interval should fail', async () => {
+      const { HEALTH_CHECK_MAX_RETRIES: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ HEALTH_CHECK_MAX_RETRIES: -1, ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ HEALTH_CHECK_MAX_RETRIES: 'foo', ...env })).rejects.toBeDefined();
     });
 
     it('missing graph environment type should fail', async () => {
@@ -169,6 +188,19 @@ describe('ReconnectionConfigService', () => {
     it('invalid graph environment dev config should fail', async () => {
       const { GRAPH_ENVIRONMENT_TYPE: dummy, GRAPH_ENVIRONMENT_DEV_CONFIG: dummy2, ...env } = ALL_ENV;
       await expect(setupConfigService({ GRAPH_ENVIRONMENT_TYPE: 'Dev', GRAPH_ENVIRONMENT_DEV_CONFIG: 'invalid json', ...env })).rejects.toBeDefined();
+    });
+
+    it('missing capacity limits should fail', async () => {
+      const { CAPACITY_LIMIT: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ CAPACITY_LIMIT: undefined, ...env })).rejects.toBeDefined();
+    });
+
+    it('invalid capacity limit should fail', async () => {
+      const { CAPACITY_LIMIT: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ CAPACITY_LIMIT: '{ "type": "bad type", "value": 0 }', ...env })).rejects.toBeDefined();
+      await expect(async () => setupConfigService({ CAPACITY_LIMIT: '{ "type": "percentage", "value": -1 }', ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ CAPACITY_LIMIT: '{ "type": "percentage", "value": 101 }', ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ CAPACITY_LIMIT: '{ "type": "amount", "value": -1 }', ...env })).rejects.toBeDefined();
     });
   });
 
@@ -191,11 +223,11 @@ describe('ReconnectionConfigService', () => {
     });
 
     it('should get provider base url', () => {
-      expect(reconnectionConfigService.providerBaseUrl(ALL_ENV.PROVIDER_ID as string).toString()).toStrictEqual(ALL_ENV.PROVIDER_BASE_URL);
+      expect(reconnectionConfigService.providerBaseUrl.toString()).toStrictEqual(ALL_ENV.PROVIDER_BASE_URL);
     });
 
     it('should get provider api token', () => {
-      expect(reconnectionConfigService.providerApiToken(ALL_ENV.PROVIDER_ID as string).toString()).toStrictEqual(ALL_ENV.PROVIDER_ACCESS_TOKEN);
+      expect(reconnectionConfigService.providerApiToken!.toString()).toStrictEqual(ALL_ENV.PROVIDER_ACCESS_TOKEN);
     });
 
     it('should get scan interval', () => {
@@ -218,8 +250,16 @@ describe('ReconnectionConfigService', () => {
       expect(reconnectionConfigService.getWebhookRetryIntervalSeconds()).toStrictEqual(parseInt(ALL_ENV.WEBHOOK_RETRY_INTERVAL_SECONDS as string, 10));
     });
 
-    it('should get health check retry interval', () => {
-      expect(reconnectionConfigService.getHealthCheckRetryIntervalSeconds()).toStrictEqual(parseInt(ALL_ENV.HEALTH_CHECK_RETRY_INTERVAL_SECONDS as string, 10));
+    it('should get health check max retry interval', () => {
+      expect(reconnectionConfigService.getHealthCheckMaxRetryIntervalSeconds()).toStrictEqual(parseInt(ALL_ENV.HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS as string, 10));
+    });
+
+    it('should get health check max retries', () => {
+      expect(reconnectionConfigService.getHealthCheckMaxRetries()).toStrictEqual(parseInt(ALL_ENV.HEALTH_CHECK_MAX_RETRIES as string, 10));
+    });
+
+    it('should get provider id', () => {
+      expect(reconnectionConfigService.getProviderId()).toStrictEqual(ALL_ENV.PROVIDER_ID as string);
     });
 
     it('should get provider seed phrase', () => {
@@ -232,6 +272,10 @@ describe('ReconnectionConfigService', () => {
 
     it('should get graph environment dev config', () => {
       expect(reconnectionConfigService.getGraphEnvironmentConfig()).toStrictEqual(ALL_ENV.GRAPH_ENVIRONMENT_DEV_CONFIG);
+    });
+
+    it('should get capacity limit', () => {
+      expect(reconnectionConfigService.getCapacityLimit()).toStrictEqual(JSON.parse(ALL_ENV.CAPACITY_LIMIT!));
     });
   });
 });

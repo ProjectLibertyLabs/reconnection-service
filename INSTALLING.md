@@ -16,6 +16,8 @@ The standalone container image is meant to be a complete solution for a provider
 
 The internal Redis server included in the complete image is already configured for persistence; it is simply necessary to configure your container pod to map the directory `/var/lib/redis` to a persistent storage volume.
 
+#### Note: The internal redis server runs as user:group 100:102, so mapped volume permissions must at minimum allow write access to this user. How this is provisioned will depend on the specifics of your persistent storage infrastructure. If this is not configured properly, the redis server will fail to start, and the application upon launch will throw `ECONNREFUSED` errors.
+
 Follow the instructions below for [configuration](#configuration), with the exception that you should _not_ modify `REDIS_URL`, as it already points to the internal Redis server.
 
 ### App-only image

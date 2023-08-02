@@ -39,12 +39,11 @@ export class GraphStateManager implements OnApplicationBootstrap {
       throw new Error('Unable to initialize schema ids');
     }
 
-    const publicFollow = await this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Public);
-    const publicFriend = await this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Friendship, PrivacyType.Public);
-    const privateFollow = await this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Private);
-    const privateFriend = await this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Friendship, PrivacyType.Private);
+    const publicFollow = this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Public);
+    const privateFollow = this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Private);
+    const privateFriend = this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Friendship, PrivacyType.Private);
 
-    this.graphKeySchemaId = (await this.graphState.getGraphConfig(this.environment)).graphPublicKeySchemaId;
+    this.graphKeySchemaId = this.graphState.getGraphConfig(this.environment).graphPublicKeySchemaId;
 
     this.schemaIds = {
       [ConnectionType.Follow]: {
@@ -52,13 +51,12 @@ export class GraphStateManager implements OnApplicationBootstrap {
         [PrivacyType.Private]: privateFollow,
       },
       [ConnectionType.Friendship]: {
-        [PrivacyType.Public]: publicFriend,
         [PrivacyType.Private]: privateFriend,
       },
     };
   }
 
-  constructor(private configService: ConfigService) {
+  constructor(configService: ConfigService) {
     const environmentType = configService.getGraphEnvironmentType();
     if (environmentType === EnvironmentType.Dev.toString()) {
       const configJson = configService.getGraphEnvironmentConfig();
@@ -119,7 +117,7 @@ export class GraphStateManager implements OnApplicationBootstrap {
 
   public async exportGraphUpdates(): Promise<Update[]> {
     if (this.graphState) {
-      return await this.graphState.exportUpdates();
+      return this.graphState.exportUpdates();
     }
     return [];
   }

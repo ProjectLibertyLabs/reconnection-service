@@ -19,7 +19,12 @@ export class ReconnectionServiceController {
 
   @Get('queue')
   async queue() {
-    return this.graphUpdateQueue.getJobCounts();
+    const jobCounts = await this.graphUpdateQueue.getJobCounts();
+    const isPaused = await this.graphUpdateQueue.isPaused();
+    return {
+      ...jobCounts,
+      isPaused,
+    };
   }
 
   @Get('queue/:jobstatus')
