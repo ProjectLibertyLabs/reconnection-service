@@ -1,8 +1,10 @@
 import { Controller, Get, HttpException, HttpStatus, Logger, Param, Post, UseGuards } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { BlockchainScannerService } from './blockchain-scanner.service';
+import { BlockchainScannerService, LAST_SEEN_BLOCK_NUMBER_KEY } from './blockchain-scanner.service';
 import { ApiKeyGuard } from './apiKey.guard';
+import { InjectRedis } from '@liaoliaots/nestjs-redis';
+import Redis from 'ioredis';
 
 type JobStatus = 'active' | 'completed' | 'waiting' | 'failed' | 'delayed';
 
@@ -10,7 +12,11 @@ type JobStatus = 'active' | 'completed' | 'waiting' | 'failed' | 'delayed';
 export class ReconnectionServiceController {
   private readonly logger: Logger;
 
-  constructor(private scannerService: BlockchainScannerService, @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue) {
+  constructor(
+    private scannerService: BlockchainScannerService, 
+    @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
+    @InjectRedis() private cacheManager: Redis
+  ) {
     this.logger = new Logger(this.constructor.name);
   }
 
@@ -57,5 +63,19 @@ export class ReconnectionServiceController {
   @Post('queue/pause')
   async pauseQueue() {
     await this.graphUpdateQueue.pause();
+  }
+
+  @UseGuards(ApiKeyGuard)
+  @Post('scan/:blockNumber')
+  async scanChainFromBlock(@Param('blockNumber') blockNumber: string) {
+    const block = BigInt(blockNumber) - 1n;
+    await this.cacheManager.set(LAST_SEEN_BLOCK_NUMBER_KEY, block.toString());
+    this.scannerService.scan();
+  }
+
+  @UseGuards(ApiKeyGuard)
+  @Post('scan')
+  async scanChain() {
+    this.scannerService.scan();
   }
 }
