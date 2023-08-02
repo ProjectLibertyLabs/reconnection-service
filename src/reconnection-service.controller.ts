@@ -3,7 +3,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { BlockchainScannerService } from './blockchain-scanner.service';
 
-type JobStatus = 'active' | 'completed' | 'failed' | 'delayed';
+type JobStatus = 'active' | 'completed' | 'failed' | 'delayed' | 'waiting';
 
 @Controller('reconnection-service')
 export class ReconnectionServiceController {
@@ -41,7 +41,8 @@ export class ReconnectionServiceController {
 
       case 'failed':
         return this.graphUpdateQueue.getFailed();
-
+      case 'waiting':
+        return this.graphUpdateQueue.getWaiting();
       default:
         throw new HttpException('Unrecognized job status', HttpStatus.BAD_REQUEST);
     }

@@ -36,7 +36,7 @@ export function createGraphUpdateJob(
   }
 
   return {
-    key: `${dsnpId}:${providerId}`,
+    key: `${dsnpId}:${providerId}:${processTransitiveUpdates}`,
     data: {
       dsnpId,
       providerId,
