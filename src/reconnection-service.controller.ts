@@ -69,6 +69,8 @@ export class ReconnectionServiceController {
   @Post('queue/clear')
   async clearQueue() {
     await this.graphUpdateQueue.drain();
+    await this.graphUpdateQueue.obliterate();
+    await this.graphUpdateQueue.resume();
   }
 
   @UseGuards(ApiKeyGuard)
@@ -83,5 +85,27 @@ export class ReconnectionServiceController {
   @Post('scan')
   async scanChain() {
     this.scannerService.scan();
+  }
+
+  @UseGuards(ApiKeyGuard)
+  @Post('queue/retry')
+  async retryJob(@Param('jobId') jobId: string) {
+    const job = await this.graphUpdateQueue.getJob(jobId);
+    if (job) {
+      job.retry();
+    } else {
+      throw new HttpException('Job ID not found', HttpStatus.NOT_FOUND);
+    }
+  }
+
+  @UseGuards(ApiKeyGuard)
+  @Post('queue/remove')
+  async removeJob(@Param('jobId') jobId: string) {
+    const job = await this.graphUpdateQueue.getJob(jobId);
+    if (job) {
+      await this.graphUpdateQueue.remove(jobId);
+    } else {
+      throw new HttpException('Job ID not found', HttpStatus.NOT_FOUND);
+    }
   }
 }
