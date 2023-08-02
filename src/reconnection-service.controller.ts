@@ -44,4 +44,14 @@ export class ReconnectionServiceController {
         throw new HttpException('Unrecognized job status', HttpStatus.BAD_REQUEST);
     }
   }
+
+  @Post('queue/resume')
+  async resumeQueue() {
+    await this.graphUpdateQueue.resume();
+  }
+
+  @Post('queue/pause')
+  async pauseQueue() {
+    await this.graphUpdateQueue.pause();
+  }
 }
