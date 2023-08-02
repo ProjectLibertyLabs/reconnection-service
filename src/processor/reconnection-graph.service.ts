@@ -29,7 +29,7 @@ import { ConfigService } from '../config/config.service';
 import { ParsedEventResult } from '../blockchain/extrinsic';
 import { KeyringPair } from '@polkadot/keyring/types';
 import { hexToU8a } from '@polkadot/util';
-
+import * as errors from './errors';
 @Injectable()
 export class ReconnectionGraphService {
   private logger: Logger;
@@ -75,7 +75,7 @@ export class ReconnectionGraphService {
         if (errMessage.includes('already exists')) {
           this.logger.warn(`Error applying actions: ${e}`);
         } else {
-          throw e;
+          throw new errors.ApplyActionsError(`Error applying actions: ${e}`);
         }
       }
 
@@ -151,13 +151,16 @@ export class ReconnectionGraphService {
         }
       }
     } catch (err) {
+      this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${err}`);
       if (updateConnections) {
-        this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${err}`);
+        /// if updateConnections is true, we want to queue a graph update job and pause the queue
         this.graphUpdateQueue.add('graphUpdate', data_nt, { jobId: jobId_nt });
-      } else {
-        this.logger.error(err);
-        throw err;
       }
+      // if we have unknwon error, capacity error we want to pause the queue
+      if (err instanceof errors.UnknownError || err instanceof errors.CapacityLowError || err instanceof errors.GetUserGraphError) {
+        this.graphUpdateQueue.pause();
+      }
+      throw err;
     }
   }
 
@@ -187,11 +190,11 @@ export class ReconnectionGraphService {
         webhookFailures = 0;
 
         if (!response.data || !response.data.connections) {
-          throw new Error(`Invalid response from provider: No connections found for ${dsnpUserId.toString()}`);
+          throw new errors.GetUserGraphError(`Invalid response from provider: No connections found for ${dsnpUserId.toString()}`);
         }
 
         if (response.data.dsnpId !== dsnpUserId.toString()) {
-          throw new Error(`DSNP ID mismatch in response for ${dsnpUserId.toString()}`);
+          throw new errors.GetUserGraphError(`DSNP ID mismatch in response for ${dsnpUserId.toString()}`);
         }
 
         const { data }: { data: ProviderGraph[] } = response.data.connections;
@@ -229,7 +232,7 @@ export class ReconnectionGraphService {
             }
           }
           else {
-            throw new Error(JSON.stringify(error));
+            throw new errors.GetUserGraphError(JSON.stringify(error));
           }
         } else {
           throw error;
@@ -269,7 +272,7 @@ export class ReconnectionGraphService {
     // check if all keys are of type X25519
     const areKeysCorrectType = graphKeyPairs.every((keyPair) => keyPair.keyType === KeyType.X25519);
     if (!areKeysCorrectType) {
-      throw new Error('Only X25519 keys are supported for now');
+      throw new errors.GetUserGraphError('Only X25519 keys are supported for now');
     }
     if(dsnpKeys && dsnpKeys.keys.length > 0 && graphKeyPairs && graphKeyPairs.length > 0) {
       // an empty page is created to store the public keys
@@ -429,7 +432,7 @@ export class ReconnectionGraphService {
           break;
         }
         default:
-          throw new Error(`Unrecognized connection direction: ${connection.direction}`);
+          throw new errors.UnknownError(`Unrecognized connection direction: ${connection.direction}`);
       }
     }
 
@@ -491,42 +494,23 @@ export class ReconnectionGraphService {
         { eventPallet: 'utility', event: 'BatchCompleted' },
         providerKeys, batch).signAndSend();
       
-      if (!event) {
+      if (!event|| !this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
         // if we dont get any events, covering any unexpected connection errors
         throw new Error(`No events were found for ${dsnpUserId.toString()}`);
-      }
-
-      if(!this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
-        this.logger.warn(`Batch failed event found for ${dsnpUserId.toString()}: ${event}`);
-        if(this.blockchainService.api.events.utility.BatchInterrupted.is(event)) {
-          // this event should not occur given we are filtering target event in extrinsic
-          // call to be `BatchCompleted`
-          this.logger.warn(`Unexpected event found for ${dsnpUserId.toString()}`);
-          this.logger.warn(event);
-          this.logger.warn(eventMap);
-          throw new Error(`Batch interrupted event found for ${dsnpUserId.toString()}`);
-        }
       }
     } catch (e) {
       this.logger.error(`Error processing batch for ${dsnpUserId.toString()}: ${e}`);
       //Following errors includes are checked against
       // 1. Inability to pay some fees`
       // 2. Transaction is not valid due to `Target page hash does not match current page hash`
-
       if (e instanceof Error && e.message.includes('Inability to pay some fees')) {
-        // in case capacity is low pause the queue
-        this.graphUpdateQueue.pause();
-        throw e;
+        throw new errors.CapacityLowError(e.message);
       } else if (e instanceof Error && e.message.includes('Target page hash does not match current page hash')) {
-        // refresh state and queue a non-transitive graph update
-        // this is safe to do as we are only updating single user's graph
-        const { key: jobId, data } = createGraphUpdateJob(dsnpUserId, provideId, SkipTransitiveGraphs);
-        this.graphUpdateQueue.add('graphUpdate', data, { jobId });
-        return;
+        throw new errors.StaleHashError(e.message);
       }
       /// any errors we dont recognize, such as bad schema_id, etc
       /// in such cases we should not retry the job
-      throw e;
+      throw new errors.UnknownError(JSON.stringify(e));
     }
   }
 
