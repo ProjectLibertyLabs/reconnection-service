@@ -66,6 +66,12 @@ export class ReconnectionServiceController {
   }
 
   @UseGuards(ApiKeyGuard)
+  @Post('queue/clear')
+  async clearQueue() {
+    await this.graphUpdateQueue.drain();
+  }
+
+  @UseGuards(ApiKeyGuard)
   @Post('scan/:blockNumber')
   async scanChainFromBlock(@Param('blockNumber') blockNumber: string) {
     const block = BigInt(blockNumber) - 1n;
