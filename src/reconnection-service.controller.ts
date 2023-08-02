@@ -1,10 +1,12 @@
-import { Controller, Get, HttpException, HttpStatus, Logger, Param, Post } from '@nestjs/common';
+import { Controller, Get, HttpException, HttpStatus, Logger, Param, Post, UseGuards } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { BlockchainScannerService } from './blockchain-scanner.service';
+import { ApiKeyGuard } from './apiKey.guard';
 
 type JobStatus = 'active' | 'completed' | 'waiting' | 'failed' | 'delayed';
 
+@UseGuards(ApiKeyGuard)
 @Controller('reconnection-service')
 export class ReconnectionServiceController {
   private readonly logger: Logger;
