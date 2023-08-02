@@ -6,7 +6,6 @@ import { ApiKeyGuard } from './apiKey.guard';
 
 type JobStatus = 'active' | 'completed' | 'waiting' | 'failed' | 'delayed';
 
-@UseGuards(ApiKeyGuard)
 @Controller('reconnection-service')
 export class ReconnectionServiceController {
   private readonly logger: Logger;
@@ -24,6 +23,7 @@ export class ReconnectionServiceController {
     return this.graphUpdateQueue.getJobCounts();
   }
 
+  @UseGuards(ApiKeyGuard)
   @Get('queue/:jobstatus')
   async getQueueByStatus(@Param('jobstatus') jobstatus: JobStatus) {
     switch (jobstatus) {
@@ -47,11 +47,13 @@ export class ReconnectionServiceController {
     }
   }
 
+  @UseGuards(ApiKeyGuard)
   @Post('queue/resume')
   async resumeQueue() {
     await this.graphUpdateQueue.resume();
   }
 
+  @UseGuards(ApiKeyGuard)
   @Post('queue/pause')
   async pauseQueue() {
     await this.graphUpdateQueue.pause();
