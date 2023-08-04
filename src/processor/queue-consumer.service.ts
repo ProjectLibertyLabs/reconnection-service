@@ -1,7 +1,3 @@
-/*
-https://docs.nestjs.com/providers#services
-*/
-
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job, Queue } from 'bullmq';
@@ -51,7 +47,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
 
   // eslint-disable-next-line class-methods-use-this
   async process(job: Job<IGraphUpdateJob, any, string>) {
-    this.logger.debug(`Processing job ${job.id}`);
+    this.logger.debug(`Processing job ${job.id}, attempts: ${job.attemptsMade}`);
 
     // Handle dev/debug jobs
     if (typeof job.data.debugDisposition !== 'undefined') {
@@ -84,8 +80,11 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     }
 
     try {
-      this.logger.debug(`Processing job ${job.id}, attempts: ${job.attemptsMade}`);
       await this.graphSdkService.updateUserGraph(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
+      this.logger.verbose(`Successfully completed job ${job.id}`);
+    } catch (e) {
+      this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);
+      throw e;
     } finally {
       await this.checkCapacity();
     }
@@ -93,12 +92,14 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
 
   @OnEvent('webhook.gone', { async: true, promisify: true })
   private async handleWebhookGone() {
+    this.logger.debug('Received webhook.gone event');
     this.webhookOk = false;
     await this.graphUpdateQueue.pause();
   }
 
   @OnEvent('webhook.healthy', { async: true, promisify: true })
   private async handleWebhookRestored() {
+    this.logger.debug('Received webhook.healthy event');
     this.webhookOk = true;
     if (!this.capacityExhausted) {
       await this.graphUpdateQueue.resume();
@@ -107,6 +108,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
 
   @OnEvent('capacity.exhausted', { async: true, promisify: true })
   private async handleCapacityExhausted() {
+    this.logger.debug('Received capacity.exhausted event');
     this.capacityExhausted = true;
     await this.graphUpdateQueue.pause();
     const capacityLimit = this.configService.getCapacityLimit();
@@ -130,6 +132,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
 
   @OnEvent('capacity.refilled', { async: true, promisify: true })
   private async handleCapacityRefilled() {
+    this.logger.debug('Received capacity.refilled event');
     this.capacityExhausted = false;
     try {
       this.schedulerRegistry.deleteTimeout(CAPACITY_EPOCH_TIMEOUT_NAME);
@@ -149,13 +152,20 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
 
     if (capacityLimit.type === 'percentage') {
       const minRemainingPct = 100 - capacityLimit.value;
-      if ((capacity.remainingCapacity / (capacity.totalCapacityIssued || 1n)) * 100n <= minRemainingPct) {
+      const percentageRemaining = (capacity.remainingCapacity * 100n) / (capacity.totalCapacityIssued || 1n);
+      if (percentageRemaining <= minRemainingPct) {
         outOfCapacity = true;
+        this.logger.warn(
+          `Capacity threshold reached: remaining pct = ${percentageRemaining}% (${minRemainingPct}% required (${
+            (capacity.remainingCapacity * 100n) / capacity.totalCapacityIssued
+          }))`,
+        );
       }
     } else {
       const capacityUsed = capacity.totalCapacityIssued - capacity.remainingCapacity;
       if (capacityUsed >= capacityLimit.value) {
         outOfCapacity = true;
+        this.logger.warn(`Capacity threshold reached: used ${capacityUsed} of ${capacityLimit.value}`);
       }
     }
 

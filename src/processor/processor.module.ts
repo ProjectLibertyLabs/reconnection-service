@@ -43,7 +43,7 @@ import { ProviderWebhookService } from './provider-webhook.service';
     BullModule.registerQueue({
       name: 'graphUpdateQueue',
       defaultJobOptions: {
-        attempts: 5,
+        attempts: 1,
         backoff: {
           type: 'exponential',
         },
