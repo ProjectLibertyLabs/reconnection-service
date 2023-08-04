@@ -121,7 +121,7 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
         result[1] = em;
         return result;
       }),
-      tap((events) => console.log(events)),
+      // tap((events) => console.log(events)),
     );
   }
 }

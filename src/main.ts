@@ -11,7 +11,7 @@ BigInt.prototype['toJSON'] = function () { return this.toString() };
 
 async function bootstrap() {
   const app = await NestFactory.create(ReconnectionServiceModule, {
-    logger: process.env.DEBUG ? ['error', 'warn', 'log', 'debug'] : ['error', 'warn', 'log'],
+    logger: process.env.DEBUG ? ['error', 'warn', 'log', 'verbose', 'debug'] : ['error', 'warn', 'log'],
   });
 
   // Get event emitter & register a shutdown listener
