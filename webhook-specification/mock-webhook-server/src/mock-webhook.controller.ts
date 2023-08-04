@@ -46,6 +46,7 @@ export class MockWebhookController {
     if (filename) {
       const content = fs.readFileSync(filename);
       const obj = JSON.parse(content.toString());
+      obj.dsnpId = dsnpId;
       return obj;
     }
 
