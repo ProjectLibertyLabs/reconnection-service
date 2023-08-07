@@ -5,7 +5,6 @@ import { mnemonicValidate } from '@polkadot/util-crypto';
 export const configModuleOptions: ConfigModuleOptions = {
   isGlobal: true,
   validationSchema: Joi.object({
-    PROVIDER_ID: Joi.string().required(),
     REDIS_URL: Joi.string().uri().required(),
     FREQUENCY_URL: Joi.string().uri().required(),
     PROVIDER_ID: Joi.required().custom((value: string, helpers) => {
