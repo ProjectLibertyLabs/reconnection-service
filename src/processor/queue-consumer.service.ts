@@ -149,24 +149,27 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     const capacityLimit = this.configService.getCapacityLimit();
     const capacity = await this.blockchainService.capacityInfo(this.configService.getProviderId());
     const remainingCapacity = capacity.remainingCapacity;
-    let outOfCapacity = false;
+    let outOfCapacity = capacity.remainingCapacity <= 0n;
 
-    if (capacityLimit.type === 'percentage' && remainingCapacity > 0) {
-      const minRemainingPct = 100 - capacityLimit.value;
-      const percentageRemaining = (capacity.remainingCapacity * 100n) / (capacity.totalCapacityIssued || 1n);
-      if (percentageRemaining <= minRemainingPct ) {
-        outOfCapacity = true;
-        this.logger.warn(
-          `Capacity threshold reached: remaining pct = ${percentageRemaining}% (${minRemainingPct}% required (${
-            (capacity.remainingCapacity * 100n) / capacity.totalCapacityIssued
-          }))`,
-        );
-      }
-    } else {
-      const capacityUsed = capacity.totalCapacityIssued - capacity.remainingCapacity;
-      if (capacityUsed >= capacityLimit.value) {
-        outOfCapacity = true;
-        this.logger.warn(`Capacity threshold reached: used ${capacityUsed} of ${capacityLimit.value}`);
+      if(!outOfCapacity) {
+        this.logger.debug(`Capacity remaining: ${remainingCapacity}`);
+        if (capacityLimit.type === 'percentage') {
+          const minRemainingPct = 100 - capacityLimit.value;
+          const percentageRemaining = (capacity.remainingCapacity * 100n) / (capacity.totalCapacityIssued || 1n);
+          if (percentageRemaining <= minRemainingPct ) {
+            outOfCapacity = true;
+            this.logger.warn(
+              `Capacity threshold reached: remaining pct = ${percentageRemaining}% (${minRemainingPct}% required (${
+                (capacity.remainingCapacity * 100n) / capacity.totalCapacityIssued
+              }))`,
+            );
+          }
+        } else {
+          const capacityUsed = capacity.totalCapacityIssued - capacity.remainingCapacity;
+          if (capacityUsed >= capacityLimit.value) {
+            outOfCapacity = true;
+            this.logger.warn(`Capacity threshold reached: used ${capacityUsed} of ${capacityLimit.value}`);
+          }
       }
     }
 
