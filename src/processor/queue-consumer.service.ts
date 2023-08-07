@@ -8,6 +8,7 @@ import { ConfigService } from '#app/config/config.service';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { CapacityLowError } from './errors';
 
 export const SECONDS_PER_BLOCK = 12;
 const CAPACITY_EPOCH_TIMEOUT_NAME = 'capacity_check';
@@ -84,6 +85,18 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
       this.logger.verbose(`Successfully completed job ${job.id}`);
     } catch (e) {
       this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);
+      if(e instanceof CapacityLowError){
+        // if capacity is low, saying for some failing transactions
+        // add delay to job and continue
+        // all failing txs due to low capacity will be delayed until next epoch
+        const capacity = await this.blockchainService.capacityInfo(this.configService.getProviderId());
+        const blocksRemaining = capacity.nextEpochStart - capacity.currentBlockNumber;
+        const delay = blocksRemaining * SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
+        this.logger.debug(`Adding delay to job ${job.id} for ${delay}ms`);
+        await job.updateProgress(0);
+        await job.moveToDelayed(delay);
+        return;
+      }
       throw e;
     } finally {
       await this.checkCapacity();
@@ -123,7 +136,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     try {
       this.schedulerRegistry.addTimeout(
         CAPACITY_EPOCH_TIMEOUT_NAME,
-        setTimeout(() => this.checkCapacity(), blocksRemaining * 12 * MILLISECONDS_PER_SECOND),
+        setTimeout(() => this.checkCapacity(), blocksRemaining * SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND),
       );
     } catch (err) {
       // ignore duplicate timeout
