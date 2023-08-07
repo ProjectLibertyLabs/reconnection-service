@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job, Queue } from 'bullmq';
-import { IGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
+import { IGraphUpdateJob, createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
 import { ReconnectionGraphService } from '#app/processor/reconnection-graph.service';
 import { BlockchainService } from '#app/blockchain/blockchain.service';
 import { ConfigService } from '#app/config/config.service';
@@ -93,8 +93,8 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
         const blocksRemaining = capacity.nextEpochStart - capacity.currentBlockNumber;
         const delay = blocksRemaining * SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
         this.logger.debug(`Adding delay to job ${job.id} for ${delay}ms`);
-        await job.updateProgress(0);
-        await job.moveToDelayed(delay);
+        const {key: delayJobId, data: delayJobData} = createGraphUpdateJob(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
+        await this.graphUpdateQueue.add(delayJobId, delayJobData, {delay});
         return;
       }
       throw e;
