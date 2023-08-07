@@ -2,16 +2,15 @@
 https://docs.nestjs.com/providers#services
 */
 
+import { ICapacityLimit } from '#app/interfaces/capacity-limit.interface';
 import type { EnvironmentType } from '@dsnp/graph-sdk';
-import { ProviderId } from '@frequency-chain/api-augment/interfaces';
 import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
-import { AnyNumber } from '@polkadot/types/types';
 
 export interface ConfigEnvironmentVariables {
   REDIS_URL: URL;
   FREQUENCY_URL: URL;
-  PROVIDER_ID: bigint;
+  PROVIDER_ID: string;
   PROVIDER_BASE_URL: URL;
   PROVIDER_ACCESS_TOKEN: string;
   BLOCKCHAIN_SCAN_INTERVAL_MINUTES: number;
@@ -19,41 +18,21 @@ export interface ConfigEnvironmentVariables {
   WEBHOOK_FAILURE_THRESHOLD: number;
   HEALTH_CHECK_SUCCESS_THRESHOLD: number;
   WEBHOOK_RETRY_INTERVAL_SECONDS: number;
-  HEALTH_CHECK_RETRY_INTERVAL_SECONDS: number;
+  HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS: number;
+  HEALTH_CHECK_MAX_RETRIES: number;
   GRAPH_ENVIRONMENT_TYPE: keyof EnvironmentType;
   GRAPH_ENVIRONMENT_DEV_CONFIG: string;
   PROVIDER_ACCOUNT_SEED_PHRASE: string;
-}
-
-interface ProviderDetails {
-  baseUrl: URL;
-  apiToken: string;
+  CAPACITY_LIMIT: ICapacityLimit;
 }
 
 /// Config service to get global app and provider-specific config values.
-/// Though this is currently designed to take a single environment-injected
-/// Provider config, it is designed with an API suitable for a multi-provider
-/// environment which may use other backends (DB, secrets engine) to get provider
-/// configuration values, so that it may be swapped out without requiring the rest
-/// of the application to change.
 @Injectable()
 export class ConfigService {
-  public providerMap: Map<string, ProviderDetails>;
+  private capacityLimit: ICapacityLimit;
 
   constructor(private nestConfigService: NestConfigService<ConfigEnvironmentVariables>) {
-    const providerId: bigint = nestConfigService.get<bigint>('PROVIDER_ID') ?? 0n;
-    const baseUrl = nestConfigService.get('PROVIDER_BASE_URL');
-    const apiToken = this.nestConfigService.get('PROVIDER_ACCESS_TOKEN');
-
-    this.providerMap = new Map<string, ProviderDetails>([
-      [
-        providerId.toString(),
-        {
-          baseUrl,
-          apiToken,
-        },
-      ],
-    ]);
+    this.capacityLimit = JSON.parse(nestConfigService.get('CAPACITY_LIMIT')!);
   }
 
   public get redisUrl(): URL {
@@ -64,12 +43,12 @@ export class ConfigService {
     return this.nestConfigService.get('FREQUENCY_URL')!;
   }
 
-  public providerBaseUrl(id: ProviderId | AnyNumber): URL {
-    return this.providerMap.get(id.toString())?.baseUrl!;
+  public get providerBaseUrl(): URL {
+    return this.nestConfigService.get<URL>('PROVIDER_BASE_URL')!;
   }
 
-  public providerApiToken(id: ProviderId | AnyNumber): string {
-    return this.providerMap.get(id.toString())?.apiToken!;
+  public get providerApiToken(): string | undefined {
+    return this.nestConfigService.get<string>('PROVIDER_ACCESS_TOKEN');
   }
 
   public getBlockchainScanIntervalMinutes(): number {
@@ -92,8 +71,16 @@ export class ConfigService {
     return this.nestConfigService.get<number>('WEBHOOK_RETRY_INTERVAL_SECONDS')!;
   }
 
-  public getHealthCheckRetryIntervalSeconds(): number {
-    return this.nestConfigService.get<number>('HEALTH_CHECK_RETRY_INTERVAL_SECONDS')!;
+  public getHealthCheckMaxRetryIntervalSeconds(): number {
+    return this.nestConfigService.get<number>('HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS')!;
+  }
+
+  public getHealthCheckMaxRetries(): number {
+    return this.nestConfigService.get<number>('HEALTH_CHECK_MAX_RETRIES')!;
+  }
+
+  public getProviderId(): string {
+    return this.nestConfigService.get<string>('PROVIDER_ID')!;
   }
 
   public getProviderAccountSeedPhrase(): string {
@@ -106,5 +93,9 @@ export class ConfigService {
 
   public getGraphEnvironmentConfig(): string {
     return this.nestConfigService.get<string>('GRAPH_ENVIRONMENT_DEV_CONFIG')!;
+  }
+
+  public getCapacityLimit(): ICapacityLimit {
+    return this.capacityLimit;
   }
 }

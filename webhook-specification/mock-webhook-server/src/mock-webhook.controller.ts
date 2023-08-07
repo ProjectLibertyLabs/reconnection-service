@@ -3,7 +3,7 @@
 https://docs.nestjs.com/controllers#controllers
 */
 
-import { Controller, Get, HttpStatus, Logger, Param, Post } from '@nestjs/common';
+import { Controller, Get, HttpException, HttpStatus, Logger, Param, Post } from '@nestjs/common';
 import fs from 'fs';
 
 @Controller()
@@ -18,6 +18,9 @@ export class MockWebhookController {
 
   @Get('/api/v1.0.0/health')
   public health() {
+    if (this.healthResponse !== HttpStatus.OK) {
+      throw new HttpException('Unhealthy', this.healthResponse);
+    }
     return this.healthResponse;
   }
 
@@ -28,6 +31,11 @@ export class MockWebhookController {
 
   @Get('/api/v1.0.0/connections/:dsnpId')
   public getConnections(@Param('dsnpId') dsnpId: string) {
+    if (this.healthResponse !== HttpStatus.OK) {
+      this.logger.log(`/connections returning ${this.healthResponse}`);
+      throw new HttpException('Bad endpoint', this.healthResponse);
+    }
+
     let filename: string = '';
     if (fs.existsSync(`./responses/response.${dsnpId}.json`)) {
       filename = `./responses/response.${dsnpId}.json`;
@@ -38,6 +46,7 @@ export class MockWebhookController {
     if (filename) {
       const content = fs.readFileSync(filename);
       const obj = JSON.parse(content.toString());
+      obj.dsnpId = dsnpId;
       return obj;
     }
 

@@ -34,17 +34,16 @@ export class GraphStateManager implements OnApplicationBootstrap {
     }
   });
 
-  public async onApplicationBootstrap() {
+  public onApplicationBootstrap() {
     if (!this.graphState) {
       throw new Error('Unable to initialize schema ids');
     }
 
-    const publicFollow = await this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Public);
-    const publicFriend = await this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Friendship, PrivacyType.Public);
-    const privateFollow = await this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Private);
-    const privateFriend = await this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Friendship, PrivacyType.Private);
+    const publicFollow = this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Public);
+    const privateFollow = this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Private);
+    const privateFriend = this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Friendship, PrivacyType.Private);
 
-    this.graphKeySchemaId = (await this.graphState.getGraphConfig(this.environment)).graphPublicKeySchemaId;
+    this.graphKeySchemaId = this.graphState.getGraphConfig(this.environment).graphPublicKeySchemaId;
 
     this.schemaIds = {
       [ConnectionType.Follow]: {
@@ -52,13 +51,12 @@ export class GraphStateManager implements OnApplicationBootstrap {
         [PrivacyType.Private]: privateFollow,
       },
       [ConnectionType.Friendship]: {
-        [PrivacyType.Public]: publicFriend,
         [PrivacyType.Private]: privateFriend,
       },
     };
   }
 
-  constructor(private configService: ConfigService) {
+  constructor(configService: ConfigService) {
     const environmentType = configService.getGraphEnvironmentType();
     if (environmentType === EnvironmentType.Dev.toString()) {
       const configJson = configService.getGraphEnvironmentConfig();
@@ -73,14 +71,14 @@ export class GraphStateManager implements OnApplicationBootstrap {
     GraphStateManager.graphStateFinalizer.register(this, this.graphState);
   }
 
-  public async getGraphState(): Promise<Graph> {
+  public getGraphState(): Graph {
     if (this.graphState) {
       return this.graphState;
     }
     return {} as Graph;
   }
 
-  public async getGraphConfig(): Promise<Config> {
+  public getGraphConfig(): Config {
     if (this.graphState) {
       return this.graphState.getGraphConfig(this.environment);
     }
@@ -95,78 +93,86 @@ export class GraphStateManager implements OnApplicationBootstrap {
     return this.graphKeySchemaId;
   }
 
-  public static async generateKeyPair(keyType: GraphKeyType): Promise<GraphKeyPair> {
+  public static generateKeyPair(keyType: GraphKeyType): GraphKeyPair {
     return Graph.generateKeyPair(keyType);
   }
 
-  public static async deserializeDsnpKeys(keys: DsnpKeys): Promise<DsnpPublicKey[]> {
+  public static deserializeDsnpKeys(keys: DsnpKeys): DsnpPublicKey[] {
     return Graph.deserializeDsnpKeys(keys);
   }
 
-  public async importUserData(payload: ImportBundle[]): Promise<boolean> {
+  public importUserData(payload: ImportBundle[]): boolean {
     if (this.graphState) {
       return this.graphState.importUserData(payload);
     }
     return false;
   }
 
-  public async applyActions(actions: Action[], ignoreExistingConnection: boolean): Promise<boolean> {
+  public applyActions(actions: Action[], ignoreExistingConnection: boolean): boolean {
     if (this.graphState) {
       return this.graphState.applyActions(actions, { ignoreExistingConnections: ignoreExistingConnection });
     }
     return false;
   }
 
-  public async exportGraphUpdates(): Promise<Update[]> {
+  public exportGraphUpdates(): Update[] {
     if (this.graphState) {
-      return await this.graphState.exportUpdates();
+      return this.graphState.exportUpdates();
     }
     return [];
   }
 
-  public async removeUserGraph(dsnpUserId: string): Promise<boolean> {
+  public exportUserGraphUpdates(dsnpId: string): Update[] {
+    if (this.graphState) {
+      return this.graphState.exportUserGraphUpdates(dsnpId);
+    }
+
+    return [];
+  }
+
+  public removeUserGraph(dsnpUserId: string): boolean {
     if (this.graphState) {
       return this.graphState.removeUserGraph(dsnpUserId);
     }
     return false;
   }
 
-  public async graphContainsUser(dsnpUserId: string): Promise<boolean> {
+  public graphContainsUser(dsnpUserId: string): boolean {
     if (this.graphState) {
       return this.graphState.containsUserGraph(dsnpUserId);
     }
     return false;
   }
 
-  public async getConnectionsForUserGraph(dsnpUserId: string, schemaId: number, includePending: boolean): Promise<DsnpGraphEdge[]> {
+  public getConnectionsForUserGraph(dsnpUserId: string, schemaId: number, includePending: boolean): DsnpGraphEdge[] {
     if (this.graphState) {
       return this.graphState.getConnectionsForUserGraph(dsnpUserId, schemaId, includePending);
     }
     return [];
   }
 
-  public async getConnectionWithoutKeys(): Promise<string[]> {
+  public getConnectionWithoutKeys(): string[] {
     if (this.graphState) {
       return this.graphState.getConnectionsWithoutKeys();
     }
     return [];
   }
 
-  public async getOneSidedPrivateFriendshipConnections(dsnpUserId: string): Promise<DsnpGraphEdge[]> {
+  public getOneSidedPrivateFriendshipConnections(dsnpUserId: string): DsnpGraphEdge[] {
     if (this.graphState) {
       return this.graphState.getOneSidedPrivateFriendshipConnections(dsnpUserId);
     }
     return [];
   }
 
-  public async getPublicKeys(dsnpUserId: string): Promise<DsnpPublicKey[]> {
+  public getPublicKeys(dsnpUserId: string): DsnpPublicKey[] {
     if (this.graphState) {
       return this.graphState.getPublicKeys(dsnpUserId);
     }
     return [];
   }
 
-  public async forceCalculateGraphs(dsnpUserId: string): Promise<Update[]> {
+  public forceCalculateGraphs(dsnpUserId: string): Update[] {
     if (this.graphState) {
       return this.graphState.forceCalculateGraphs(dsnpUserId);
     }

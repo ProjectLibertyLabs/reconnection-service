@@ -5,9 +5,11 @@ import { ApiPromise, ApiRx, HttpProvider, WsProvider } from '@polkadot/api';
 import { firstValueFrom } from 'rxjs';
 import { options } from '@frequency-chain/api-augment';
 import { KeyringPair } from '@polkadot/keyring/types';
-import { BlockHash, BlockNumber, Call } from '@polkadot/types/interfaces';
+import { BlockHash, BlockNumber } from '@polkadot/types/interfaces';
 import { SubmittableExtrinsic } from '@polkadot/api/types';
 import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
+import { u32, Option, u128 } from '@polkadot/types';
+import { PalletCapacityCapacityDetails, PalletCapacityEpochInfo } from '@polkadot/types/lookup';
 import { Extrinsic } from './extrinsic';
 
 @Injectable()
@@ -38,7 +40,15 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
   }
 
   public async onApplicationShutdown(signal?: string | undefined) {
-    await Promise.all([this.api.disconnect(), this.apiPromise.disconnect()]);
+    const promises: Promise<any>[] = [];
+    if (this.api) {
+      promises.push(this.api.disconnect());
+    }
+
+    if (this.apiPromise) {
+      promises.push(this.apiPromise.disconnect());
+    }
+    await Promise.all(promises);
   }
 
   constructor(configService: ConfigService) {
@@ -89,5 +99,28 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
   public async queryAt(blockHash: BlockHash, pallet: string, extrinsic: string, ...args: (any | undefined)[]): Promise<any> {
     const newApi = await this.apiPromise.at(blockHash);
     return newApi.query[pallet][extrinsic](...args);
+  }
+
+  public async capacityInfo(providerId: string): Promise<{
+    providerId: string;
+    currentBlockNumber: number;
+    nextEpochStart: number;
+    remainingCapacity: bigint;
+    totalCapacityIssued: bigint;
+  }> {
+    const providerU64 = this.api.createType('u64', providerId);
+    const { epochStart }: PalletCapacityEpochInfo = await this.query('capacity', 'currentEpochInfo');
+    const epochBlockLength: u32 = await this.query('capacity', 'epochLength');
+    const capacityDetailsOption: Option<PalletCapacityCapacityDetails> = await this.query('capacity', 'capacityLedger', providerU64);
+    const { remainingCapacity, totalCapacityIssued } = capacityDetailsOption.unwrapOr({ remainingCapacity: 0, totalCapacityIssued: 0 });
+    const currentBlock: u32 = await this.query('system', 'number');
+
+    return {
+      providerId,
+      currentBlockNumber: currentBlock.toNumber(),
+      nextEpochStart: epochStart.add(epochBlockLength).toNumber(),
+      remainingCapacity: typeof remainingCapacity === 'number' ? BigInt(remainingCapacity) : remainingCapacity.toBigInt(),
+      totalCapacityIssued: typeof totalCapacityIssued === 'number' ? BigInt(totalCapacityIssued) : totalCapacityIssued.toBigInt(),
+    };
   }
 }
