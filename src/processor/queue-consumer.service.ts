@@ -148,22 +148,18 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
   private async checkCapacity(): Promise<void> {
     const capacityLimit = this.configService.getCapacityLimit();
     const capacity = await this.blockchainService.capacityInfo(this.configService.getProviderId());
+    const remainingCapacity = capacity.remainingCapacity;
     let outOfCapacity = false;
 
-    if (capacityLimit.type === 'percentage') {
+    if (capacityLimit.type === 'percentage' && remainingCapacity > 0) {
       const minRemainingPct = 100 - capacityLimit.value;
       const percentageRemaining = (capacity.remainingCapacity * 100n) / (capacity.totalCapacityIssued || 1n);
-      if (percentageRemaining <= minRemainingPct && capacity.remainingCapacity > 0n) {
+      if (percentageRemaining <= minRemainingPct ) {
         outOfCapacity = true;
         this.logger.warn(
           `Capacity threshold reached: remaining pct = ${percentageRemaining}% (${minRemainingPct}% required (${
             (capacity.remainingCapacity * 100n) / capacity.totalCapacityIssued
           }))`,
-        );
-      } else {
-        outOfCapacity = true;
-        this.logger.error(
-          `Capacity infomation is not available: Capacity may not have been staked yet. Remaining pct = ${percentageRemaining}% (${minRemainingPct}% required)`,
         );
       }
     } else {
