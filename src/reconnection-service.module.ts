@@ -26,6 +26,8 @@ import { BlockchainModule } from './blockchain/blockchain.module';
       true, // isGlobal
     ),
     EventEmitterModule.forRoot({
+      // Use this instance throughout the application
+      global: true,
       // set this to `true` to use wildcards
       wildcard: false,
       // the delimiter used to segment namespaces
@@ -46,11 +48,7 @@ import { BlockchainModule } from './blockchain/blockchain.module';
     BlockchainModule,
   ],
   providers: [ConfigService, BlockchainScannerService],
-  controllers: [
-    // Uncomment the following line to enable development/debug endpoints
-    // DevelopmentController,
-    ReconnectionServiceController,
-  ],
+  controllers: process.env?.ENABLE_DEV_CONTROLLER === 'true' ? [DevelopmentController, ReconnectionServiceController] : [ReconnectionServiceController],
   exports: [],
 })
 export class ReconnectionServiceModule {}

@@ -83,7 +83,7 @@ export class BlockchainScannerService implements OnApplicationBootstrap {
         // eslint-disable-next-line no-await-in-loop
         const events = (await this.blockchainService.queryAt(currentBlockHash, 'system', 'events')).toArray();
         const filteredEvents = events.reduce((jobs: Promise<any>[], { event }) => {
-          if (this.blockchainService.api.events.msa.DelegationGranted.is(event) && this.configService.providerBaseUrl(event.data.providerId)) {
+          if (this.blockchainService.api.events.msa.DelegationGranted.is(event) && this.configService.getProviderId() === event.data.providerId.toString()) {
             const { key: jobId, data } = createGraphUpdateJob(event.data.delegatorId, event.data.providerId, UpdateTransitiveGraphs);
             jobs.push(this.graphUpdateQueue.add('graphUpdate', data, { jobId }));
             this.logger.debug(`Queued graph update for DSNP user ${data.dsnpId}, provider ${data.providerId}`);
@@ -94,8 +94,13 @@ export class BlockchainScannerService implements OnApplicationBootstrap {
         if (filteredEvents.length > 0) {
           this.logger.debug(`Found ${filteredEvents.length} delegations at block #${currentBlockNumber}`);
         }
+        const jobs = filteredEvents.map(({ event }) => {
+          const { key: jobId, data } = createGraphUpdateJob(event.data.delegatorId, event.data.providerId, UpdateTransitiveGraphs);
+          return this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+        });
+
         // eslint-disable-next-line no-await-in-loop
-        await Promise.all(filteredEvents);
+        await Promise.all(jobs);
         // eslint-disable-next-line no-await-in-loop
         await this.saveProgress(currentBlockNumber);
 

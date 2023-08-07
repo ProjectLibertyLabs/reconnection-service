@@ -23,6 +23,26 @@ services:
     volumes:
       - redis_data:/data
 
+  frequency:
+    image: frequencychain/instant-seal-node:latest
+    ports:
+      - 9944:9944
+    networks:
+      - reconnection-service-network-dev
+    container_name: frequency-node
+
+  webhook:
+    container_name: webhook
+    build:
+      context: .
+      dockerfile: webhook-specification/mock-webhook-server/Dockerfile
+    ports:
+      - 3001:3001
+    volumes:
+      - ./webhook-specification/mock-webhook-server:/app
+    networks:
+      - reconnection-service-network-dev
+
 volumes:
   redis_data:
 

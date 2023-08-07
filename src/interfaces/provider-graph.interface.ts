@@ -1,15 +1,16 @@
 export interface ProviderGraph {
-    dsnpId: string;
-    privacyType: string;
-    direction: string;
-    connectionType: string;
+  dsnpId: string;
+  privacyType: string;
+  direction: string;
+  connectionType: string;
 }
 
+// eslint-disable-next-line no-shadow
 export enum KeyType {
-    X25519 = 'X25519',
+  X25519 = 'X25519',
 }
 export interface GraphKeyPair {
-    publicKey: string;
-    privateKey: string;
-    keyType: KeyType;
+  publicKey: string;
+  privateKey: string;
+  keyType: KeyType;
 }

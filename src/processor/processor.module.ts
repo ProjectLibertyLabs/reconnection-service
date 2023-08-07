@@ -7,19 +7,23 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '#app/config/config.module';
 import { ConfigService } from '#app/config/config.service';
 import { BlockchainModule } from '#app/blockchain/blockchain.module';
-import { BackoffOptions } from 'bullmq';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { QueueConsumerService } from './queue-consumer.service';
 import { ReconnectionGraphService } from './reconnection-graph.service';
 import { GraphManagerModule } from '../graph/graph-state.module';
 import { GraphStateManager } from '../graph/graph-state-manager';
+import { ProviderWebhookService } from './provider-webhook.service';
 
 @Module({
   imports: [
+    EventEmitterModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         // Note: BullMQ doesn't honor a URL for the Redis connection, and
-        // JS URL doesn't parse 'redis://' as a valid protocol.
+        // JS URL doesn't parse 'redis://' as a valid protocol, so we fool
+        // it by changing the URL to use 'http://' in order to parse out
+        // the host, port, username, password, etc.
         // We could pass REDIS_HOST, REDIS_PORT, etc, in the environment, but
         // trying to keep the # of environment variables from proliferating
         const url = new URL(configService.redisUrl.toString().replace(/^redis[s]*/, 'http'));
@@ -39,12 +43,12 @@ import { GraphStateManager } from '../graph/graph-state-manager';
     BullModule.registerQueue({
       name: 'graphUpdateQueue',
       defaultJobOptions: {
-        attempts: 5,
+        attempts: 1,
         backoff: {
           type: 'exponential',
         },
-        removeOnComplete: { count: 100 },
-        removeOnFail: { count: 5000 },
+        removeOnComplete: true,
+        removeOnFail: true,
       },
     }),
     ConfigModule,
@@ -52,7 +56,7 @@ import { GraphStateManager } from '../graph/graph-state-manager';
     BlockchainModule,
   ],
   controllers: [],
-  providers: [QueueConsumerService, ReconnectionGraphService, GraphStateManager],
+  providers: [QueueConsumerService, ReconnectionGraphService, GraphStateManager, ProviderWebhookService],
   exports: [ReconnectionGraphService, BullModule],
 })
 export class ProcessorModule {}
