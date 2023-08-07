@@ -153,12 +153,17 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     if (capacityLimit.type === 'percentage') {
       const minRemainingPct = 100 - capacityLimit.value;
       const percentageRemaining = (capacity.remainingCapacity * 100n) / (capacity.totalCapacityIssued || 1n);
-      if (percentageRemaining <= minRemainingPct) {
+      if (percentageRemaining <= minRemainingPct && capacity.remainingCapacity > 0n) {
         outOfCapacity = true;
         this.logger.warn(
           `Capacity threshold reached: remaining pct = ${percentageRemaining}% (${minRemainingPct}% required (${
             (capacity.remainingCapacity * 100n) / capacity.totalCapacityIssued
           }))`,
+        );
+      } else {
+        outOfCapacity = true;
+        this.logger.error(
+          `Capacity infomation is not available: Capacity may not have been staked yet. Remaining pct = ${percentageRemaining}% (${minRemainingPct}% required)`,
         );
       }
     } else {
