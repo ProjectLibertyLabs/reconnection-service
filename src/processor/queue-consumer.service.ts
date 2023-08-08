@@ -184,7 +184,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     const currentEpoch = capacity.currentEpoch;
     const epochCapacityKey = `epochCapacity:${currentEpoch}`;
     const epochUsedCapacity = BigInt(await this.cacheManager.get(epochCapacityKey) ?? 0); // Fetch capacity used by the service
-    let outOfCapacity = remainingCapacity <= 0n || epochUsedCapacity >= remainingCapacity;
+    let outOfCapacity = remainingCapacity <= 0n;
 
     if(!outOfCapacity) {
         this.logger.debug(`Capacity remaining: ${remainingCapacity}`);
