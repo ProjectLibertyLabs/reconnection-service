@@ -115,14 +115,24 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     const capacityDetailsOption: Option<PalletCapacityCapacityDetails> = await this.query('capacity', 'capacityLedger', providerU64);
     const { remainingCapacity, totalCapacityIssued } = capacityDetailsOption.unwrapOr({ remainingCapacity: 0, totalCapacityIssued: 0 });
     const currentBlock: u32 = await this.query('system', 'number');
-    const currentEpoch: u32  = await this.query('capacity', 'currentEpoch');
+    const currentEpoch = await this.getCurrentCapacityEpoch();
     return {
-      currentEpoch: typeof currentEpoch === 'number' ? BigInt(currentEpoch) : currentEpoch.toBigInt(),
+      currentEpoch,
       providerId,
       currentBlockNumber: currentBlock.toNumber(),
       nextEpochStart: epochStart.add(epochBlockLength).toNumber(),
       remainingCapacity: typeof remainingCapacity === 'number' ? BigInt(remainingCapacity) : remainingCapacity.toBigInt(),
       totalCapacityIssued: typeof totalCapacityIssued === 'number' ? BigInt(totalCapacityIssued) : totalCapacityIssued.toBigInt(),
     };
+  }
+
+  public async getCurrentCapacityEpoch(): Promise<bigint> {
+    const currentEpoch: u32  = await this.query('capacity', 'currentEpoch');
+    return typeof currentEpoch === 'number' ? BigInt(currentEpoch) : currentEpoch.toBigInt();
+  }
+
+  public async getCurrentEpochLength(): Promise<bigint> {
+    const epochLength: u32 = await this.query('capacity', 'epochLength');
+    return typeof epochLength === 'number' ? BigInt(epochLength) : epochLength.toBigInt();
   }
 }

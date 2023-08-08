@@ -174,7 +174,8 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     const epochCapacityKey = `epochCapacity:${currentEpoch}`;
     const epochCapacity = BigInt(await this.cacheManager.get(epochCapacityKey) ?? 0);
     const newEpochCapacity = epochCapacity + totalCapacityUsed;
-    await this.cacheManager.set(epochCapacityKey, newEpochCapacity.toString());
+    const epochDuration = await this.blockchainService.getCurrentEpochLength();
+    await this.cacheManager.setex(epochCapacityKey, epochDuration.toString(), newEpochCapacity.toString());
   }
 
   private async checkCapacity(): Promise<void> {
