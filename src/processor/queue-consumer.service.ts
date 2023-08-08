@@ -9,6 +9,8 @@ import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { CapacityLowError } from './errors';
+import { InjectRedis } from '@liaoliaots/nestjs-redis';
+import Redis from 'ioredis';
 
 export const SECONDS_PER_BLOCK = 12;
 const CAPACITY_EPOCH_TIMEOUT_NAME = 'capacity_check';
@@ -36,6 +38,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
 
   constructor(
     @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
+    @InjectRedis() private cacheManager: Redis,
     private graphSdkService: ReconnectionGraphService,
     private blockchainService: BlockchainService,
     private configService: ConfigService,
@@ -81,7 +84,8 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     }
 
     try {
-      await this.graphSdkService.updateUserGraph(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
+      const totalCapacityUsed = await this.graphSdkService.updateUserGraph(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
+      await this.setEpochCapacity(totalCapacityUsed);
       this.logger.verbose(`Successfully completed job ${job.id}`);
     } catch (e) {
       this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);
@@ -164,38 +168,46 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     }
   }
 
+  private async setEpochCapacity(totalCapacityUsed: bigint): Promise<void> {
+    const capacityInfo = await this.blockchainService.capacityInfo(this.configService.getProviderId());
+    const currentEpoch = capacityInfo.currentEpoch;
+    const epochCapacityKey = `epochCapacity:${currentEpoch}`;
+    const epochCapacity = BigInt(await this.cacheManager.get(epochCapacityKey) ?? 0);
+    const newEpochCapacity = epochCapacity + totalCapacityUsed;
+    await this.cacheManager.set(epochCapacityKey, newEpochCapacity.toString());
+  }
+
   private async checkCapacity(): Promise<void> {
     const capacityLimit = this.configService.getCapacityLimit();
     const capacity = await this.blockchainService.capacityInfo(this.configService.getProviderId());
     const remainingCapacity = capacity.remainingCapacity;
-    let outOfCapacity = capacity.remainingCapacity <= 0n;
+    const currentEpoch = capacity.currentEpoch;
+    const epochCapacityKey = `epochCapacity:${currentEpoch}`;
+    const epochUsedCapacity = BigInt(await this.cacheManager.get(epochCapacityKey) ?? 0); // Fetch capacity used by the service
+    let outOfCapacity = remainingCapacity <= 0n || epochUsedCapacity >= remainingCapacity;
 
-      if(!outOfCapacity) {
+    if(!outOfCapacity) {
         this.logger.debug(`Capacity remaining: ${remainingCapacity}`);
         if (capacityLimit.type === 'percentage') {
-          const minRemainingPct = 100 - capacityLimit.value;
-          const percentageRemaining = (capacity.remainingCapacity * 100n) / (capacity.totalCapacityIssued || 1n);
-          if (percentageRemaining <= minRemainingPct ) {
-            outOfCapacity = true;
-            this.logger.warn(
-              `Capacity threshold reached: remaining pct = ${percentageRemaining}% (${minRemainingPct}% required (${
-                (capacity.remainingCapacity * 100n) / capacity.totalCapacityIssued
-              }))`,
-            );
-          }
+            const capacityLimitPercentage = BigInt(capacityLimit.value);
+            const capacityLimitThreshold = (capacity.totalCapacityIssued * capacityLimitPercentage) / 100n;
+            this.logger.debug(`Capacity limit threshold: ${capacityLimitThreshold}`);
+            if (epochUsedCapacity >= capacityLimitThreshold) {
+                outOfCapacity = true;
+                this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimitThreshold}`);
+            }
         } else {
-          const capacityUsed = capacity.totalCapacityIssued - capacity.remainingCapacity;
-          if (capacityUsed >= capacityLimit.value) {
-            outOfCapacity = true;
-            this.logger.warn(`Capacity threshold reached: used ${capacityUsed} of ${capacityLimit.value}`);
-          }
-      }
+            if (epochUsedCapacity >= capacityLimit.value) {
+                outOfCapacity = true;
+                this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimit.value}`);
+            }
+        }
     }
 
     if (outOfCapacity) {
-      await this.eventEmitter.emitAsync('capacity.exhausted');
+        await this.eventEmitter.emitAsync('capacity.exhausted');
     } else {
-      await this.eventEmitter.emitAsync('capacity.refilled');
+        await this.eventEmitter.emitAsync('capacity.refilled');
     }
   }
 }

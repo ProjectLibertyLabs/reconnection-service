@@ -107,6 +107,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     nextEpochStart: number;
     remainingCapacity: bigint;
     totalCapacityIssued: bigint;
+    currentEpoch: bigint;
   }> {
     const providerU64 = this.api.createType('u64', providerId);
     const { epochStart }: PalletCapacityEpochInfo = await this.query('capacity', 'currentEpochInfo');
@@ -114,8 +115,9 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     const capacityDetailsOption: Option<PalletCapacityCapacityDetails> = await this.query('capacity', 'capacityLedger', providerU64);
     const { remainingCapacity, totalCapacityIssued } = capacityDetailsOption.unwrapOr({ remainingCapacity: 0, totalCapacityIssued: 0 });
     const currentBlock: u32 = await this.query('system', 'number');
-
+    const currentEpoch: u32  = await this.query('capacity', 'currentEpoch');
     return {
+      currentEpoch: typeof currentEpoch === 'number' ? BigInt(currentEpoch) : currentEpoch.toBigInt(),
       providerId,
       currentBlockNumber: currentBlock.toNumber(),
       nextEpochStart: epochStart.add(epochBlockLength).toNumber(),

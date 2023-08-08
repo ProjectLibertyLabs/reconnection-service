@@ -40,7 +40,7 @@ export class ReconnectionGraphService {
     return this.blockchainService.api.consts.frequencyTxPayment.maximumCapacityBatchLength.toNumber();
   }
 
-  public async updateUserGraph(dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<void> {
+  public async updateUserGraph(dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<bigint> {
     this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
     const dsnpUserId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', dsnpUserStr);
     const providerId: ProviderId = this.blockchainService.api.registry.createType('ProviderId', providerStr);
@@ -113,7 +113,7 @@ export class ReconnectionGraphService {
         batches.push(batch);
       }
       // eslint-disable-next-line no-await-in-loop
-      await this.sendAndProcessChainEvents(dsnpUserId, providerKeys, batches);
+      const totalCapacityUsed = await this.sendAndProcessChainEvents(dsnpUserId, providerKeys, batches);
       // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
       // import bundles are used to import the user's DSNP Graph into the graph SDK
       // check if user graph exists in the graph SDK else queue a graph update job
@@ -128,6 +128,7 @@ export class ReconnectionGraphService {
       } else {
         throw new Error(`Error re-importing bundles for ${dsnpUserId.toString()}`);
       }
+      return totalCapacityUsed;
     } catch (err: any) {
       this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${(err as Error).stack}`);
       if (err instanceof errors.UnknownError || err instanceof errors.GetUserGraphError) {
@@ -400,34 +401,40 @@ export class ReconnectionGraphService {
     return dsnpKeys;
   }
 
-  async sendAndProcessChainEvents(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batchesMap: SubmittableExtrinsic<'rxjs', ISubmittableResult>[][]): Promise<void> {
+  async sendAndProcessChainEvents(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batchesMap: SubmittableExtrinsic<'rxjs', ISubmittableResult>[][]): Promise<bigint> {
     try {
-      // iterate over batches and send them to the chain
-      const batchPromises: Promise<void>[] = [];
+      // iterate over batches and send them to the chain returning the capacity withdrawn
+      const batchPromises: Promise<bigint>[] = [];
 
       batchesMap.forEach(async (batch) => {
         batchPromises.push(this.processSingleBatch(dsnpUserId, providerKeys, batch));
       });
 
       this.logger.debug(`Processing ${batchPromises.length} batches for user ${dsnpUserId.toString()}`);
-      await Promise.all(batchPromises);
+      const totalCapUsedRes = await Promise.all(batchPromises);
+      const totalCapUsed = totalCapUsedRes.reduce((acc, cur) => acc + cur, BigInt(0));
+      this.logger.debug(`Processed ${batchPromises.length} batches for user ${dsnpUserId.toString()}`);
+      return totalCapUsed;
     } catch (e) {
       this.logger.error(`Error processing batches for ${dsnpUserId.toString()}: ${e}`);
       throw e;
     }
   }
 
-  async processSingleBatch(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]): Promise<void> {
+  async processSingleBatch(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]): Promise<bigint> {
     this.logger.debug(`Submitting batch for user ${dsnpUserId.toString()}`);
     try {
-      const [event] = await this.blockchainService
+      const [event, eventMap] = await this.blockchainService
         .createExtrinsic({ pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, { eventPallet: 'utility', event: 'BatchCompleted' }, providerKeys, batch)
         .signAndSend();
-
       if (!event || !this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
         // if we dont get any events, covering any unexpected connection errors
         throw new Error(`No events were found for ${dsnpUserId.toString()}`);
       }
+      const capacityWithDrawn = BigInt(eventMap['capacity.CapacityWithdrawn'].data[1].toString());
+      this.logger.debug(`Batch submitted for user ${dsnpUserId.toString()}`);
+      this.logger.debug(`Capacity withdrawn for user ${dsnpUserId.toString()}: ${capacityWithDrawn}`);
+      return capacityWithDrawn;
     } catch (e) {
       this.logger.error(`Error processing batch for ${dsnpUserId.toString()}: ${e}`);
       // Following errors includes are checked against
