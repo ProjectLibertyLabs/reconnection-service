@@ -168,14 +168,14 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     }
   }
 
-  private async setEpochCapacity(totalCapacityUsed: bigint): Promise<void> {
-    const capacityInfo = await this.blockchainService.capacityInfo(this.configService.getProviderId());
-    const currentEpoch = capacityInfo.currentEpoch;
-    const epochCapacityKey = `epochCapacity:${currentEpoch}`;
-    const epochCapacity = BigInt(await this.cacheManager.get(epochCapacityKey) ?? 0);
-    const newEpochCapacity = epochCapacity + totalCapacityUsed;
-    const epochDuration = await this.blockchainService.getCurrentEpochLength();
-    await this.cacheManager.setex(epochCapacityKey, epochDuration.toString(), newEpochCapacity.toString());
+  private async setEpochCapacity(totalCapacityUsed: {[key: string]: bigint}): Promise<void> {
+    for (const [epoch, capacityUsed] of Object.entries(totalCapacityUsed)) {
+      const epochCapacityKey = `epochCapacity:${epoch}`;
+      const epochCapacity = BigInt(await this.cacheManager.get(epochCapacityKey) ?? 0);
+      const newEpochCapacity = epochCapacity + capacityUsed;
+      const epochDuration = await this.blockchainService.getCurrentEpochLength();
+      await this.cacheManager.setex(epochCapacityKey, epochDuration.toString(), newEpochCapacity.toString());
+    }
   }
 
   private async checkCapacity(): Promise<void> {

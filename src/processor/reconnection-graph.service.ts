@@ -40,7 +40,7 @@ export class ReconnectionGraphService {
     return this.blockchainService.api.consts.frequencyTxPayment.maximumCapacityBatchLength.toNumber();
   }
 
-  public async updateUserGraph(dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<bigint> {
+  public async updateUserGraph(dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<{[key: string]: bigint}> {
     this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
     const dsnpUserId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', dsnpUserStr);
     const providerId: ProviderId = this.blockchainService.api.registry.createType('ProviderId', providerStr);
@@ -401,29 +401,38 @@ export class ReconnectionGraphService {
     return dsnpKeys;
   }
 
-  async sendAndProcessChainEvents(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batchesMap: SubmittableExtrinsic<'rxjs', ISubmittableResult>[][]): Promise<bigint> {
+  async sendAndProcessChainEvents(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batchesMap: SubmittableExtrinsic<'rxjs', ISubmittableResult>[][]): Promise<{[key: string]: bigint}> {
     try {
       // iterate over batches and send them to the chain returning the capacity withdrawn
-      const batchPromises: Promise<bigint>[] = [];
+      const batchPromises: Promise<{[key: string]: bigint}>[] = [];
 
       batchesMap.forEach(async (batch) => {
         batchPromises.push(this.processSingleBatch(dsnpUserId, providerKeys, batch));
       });
 
       this.logger.debug(`Processing ${batchPromises.length} batches for user ${dsnpUserId.toString()}`);
-      const totalCapUsedRes = await Promise.all(batchPromises);
-      const totalCapUsed = totalCapUsedRes.reduce((acc, cur) => acc + cur, BigInt(0));
+      const totalCapUsedPerEpoch = await Promise.all(batchPromises);
       this.logger.debug(`Processed ${batchPromises.length} batches for user ${dsnpUserId.toString()}`);
-      return totalCapUsed;
+      const totalCapacityUsed = totalCapUsedPerEpoch.reduce((acc, curr) => {
+        const epoch = Object.keys(curr)[0];
+        if (acc[epoch]) {
+          acc[epoch] += curr[epoch];
+        }
+        acc[epoch] = curr[epoch];
+        return acc;
+      }, {} as {[key: string]: bigint});
+
+      return totalCapacityUsed;
     } catch (e) {
       this.logger.error(`Error processing batches for ${dsnpUserId.toString()}: ${e}`);
       throw e;
     }
   }
 
-  async processSingleBatch(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]): Promise<bigint> {
+  async processSingleBatch(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]): Promise<{[key: string]: bigint}> {
     this.logger.debug(`Submitting batch for user ${dsnpUserId.toString()}`);
     try {
+      const currrentEpoch = await this.blockchainService.getCurrentCapacityEpoch();
       const [event, eventMap] = await this.blockchainService
         .createExtrinsic({ pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, { eventPallet: 'utility', event: 'BatchCompleted' }, providerKeys, batch)
         .signAndSend();
@@ -434,7 +443,7 @@ export class ReconnectionGraphService {
       const capacityWithDrawn = BigInt(eventMap['capacity.CapacityWithdrawn'].data[1].toString());
       this.logger.debug(`Batch submitted for user ${dsnpUserId.toString()}`);
       this.logger.debug(`Capacity withdrawn for user ${dsnpUserId.toString()}: ${capacityWithDrawn}`);
-      return capacityWithDrawn;
+      return { [currrentEpoch.toString()]: capacityWithDrawn };
     } catch (e) {
       this.logger.error(`Error processing batch for ${dsnpUserId.toString()}: ${e}`);
       // Following errors includes are checked against
