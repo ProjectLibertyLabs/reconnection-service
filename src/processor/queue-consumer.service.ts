@@ -126,7 +126,6 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
   @OnEvent('error.graph', { async: true, promisify: true })
   private async handleUnknownError(error: Error) {
     this.logger.error(`Received error.graph event: ${error.message}`);
-    await this.graphUpdateQueue.drain();
     process.exit(1);
   }
 
