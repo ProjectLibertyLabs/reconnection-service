@@ -82,7 +82,11 @@ export class BlockchainScannerService implements OnApplicationBootstrap {
       while (!currentBlockHash.isEmpty && queueSize < this.configService.getQueueHighWater()) {
         // eslint-disable-next-line no-await-in-loop
         const events = (await this.blockchainService.queryAt(currentBlockHash, 'system', 'events')).toArray();
-        const filteredEvents = events.filter(({ event }) => this.blockchainService.api.events.msa.DelegationGranted.is(event));
+
+        const filteredEvents = events.filter(({ event }) =>
+          this.blockchainService.api.events.msa.DelegationGranted.is(event) &&
+          event.data.providerId.eq(this.configService.getProviderId()));
+
         if (filteredEvents.length > 0) {
           this.logger.debug(`Found ${filteredEvents.length} delegations at block #${currentBlockNumber}`);
         }
