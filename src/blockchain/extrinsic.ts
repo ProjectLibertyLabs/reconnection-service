@@ -29,7 +29,7 @@ import { SubmittableExtrinsic, ApiTypes, AugmentedEvent } from '@polkadot/api/ty
 import { Call, Event } from '@polkadot/types/interfaces';
 import { IsEvent } from '@polkadot/types/metadata/decorate/types';
 import { Codec, IEvent, ISubmittableResult, AnyTuple } from '@polkadot/types/types';
-import { filter, firstValueFrom, map, pipe, tap } from 'rxjs';
+import { catchError, filter, firstValueFrom, map, pipe, tap } from 'rxjs';
 import { KeyringPair } from '@polkadot/keyring/types';
 import { EventError } from './event-error';
 
@@ -83,9 +83,53 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
     );
   }
 
+  public payWithCapacityWithRetry(nonce?: number, maxRetries = 3, retryInterval = 5000): Promise<ParsedEventResult> {
+    let retries = 0;
+  
+    return new Promise<ParsedEventResult>((resolve, reject) => {
+      const resultPromise = firstValueFrom(
+        this.api.tx.frequencyTxPayment
+          .payWithCapacity(this.extrinsic)
+          .signAndSend(this.keys, { nonce })
+          .pipe(
+            catchError((error) => {
+              console.error('Transaction error:', error);
+              if (retries < maxRetries) {
+                console.error(`Transaction failed. Retrying in ${retryInterval / 1000} seconds...`);
+                retries++;
+                setTimeout(() => {
+                  this.payWithCapacityWithRetry(nonce, maxRetries, retryInterval)
+                    .then(resolve)
+                    .catch(reject);
+                }, retryInterval);
+              } else {
+                reject(new Error(`Transaction failed after ${maxRetries} retries.`));
+              }
+              throw error; // Re-throw the error to continue the error flow
+            }),
+            tap(({ status }) => {
+              if (!status.isInBlock && !status.isFinalized) {
+                this.parseBadBlockResult(this.event); // Assuming this function exists to handle bad block events
+              }
+            }),
+            this.parseResult(this.event),
+          )
+      );
+  
+      resultPromise
+        .then(resolve)
+        .catch(reject);
+    });
+  }
+  
   public getCall(): Call {
     const call = this.api.createType('Call', this.extrinsic);
     return call;
+  }
+
+  // eslint-disable-next-line no-shadow
+  private parseBadBlockResult<ApiType extends ApiTypes = 'rxjs', T extends AnyTuple = AnyTuple, N = unknown>(targetEvent?: AugmentedEvent<ApiType, T, N>) {
+    
   }
 
   // eslint-disable-next-line no-shadow
