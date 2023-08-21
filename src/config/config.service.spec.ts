@@ -52,6 +52,7 @@ describe('ReconnectionConfigService', () => {
     GRAPH_ENVIRONMENT_TYPE: undefined,
     GRAPH_ENVIRONMENT_DEV_CONFIG: undefined,
     CAPACITY_LIMIT: undefined,
+    FREQUENCY_TX_TIMEOUT_SECONDS: undefined,
   };
 
   beforeAll(() => {
@@ -276,6 +277,10 @@ describe('ReconnectionConfigService', () => {
 
     it('should get capacity limit', () => {
       expect(reconnectionConfigService.getCapacityLimit()).toStrictEqual(JSON.parse(ALL_ENV.CAPACITY_LIMIT!));
+    });
+
+    it('should get frequency tx timeout seconds', () => {
+      expect(reconnectionConfigService.getFrequencyTxTimeoutSeconds()).toStrictEqual(parseInt(ALL_ENV.FREQUENCY_TX_TIMEOUT_SECONDS as string, 60));
     });
   });
 });

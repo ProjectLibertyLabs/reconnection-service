@@ -32,7 +32,6 @@ import { Codec, ISubmittableResult, AnyTuple } from '@polkadot/types/types';
 import { filter, firstValueFrom, map, pipe, tap, throwError } from 'rxjs';
 import { KeyringPair } from '@polkadot/keyring/types';
 import { EventError } from './event-error';
-import { SECONDS_PER_BLOCK } from '#app/processor/queue-consumer.service';
 import { timeout } from 'rxjs/operators';
 
 export type EventMap = { [key: string]: Event };
@@ -53,11 +52,14 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
 
   public api: ApiRx;
 
-  constructor(api: ApiRx, extrinsic: SubmittableExtrinsic<'rxjs', T>, keys: KeyringPair, targetEvent?: IsEvent<C, N>) {
+  public timeOutSeconds: number;
+
+  constructor(api: ApiRx, extrinsic: SubmittableExtrinsic<'rxjs', T>, keys: KeyringPair, targetEvent?: IsEvent<C, N>, timeOutSeconds = 60) {
     this.extrinsic = extrinsic;
     this.keys = keys;
     this.event = targetEvent;
     this.api = api;
+    this.timeOutSeconds = timeOutSeconds;
   }
 
   public get targetEvent() {
@@ -67,7 +69,7 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
   public signAndSend(nonce?: number): Promise<ParsedEventResult> {
     return firstValueFrom(
       this.extrinsic.signAndSend(this.keys, { nonce }).pipe(
-        timeout({ each: SECONDS_PER_BLOCK * 1000 }),
+        timeout({ each: this.timeOutSeconds}),
         tap(({ status }) => {
           if (!status.isInBlock || !status.isFinalized) {
             this.signAndSend(nonce);

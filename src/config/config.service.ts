@@ -24,6 +24,7 @@ export interface ConfigEnvironmentVariables {
   GRAPH_ENVIRONMENT_DEV_CONFIG: string;
   PROVIDER_ACCOUNT_SEED_PHRASE: string;
   CAPACITY_LIMIT: ICapacityLimit;
+  FREQUENCY_TX_TIMEOUT_SECONDS: number;
 }
 
 /// Config service to get global app and provider-specific config values.
@@ -97,5 +98,9 @@ export class ConfigService {
 
   public getCapacityLimit(): ICapacityLimit {
     return this.capacityLimit;
+  }
+
+  public getFrequencyTxTimeoutSeconds(): number {
+    return this.nestConfigService.get<number>('FREQUENCY_TX_TIMEOUT_SECONDS')!;
   }
 }
