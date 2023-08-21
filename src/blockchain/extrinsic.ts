@@ -28,11 +28,12 @@ import { ApiRx } from '@polkadot/api';
 import { SubmittableExtrinsic, ApiTypes, AugmentedEvent } from '@polkadot/api/types';
 import { Call, Event } from '@polkadot/types/interfaces';
 import { IsEvent } from '@polkadot/types/metadata/decorate/types';
-import { Codec, IEvent, ISubmittableResult, AnyTuple } from '@polkadot/types/types';
-import { catchError, filter, firstValueFrom, map, pipe, tap } from 'rxjs';
+import { Codec, ISubmittableResult, AnyTuple } from '@polkadot/types/types';
+import { filter, firstValueFrom, map, pipe, tap, throwError } from 'rxjs';
 import { KeyringPair } from '@polkadot/keyring/types';
 import { EventError } from './event-error';
 import { SECONDS_PER_BLOCK } from '#app/processor/queue-consumer.service';
+import { timeout } from 'rxjs/operators';
 
 export type EventMap = { [key: string]: Event };
 
@@ -66,18 +67,17 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
   public signAndSend(nonce?: number): Promise<ParsedEventResult> {
     return firstValueFrom(
       this.extrinsic.signAndSend(this.keys, { nonce }).pipe(
+        timeout({ each: SECONDS_PER_BLOCK * 1000 }),
         tap(({ status }) => {
           if (!status.isInBlock || !status.isFinalized) {
-            setTimeout(() => {
-              this.signAndSend(nonce);
-            }
-            , SECONDS_PER_BLOCK);
+            this.signAndSend(nonce);
           }
         }),
         this.parseResult(this.event),
       ),
     );
   }
+  
 
   public payWithCapacity(nonce?: number): Promise<ParsedEventResult> {
     return firstValueFrom(
