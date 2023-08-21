@@ -69,7 +69,7 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
   public signAndSend(nonce?: number): Promise<ParsedEventResult> {
     return firstValueFrom(
       this.extrinsic.signAndSend(this.keys, { nonce }).pipe(
-        timeout({ each: this.timeOutSeconds}),
+        timeout({ each: this.timeOutSeconds * 1000 }),
         tap(({ status }) => {
           if (!status.isInBlock || !status.isFinalized) {
             this.signAndSend(nonce);
