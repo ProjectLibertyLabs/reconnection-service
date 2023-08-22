@@ -85,7 +85,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     ...args: (any | undefined)[]
   ): Extrinsic {
     const targetEvent = eventPallet && event ? this.api.events[eventPallet][event] : undefined;
-    return new Extrinsic(this.api, this.api.tx[pallet][extrinsic](...args), keys, targetEvent);
+    return new Extrinsic(this.api, this.api.tx[pallet][extrinsic](...args), keys, targetEvent, this.configService.getFrequencyTxTimeoutSeconds());
   }
 
   public rpc(pallet: string, rpc: string, ...args: (any | undefined)[]): Promise<any> {

@@ -28,10 +28,11 @@ import { ApiRx } from '@polkadot/api';
 import { SubmittableExtrinsic, ApiTypes, AugmentedEvent } from '@polkadot/api/types';
 import { Call, Event } from '@polkadot/types/interfaces';
 import { IsEvent } from '@polkadot/types/metadata/decorate/types';
-import { Codec, IEvent, ISubmittableResult, AnyTuple } from '@polkadot/types/types';
-import { filter, firstValueFrom, map, pipe, tap } from 'rxjs';
+import { Codec, ISubmittableResult, AnyTuple } from '@polkadot/types/types';
+import { filter, firstValueFrom, map, pipe, tap, throwError } from 'rxjs';
 import { KeyringPair } from '@polkadot/keyring/types';
 import { EventError } from './event-error';
+import { timeout } from 'rxjs/operators';
 
 export type EventMap = { [key: string]: Event };
 
@@ -51,11 +52,14 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
 
   public api: ApiRx;
 
-  constructor(api: ApiRx, extrinsic: SubmittableExtrinsic<'rxjs', T>, keys: KeyringPair, targetEvent?: IsEvent<C, N>) {
+  public timeOutSeconds: number;
+
+  constructor(api: ApiRx, extrinsic: SubmittableExtrinsic<'rxjs', T>, keys: KeyringPair, targetEvent?: IsEvent<C, N>, timeOutSeconds = 60) {
     this.extrinsic = extrinsic;
     this.keys = keys;
     this.event = targetEvent;
     this.api = api;
+    this.timeOutSeconds = timeOutSeconds;
   }
 
   public get targetEvent() {
@@ -65,11 +69,17 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
   public signAndSend(nonce?: number): Promise<ParsedEventResult> {
     return firstValueFrom(
       this.extrinsic.signAndSend(this.keys, { nonce }).pipe(
-        filter(({ status }) => status.isInBlock || status.isFinalized),
+        timeout({ each: this.timeOutSeconds * 1000 }),
+        tap(({ status }) => {
+          if (!status.isInBlock || !status.isFinalized) {
+            this.signAndSend(nonce);
+          }
+        }),
         this.parseResult(this.event),
       ),
     );
   }
+  
 
   public payWithCapacity(nonce?: number): Promise<ParsedEventResult> {
     return firstValueFrom(

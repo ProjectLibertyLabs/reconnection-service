@@ -75,5 +75,6 @@ export const configModuleOptions: ConfigModuleOptions = {
         return value;
       })
       .required(),
+    FREQUENCY_TX_TIMEOUT_SECONDS: Joi.number().min(12).default(60),
   }),
 };
