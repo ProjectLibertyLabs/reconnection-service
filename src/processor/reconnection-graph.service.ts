@@ -256,7 +256,7 @@ export class ReconnectionGraphService {
     }
 
     // If no pages to import, import at least one empty page so that user graph will be created
-    if (publicFollows.length + privateFollows.length + privateFriendships.length === 0) {
+    if (publicFollows.length + privateFollows.length + privateFriendships.length === 0 && (graphKeyPairs.length > 0 || dsnpKeys?.keys.length > 0)) {
       this.logger.verbose(`No graph pages to import for user ${dsnpUserId.toString()}; creating empty or keys-only import bundle`);
       let builder = importBundleBuilder.withDsnpUserId(dsnpUserId.toString()).withSchemaId(privateFollowSchemaId);
 
@@ -439,8 +439,9 @@ export class ReconnectionGraphService {
       const [event, eventMap] = await this.blockchainService
         .createExtrinsic({ pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, { eventPallet: 'utility', event: 'BatchCompleted' }, providerKeys, batch)
         .signAndSend();
+      this.logger.debug(`result of signAndSend for user ${dsnpUserId.toString()}: ${JSON.stringify(event)} ${JSON.stringify(eventMap)}`);
       if (!event || !this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
-        // if we dont get any events, covering any unexpected connection errors
+        // if we dont get code events, covering any unexpected connection errors
         throw new Error(`No events were found for ${dsnpUserId.toString()}`);
       }
       const capacityWithDrawn = BigInt(eventMap['capacity.CapacityWithdrawn'].data[1].toString());
