@@ -30,6 +30,10 @@
   },
   "homepage": "https://github.com/AmplicaLabs/reconnection-service#readme",
   "dependencies": {
+    "@bull-board/api": "^5.8.4",
+    "@bull-board/express": "^5.8.4",
+    "@bull-board/nestjs": "^5.8.4",
+    "@bull-board/ui": "^5.8.4",
     "@dsnp/graph-sdk": "^1.0.1",
     "@frequency-chain/api-augment": "1.7.0",
     "@liaoliaots/nestjs-redis": "^9.0.5",
