@@ -26,10 +26,7 @@ paths:
           description: DSNPId of the user's social connections to return
           required: true
           schema:
-            type: integer
-            format: int64  # Represents a 64-bit integer
-            minimum: 1     # Ensures the integer is non-negative
-            maximum: 18446744073709551615  # Maximum value of a u64
+            type: string
         - name: pagination
           in: query
           description: Pagination parameters
@@ -78,9 +75,7 @@ components:
       type: object
       properties:
         dsnpId:
-          type: integer
-          format: int64
-          example: 10
+          type: string
         connections:
           $ref: '#/components/schemas/Connections'
         graphKeyPairs:
@@ -105,15 +100,15 @@ components:
         name: connections
       example:
         data:
-          - dsnpId: 1024
+          - dsnpId: "1024"
             privacyType: "Public"
             direction: "connectionTo"
             connectionType: "Follow"
-          - dsnpId: 2048
+          - dsnpId: "2048"
             privacyType: "Private"
             direction: "bidirectional"
             connectionType: "Friendship"
-          - dsnpId: 3072
+          - dsnpId: "3072"
             privacyType: "Public"
             direction: "connectionFrom"
             connectionType: "Follow"
@@ -125,8 +120,7 @@ components:
       type: object
       properties:
         dsnpId:
-          type: integer
-          format: int64
+          type: string
         privacyType:
           type: string
           enum:
