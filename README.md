@@ -139,6 +139,7 @@ dsnp4 -->|no| dsnp7(Show non-provider\nuser as an external\nDSNP user)
 ### Running the development environment
 
 Note: Check docker compose file for various services it will start.
+Note: If `graphQueue` is paused, then it means we are out of capacity and need to stake more capacity, in such cases the pause it put for one epoch and then it will resume automatically.
 
 1. Start the development environment
 
@@ -151,4 +152,4 @@ Note: Check docker compose file for various services it will start.
 3. Go to [Polkadotjs](https://polkadot.js.org) and connect to the local development node.
 4. Fund MSA 1 (Provider) and stake some capacity, in graph migration setup scenario MSA 1 is the provider.
 5. Reconnection service will scan the chain and find delegation for PROVIDER_ID set in `.env.docker.dev` file and will start processing the graph migration.
-6. Make sure websocket data is sending correct response when reconnection service is request graph data from provider.
+6. Make sure websocket data is sending correct response when reconnection service is requesting  graph data from provider.
