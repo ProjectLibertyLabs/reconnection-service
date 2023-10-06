@@ -85,7 +85,9 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
 
     try {
       const totalCapacityUsed = await this.graphSdkService.updateUserGraph(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
-      await this.setEpochCapacity(totalCapacityUsed);
+      if (Object.keys(totalCapacityUsed).length > 0) {
+        await this.setEpochCapacity(totalCapacityUsed);
+      }
       this.logger.verbose(`Successfully completed job ${job.id}`);
     } catch (e) {
       this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);

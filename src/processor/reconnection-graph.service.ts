@@ -61,6 +61,10 @@ export class ReconnectionGraphService {
       // using graphConnections form Action[] and update the user's DSNP Graph
       const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, updateConnections, graphConnections);
       try {
+        if (actions.length === 0) {
+          this.logger.debug(`No actions to apply for user ${dsnpUserId.toString()}`);
+          return {};
+        }
         this.graphStateManager.applyActions(actions, true);
       } catch (e: any) {
         const errMessage = e instanceof Error ? e.message : '';
