@@ -7,7 +7,7 @@
     "build": "npx tsc",
     "start": "env TS_NODE_BASEURL=./dist/src node -r tsconfig-paths/register dist/src/main.js",
     "start:dev": "set -a ; . .env.dev ; ts-node-dev -r tsconfig-paths/register src/main.ts",
-    "start:dev:docker": "npm ci && ts-node-dev -r tsconfig-paths/register src/main.ts",
+    "start:dev:docker": "npm i && ts-node-dev -r tsconfig-paths/register src/main.ts",
     "docker-build": "docker build -t reconnection-service .",
     "docker-build:dev": "docker-compose -f docker-compose.dev.yaml build",
     "docker-run": "docker build -t reconnection-service-deploy . ; docker run -p 6379:6379 --env-file .env.dev reconnection-service-deploy",
