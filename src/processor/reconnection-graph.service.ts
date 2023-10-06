@@ -133,16 +133,8 @@ export class ReconnectionGraphService {
         throw new Error(`Error re-importing bundles for ${dsnpUserId.toString()}`);
       }
       return totalCapacityUsed;
-    } catch (err: any) {
+    } catch (err) {
       this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${(err as Error).stack}`);
-      if (err instanceof errors.UnknownError || err instanceof errors.GetUserGraphError) {
-        if (updateConnections) {
-          /// if updateConnections is true, we want to queue a graph update job and pause the queue
-          const delay = SECONDS_PER_BLOCK;
-          this.graphUpdateQueue.removeRepeatableByKey(jobIdNT);
-          this.graphUpdateQueue.add(jobIdNT, dataNT, { jobId: jobIdNT, delay });
-        }
-      }
       throw err;
     } finally {
       this.graphStateManager.removeUserGraph(dsnpUserId.toString());
@@ -356,7 +348,7 @@ export class ReconnectionGraphService {
           case 'connectionFrom': {
             if (isTransitive && isDelegatedConnection.unwrap_or([]).some((grant) => grant.schema_id.toNumber() === schemaId)) {
               const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-              this.graphUpdateQueue.removeRepeatableByKey(jobId);
+              this.graphUpdateQueue.remove(jobId);
               this.graphUpdateQueue.add(jobId, data, { jobId });
             }
             break;
@@ -379,7 +371,7 @@ export class ReconnectionGraphService {
 
             if (isTransitive && isDelegatedConnection.unwrap_or([]).some((grant) => grant.schema_id.toNumber() === schemaId)) {
               const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-              this.graphUpdateQueue.removeRepeatableByKey(jobId);
+              this.graphUpdateQueue.remove(jobId);
               this.graphUpdateQueue.add(jobId, data, { jobId });
             }
             break;
@@ -419,7 +411,10 @@ export class ReconnectionGraphService {
 
       this.logger.debug(`Processing ${batchPromises.length} batches for user ${dsnpUserId.toString()}`);
       const totalCapUsedPerEpoch = await Promise.all(batchPromises);
-      this.logger.debug(`Processed ${batchPromises.length} batches for user ${dsnpUserId.toString()}`);
+      this.logger.debug(`Processed ${batchPromises.length} batches for user ${dsnpUserId.toString()}`);      
+      if (totalCapUsedPerEpoch.length === 0) {
+        return {};
+      }
       const totalCapacityUsed = totalCapUsedPerEpoch.reduce((acc, curr) => {
         const epoch = Object.keys(curr)[0];
         if (acc[epoch]) {

@@ -46,7 +46,7 @@ import { ExpressAdapter } from '@bull-board/express';
     BullModule.registerQueue({
       name: 'graphUpdateQueue',
       defaultJobOptions: {
-        attempts: 1,
+        attempts: 3,
         backoff: {
           type: 'exponential',
         },

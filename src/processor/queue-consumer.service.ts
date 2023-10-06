@@ -8,7 +8,7 @@ import { ConfigService } from '#app/config/config.service';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { CapacityLowError } from './errors';
+import { CapacityLowError, StaleHashError, UnknownError } from './errors';
 import { InjectRedis } from '@liaoliaots/nestjs-redis';
 import Redis from 'ioredis';
 
@@ -91,17 +91,19 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
       this.logger.verbose(`Successfully completed job ${job.id}`);
     } catch (e) {
       this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);
-      if(e instanceof CapacityLowError){
+      if((e instanceof CapacityLowError || e instanceof UnknownError || e instanceof StaleHashError) && (job.attemptsMade < (job.opts.attempts ?? 3))) {
         // if capacity is low, saying for some failing transactions
         // add delay to job and continue
         // all failing txs due to low capacity will be delayed until next epoch
         const capacity = await this.blockchainService.capacityInfo(this.configService.getProviderId());
         const blocksRemaining = capacity.nextEpochStart - capacity.currentBlockNumber;
-        const delay = blocksRemaining * SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
+        let blockDelay = SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
+        const delay = e instanceof CapacityLowError ? blocksRemaining * blockDelay : blockDelay;
         this.logger.debug(`Adding delay to job ${job.id} for ${delay}ms`);
-        const {key: delayJobId, data: delayJobData} = createGraphUpdateJob(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
-        await this.graphUpdateQueue.removeRepeatableByKey(delayJobId);
+        const {key: delayJobId, data: delayJobData} = createGraphUpdateJob(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates, delay.toString());
+        await this.graphUpdateQueue.remove(delayJobId);
         await this.graphUpdateQueue.add(delayJobId, delayJobData, {jobId: delayJobId, delay});
+        throw e;
       }
       throw e;
     } finally {

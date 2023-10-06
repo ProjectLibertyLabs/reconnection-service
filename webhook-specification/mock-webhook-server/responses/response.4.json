@@ -1,0 +1,33 @@
+{
+    "dsnpId": "4",
+    "connections": {
+      "data": [
+        {
+          "dsnpId": "3",
+          "privacyType": "Public",
+          "direction": "connectionTo",
+          "connectionType": "Follow"
+        },
+        {
+          "dsnpId": "2",
+          "privacyType": "Public",
+          "direction": "connectionTo",
+          "connectionType": "Follow"
+        },
+        {
+          "dsnpId": "5",
+          "privacyType": "Public",
+          "direction": "connectionTo",
+          "connectionType": "Follow"
+        },
+        {
+          "dsnpId": "6",
+          "privacyType": "Public",
+          "direction": "connectionTo",
+          "connectionType": "Follow"
+        }
+      ]
+    },
+    
+    "graphKeyPairs": []
+  }
