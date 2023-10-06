@@ -1,19 +1,6 @@
 version: '3'
 
 services:
-  reconnection-service:
-    build:
-      context: .
-      dockerfile: dev.Dockerfile
-    ports:
-      - 3000:3000
-    env_file:
-      - .env.docker.dev
-    volumes:
-    - ./:/app
-    networks:
-      - reconnection-service-network-dev
-
   redis:
     image: redis:latest
     ports:
@@ -40,6 +27,22 @@ services:
       - 3001:3001
     volumes:
       - ./webhook-specification/mock-webhook-server:/app
+    networks:
+      - reconnection-service-network-dev
+  reconnection-service:
+    depends_on:
+      - redis
+      - frequency
+      - webhook
+    build:
+      context: .
+      dockerfile: dev.Dockerfile
+    ports:
+      - 3000:3000
+    env_file:
+      - .env.docker.dev
+    volumes:
+    - ./:/app
     networks:
       - reconnection-service-network-dev
 

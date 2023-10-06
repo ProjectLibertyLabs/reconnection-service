@@ -1,7 +1,9 @@
 # Graph Reconnection Service
+
 A microservice to reconnect graphs in DSNP/Frequency
 
 ## Overview/Design
+
 The Graph Reconnection Service is designed to be hosted by a Provider inside their own environment. The service will scan the Frequency chain for new delegations to the Provider delegating Graph schema permissions for a user. The service then requests the user's Provider Graph and keys from the Provider, and updates the user's graph on-chain.
 
 The following diagrams are intended as a guide for providers to understand how to work with DSNP's social graph.
@@ -26,6 +28,7 @@ flowchart LR
 ## Reconnection Service
 
 ### Graph Update Flow to Blockchain
+
 The following diagram illustrates the differences in what is required to update a user's graph on-chain for different types of graphs: Public vs. Private, and Follow vs. Friendship. As shown, Private graph updates require the user's graph encryption keys, as Private graph data is stored encrypted on-chain. An additional requirement for Private Friendship also requires the counterparty's public graph encryption key. This enables the construction of a shared secret, a PRId, which is used to securely represent the connection in a public way. (The PRId is stored publicly on-chain, but the other side of the connection cannot be derived from it.)
 
 ```mermaid
@@ -37,7 +40,9 @@ priFriend2 --> priFriend5(Create PRId Data)
 ```
 
 ### Sequence Diagram
+
 The following sequence diagram illustrates an example event flow where three users (Alice, Bob, and Charlie), who are all mutually friends, onboard to DSNP at different times & have their social graphs migrated to DSNP in stages.
+
 ```mermaid
 sequenceDiagram;
 Note left of P:Initial state:<br/>Alice <-Provider-> Bob<br/>Alice <-Provider-> Charlie<br/>Bob <-Provider-> Charlie
@@ -101,7 +106,9 @@ Note left of P:Initial state:<br/>Alice <-Provider-> Bob<br/>Alice <-Provider-> 
 ```
 
 ## Other Graph Scenarios
+
 ### Handling External DSNP User Data Changes
+
 Though outside the responsibility of the Graph Reconnection Service, it's relevant to understand how a provider application might incorporate changes made by other actors on the blockchain into their own platform.
 
 When a user's graph is modified (whether by themselves or another provider to whom permission has been delegated), a page updated event is published on the blockchain. By correlating the schema ID contained in this event with the known schema IDs for the social graph, a provider can determine whether a user's graph has been updated, and synchronize the authoritative blockchain version of the graph with their own internal representation.
@@ -115,3 +122,33 @@ dsnp4 -->|yes| dsnp5("Apply deltas to\nprovider graph")
 dsnp2 -->|no| dsnp6(No action required)
 dsnp4 -->|no| dsnp7(Show non-provider\nuser as an external\nDSNP user)
 ```
+
+## Docker compose development environment
+
+### Prerequisites
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop) for your platform
+2. Clone this repository
+
+    ```bash
+    git clone https://github.com/LibertyDSNP/reconnection-service.git
+    ```
+
+3. Check for values in `.env.docker.dev` file and update as needed
+
+### Running the development environment
+
+Note: Check docker compose file for various services it will start.
+
+1. Start the development environment
+
+    ```bash
+    docker-compose -f docker-compose.dev.yml up
+    ```
+
+2. Run the [graph-migration-setup](https://github.com/LibertyDSNP/frequency-scenario-template/tree/main/graph-migration-setup) scenario to create the necessary accounts and delegations
+
+3. Go to [Polkadotjs](https://polkadot.js.org) and connect to the local development node.
+4. Fund MSA 1 (Provider) and stake some capacity, in graph migration setup scenario MSA 1 is the provider.
+5. Reconnection service will scan the chain and find delegation for PROVIDER_ID set in `.env.docker.dev` file and will start processing the graph migration.
+6. Make sure websocket data is sending correct response when reconnection service is request graph data from provider.
