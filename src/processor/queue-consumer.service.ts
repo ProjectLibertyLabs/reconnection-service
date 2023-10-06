@@ -100,8 +100,8 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
         const delay = blocksRemaining * SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
         this.logger.debug(`Adding delay to job ${job.id} for ${delay}ms`);
         const {key: delayJobId, data: delayJobData} = createGraphUpdateJob(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
-        await this.graphUpdateQueue.add(delayJobId, delayJobData, {delay});
-        return;
+        await this.graphUpdateQueue.removeRepeatableByKey(delayJobId);
+        await this.graphUpdateQueue.add(delayJobId, delayJobData, {jobId: delayJobId, delay});
       }
       throw e;
     } finally {
@@ -123,12 +123,6 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     if (!this.capacityExhausted) {
       await this.graphUpdateQueue.resume();
     }
-  }
-
-  @OnEvent('error.graph', { async: true, promisify: true })
-  private async handleUnknownError(error: Error) {
-    this.logger.error(`Received error.graph event: ${error.message}`);
-    process.exit(1);
   }
 
   @OnEvent('capacity.exhausted', { async: true, promisify: true })

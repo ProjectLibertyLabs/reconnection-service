@@ -50,7 +50,7 @@ import { ExpressAdapter } from '@bull-board/express';
         backoff: {
           type: 'exponential',
         },
-        removeOnComplete: false,
+        removeOnComplete: true,
         removeOnFail: false,
       },
     }),

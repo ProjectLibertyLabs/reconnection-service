@@ -19,6 +19,7 @@ import { ConfigService } from '../config/config.service';
 import { ProviderWebhookService } from './provider-webhook.service';
 
 import * as errors from './errors';
+import { SECONDS_PER_BLOCK } from './queue-consumer.service';
 
 @Injectable()
 export class ReconnectionGraphService {
@@ -137,9 +138,10 @@ export class ReconnectionGraphService {
       if (err instanceof errors.UnknownError || err instanceof errors.GetUserGraphError) {
         if (updateConnections) {
           /// if updateConnections is true, we want to queue a graph update job and pause the queue
-          this.graphUpdateQueue.add('graphUpdate', dataNT, { jobId: jobIdNT });
+          const delay = SECONDS_PER_BLOCK;
+          this.graphUpdateQueue.removeRepeatableByKey(jobIdNT);
+          this.graphUpdateQueue.add(jobIdNT, dataNT, { jobId: jobIdNT, delay });
         }
-        this.eventEmitter.emitAsync('error.graph', err);
       }
       throw err;
     } finally {
@@ -354,7 +356,8 @@ export class ReconnectionGraphService {
           case 'connectionFrom': {
             if (isTransitive && isDelegatedConnection.unwrap_or([]).some((grant) => grant.schema_id.toNumber() === schemaId)) {
               const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-              this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+              this.graphUpdateQueue.removeRepeatableByKey(jobId);
+              this.graphUpdateQueue.add(jobId, data, { jobId });
             }
             break;
           }
@@ -376,7 +379,8 @@ export class ReconnectionGraphService {
 
             if (isTransitive && isDelegatedConnection.unwrap_or([]).some((grant) => grant.schema_id.toNumber() === schemaId)) {
               const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-              this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+              this.graphUpdateQueue.removeRepeatableByKey(jobId);
+              this.graphUpdateQueue.add(jobId, data, { jobId });
             }
             break;
           }
@@ -433,22 +437,21 @@ export class ReconnectionGraphService {
   }
 
   async processSingleBatch(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]): Promise<{[key: string]: bigint}> {
-    this.logger.debug(`Submitting batch for user ${dsnpUserId.toString()}`);
+    this.logger.debug(`Submitting batch for user ${dsnpUserId.toString()}, batch length: ${batch.length}, batch: ${JSON.stringify(batch)}`);
     try {
       const currrentEpoch = await this.blockchainService.getCurrentCapacityEpoch();
       const [event, eventMap] = await this.blockchainService
         .createExtrinsic({ pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, { eventPallet: 'utility', event: 'BatchCompleted' }, providerKeys, batch)
         .signAndSend();
-      this.logger.debug(`result of signAndSend for user ${dsnpUserId.toString()}: ${JSON.stringify(event)} ${JSON.stringify(eventMap)}`);
       if (!event || !this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
         // if we dont get code events, covering any unexpected connection errors
-        throw new Error(`No events were found for ${dsnpUserId.toString()}`);
+        throw new Error(`Unexpected event received: ${JSON.stringify(event)}: re-trying to refresh graph state`);
       }
       const capacityWithDrawn = BigInt(eventMap['capacity.CapacityWithdrawn'].data[1].toString());
       this.logger.debug(`Batch submitted for user ${dsnpUserId.toString()}`);
       this.logger.debug(`Capacity withdrawn for user ${dsnpUserId.toString()}: ${capacityWithDrawn}`);
       return { [currrentEpoch.toString()]: capacityWithDrawn };
-    } catch (e) {
+    } catch (e: any) {
       this.logger.error(`Error processing batch for ${dsnpUserId.toString()}: ${e}`);
       // Following errors includes are checked against
       // 1. Inability to pay some fees`
@@ -460,7 +463,7 @@ export class ReconnectionGraphService {
       }
       /// any errors we dont recognize, such as bad schema_id, etc
       /// in such cases we should not retry the job
-      throw new errors.UnknownError(JSON.stringify(e));
+      throw new errors.UnknownError(e as Error);
     }
   }
 }
