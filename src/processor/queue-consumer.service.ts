@@ -100,7 +100,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
         let blockDelay = SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
         const delay = e instanceof CapacityLowError ? blocksRemaining * blockDelay : blockDelay;
         this.logger.debug(`Adding delay to job ${job.id} for ${delay}ms`);
-        const {key: delayJobId, data: delayJobData} = createGraphUpdateJob(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates, delay.toString());
+        const {key: delayJobId, data: delayJobData} = createGraphUpdateJob(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
         await this.graphUpdateQueue.remove(delayJobId);
         await this.graphUpdateQueue.add(delayJobId, delayJobData, {jobId: delayJobId, delay});
         throw e;
