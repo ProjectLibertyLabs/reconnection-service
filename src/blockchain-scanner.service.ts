@@ -92,7 +92,7 @@ export class BlockchainScannerService implements OnApplicationBootstrap {
         }
         const jobs = filteredEvents.map(({ event }) => {
           const { key: jobId, data } = createGraphUpdateJob(event.data.delegatorId, event.data.providerId, UpdateTransitiveGraphs);
-          return this.graphUpdateQueue.add(jobId, data, { jobId });
+          return this.graphUpdateQueue.add(`graphUpdate:${event.data.delegatorId}`, data, { jobId });
         });
 
         // eslint-disable-next-line no-await-in-loop

@@ -348,7 +348,7 @@ export class ReconnectionGraphService {
             if (isTransitive && isDelegatedConnection.unwrap_or([]).some((grant) => grant.schema_id.toNumber() === schemaId)) {
               const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
               this.graphUpdateQueue.remove(jobId);
-              this.graphUpdateQueue.add(jobId, data, { jobId });
+              this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
             }
             break;
           }
@@ -371,7 +371,7 @@ export class ReconnectionGraphService {
             if (isTransitive && isDelegatedConnection.unwrap_or([]).some((grant) => grant.schema_id.toNumber() === schemaId)) {
               const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
               this.graphUpdateQueue.remove(jobId);
-              this.graphUpdateQueue.add(jobId, data, { jobId });
+              this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
             }
             break;
           }

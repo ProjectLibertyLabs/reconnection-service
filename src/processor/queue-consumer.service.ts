@@ -102,7 +102,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
         this.logger.debug(`Adding delay to job ${job.id} for ${delay}ms`);
         const {key: delayJobId, data: delayJobData} = createGraphUpdateJob(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
         await this.graphUpdateQueue.remove(delayJobId);
-        await this.graphUpdateQueue.add(delayJobId, delayJobData, {jobId: delayJobId, delay});
+        await this.graphUpdateQueue.add(`graphUpdate:${delayJobData.dsnpId}`, delayJobData, {jobId: delayJobId, delay});
         throw e;
       }
       throw e;
