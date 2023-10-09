@@ -250,8 +250,7 @@ export class ReconnectionGraphService {
     }
 
     // If no pages to import, import at least one empty page so that user graph will be created
-    if (publicFollows.length + privateFollows.length + privateFriendships.length === 0 && (graphKeyPairs.length > 0 || dsnpKeys?.keys.length > 0)) {
-      this.logger.verbose(`No graph pages to import for user ${dsnpUserId.toString()}; creating empty or keys-only import bundle`);
+    if (privateFollows.length > 0 || privateFriendships.length > 0) {
       let builder = importBundleBuilder.withDsnpUserId(dsnpUserId.toString()).withSchemaId(privateFollowSchemaId);
 
       if (dsnpKeys?.keys?.length > 0) {
