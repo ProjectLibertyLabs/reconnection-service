@@ -100,7 +100,7 @@ export class DevelopmentController {
       const { action, ...debugOptions } = debugData;
       options = { ...options, ...debugOptions };
     }
-    await this.graphUpdateQueue.add(jobId, data, options);
+    return this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, options);
   }
 
   @Post('update/graph')
