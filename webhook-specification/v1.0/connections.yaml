@@ -138,12 +138,9 @@ components:
             - Follow
             - Friendship
     GraphKeyPairs:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/GraphKeyPair'
+      type: array
+      items:
+        $ref: '#/components/schemas/GraphKeyPair'
     GraphKeyPair:
       type: object
       properties:
