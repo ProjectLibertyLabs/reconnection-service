@@ -91,7 +91,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
       this.logger.verbose(`Successfully completed job ${job.id}`);
     } catch (e) {
       this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);
-      const isDeadLetter  = job.id?.search(this.configService.getDeadLetterPrefix()) === 0;
+      const isDeadLetter  = (job.id?.search(this.configService.getDeadLetterPrefix())?? 0 > 0);
       if(!isDeadLetter && (e instanceof CapacityLowError || e instanceof UnknownError || e instanceof StaleHashError) && (job.attemptsMade < (job.opts.attempts ?? 3))) {
         // if capacity is low, saying for some failing transactions
         // add delay to job and continue
