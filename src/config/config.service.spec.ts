@@ -285,6 +285,6 @@ describe('ReconnectionConfigService', () => {
 
     it('should get dead letter job prefix', () => {
       expect(reconnectionConfigService.getDeadLetterPrefix()).toStrictEqual(ALL_ENV.DEAD_LETTER_JOB_PREFIX);
-    }
+    });
   });
 });
