@@ -53,6 +53,7 @@ describe('ReconnectionConfigService', () => {
     GRAPH_ENVIRONMENT_DEV_CONFIG: undefined,
     CAPACITY_LIMIT: undefined,
     FREQUENCY_TX_TIMEOUT_SECONDS: undefined,
+    DEAD_LETTER_JOB_PREFIX: undefined,
   };
 
   beforeAll(() => {
