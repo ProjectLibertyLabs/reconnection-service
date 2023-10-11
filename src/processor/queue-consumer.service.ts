@@ -92,7 +92,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     } catch (e) {
       this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);
       const isDeadLetter  = job.id?.search(this.configService.getDeadLetterPrefix()) === 0;
-      if(!isDeadLetter && (e instanceof CapacityLowError || e instanceof UnknownError || e instanceof StaleHashError) && (job.attemptsMade < (job.opts.attempts ?? 3))) {
+      if(!isDeadLetter && (job.attemptsMade === 0) && job.id) {
         // if capacity is low, saying for some failing transactions
         // add delay to job and continue
         // all failing txs due to low capacity will be delayed until next epoch
@@ -104,6 +104,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
         const {key: delayJobId, data: delayJobData} = createGraphUpdateJob(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
         const deadLetterDelayedJobId = `${this.configService.getDeadLetterPrefix()}${delayJobId}`
         await this.graphUpdateQueue.remove(deadLetterDelayedJobId);
+        await this.graphUpdateQueue.remove(job.id);
         await this.graphUpdateQueue.add(`graphUpdate:${delayJobData.dsnpId}`, delayJobData, {jobId: deadLetterDelayedJobId, delay});
       }
       throw e;
