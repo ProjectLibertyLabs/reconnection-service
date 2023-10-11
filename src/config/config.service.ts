@@ -25,6 +25,7 @@ export interface ConfigEnvironmentVariables {
   PROVIDER_ACCOUNT_SEED_PHRASE: string;
   CAPACITY_LIMIT: ICapacityLimit;
   FREQUENCY_TX_TIMEOUT_SECONDS: number;
+  DEAD_LETTER_JOB_PREFIX: string;
 }
 
 /// Config service to get global app and provider-specific config values.
@@ -102,5 +103,9 @@ export class ConfigService {
 
   public getFrequencyTxTimeoutSeconds(): number {
     return this.nestConfigService.get<number>('FREQUENCY_TX_TIMEOUT_SECONDS')!;
+  }
+
+  public getDeadLetterPrefix(): string {
+    return this.nestConfigService.get<string>('DEAD_LETTER_JOB_PREFIX')!;
   }
 }

@@ -27,8 +27,8 @@ export class StaleHashError extends Error {
 }
 
 export class UnknownError extends Error {
-    constructor(message: string) {
-      super(message);
+    constructor(error: Error) {
+      super(error.message);
       this.name = "UnknownError";
     }
 }

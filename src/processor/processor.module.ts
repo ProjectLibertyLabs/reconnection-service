@@ -13,6 +13,9 @@ import { ReconnectionGraphService } from './reconnection-graph.service';
 import { GraphManagerModule } from '../graph/graph-state.module';
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { ProviderWebhookService } from './provider-webhook.service';
+import { BullBoardModule } from '@bull-board/nestjs';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
+import { ExpressAdapter } from '@bull-board/express';
 
 @Module({
   imports: [
@@ -43,13 +46,23 @@ import { ProviderWebhookService } from './provider-webhook.service';
     BullModule.registerQueue({
       name: 'graphUpdateQueue',
       defaultJobOptions: {
-        attempts: 1,
+        attempts: 3,
         backoff: {
           type: 'exponential',
         },
         removeOnComplete: true,
-        removeOnFail: true,
+        removeOnFail: false,
       },
+    }),
+
+    // Bullboard UI
+    BullBoardModule.forRoot({
+      route: '/queues',
+      adapter: ExpressAdapter,
+    }),
+    BullBoardModule.forFeature({
+      name: 'graphUpdateQueue',
+      adapter: BullMQAdapter,
     }),
     ConfigModule,
     GraphManagerModule,

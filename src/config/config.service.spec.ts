@@ -53,6 +53,7 @@ describe('ReconnectionConfigService', () => {
     GRAPH_ENVIRONMENT_DEV_CONFIG: undefined,
     CAPACITY_LIMIT: undefined,
     FREQUENCY_TX_TIMEOUT_SECONDS: undefined,
+    DEAD_LETTER_JOB_PREFIX: undefined,
   };
 
   beforeAll(() => {
@@ -281,6 +282,10 @@ describe('ReconnectionConfigService', () => {
 
     it('should get frequency tx timeout seconds', () => {
       expect(reconnectionConfigService.getFrequencyTxTimeoutSeconds()).toStrictEqual(parseInt(ALL_ENV.FREQUENCY_TX_TIMEOUT_SECONDS as string, 10));
+    });
+
+    it('should get dead letter job prefix', () => {
+      expect(reconnectionConfigService.getDeadLetterPrefix()).toStrictEqual(ALL_ENV.DEAD_LETTER_JOB_PREFIX);
     });
   });
 });

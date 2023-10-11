@@ -8,7 +8,7 @@ import { ConfigService } from '#app/config/config.service';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { CapacityLowError } from './errors';
+import { CapacityLowError, StaleHashError, UnknownError } from './errors';
 import { InjectRedis } from '@liaoliaots/nestjs-redis';
 import Redis from 'ioredis';
 
@@ -85,21 +85,27 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
 
     try {
       const totalCapacityUsed = await this.graphSdkService.updateUserGraph(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
-      await this.setEpochCapacity(totalCapacityUsed);
+      if (Object.keys(totalCapacityUsed).length > 0) {
+        await this.setEpochCapacity(totalCapacityUsed);
+      }
       this.logger.verbose(`Successfully completed job ${job.id}`);
     } catch (e) {
       this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);
-      if(e instanceof CapacityLowError){
+      const isDeadLetter  = job.id?.search(this.configService.getDeadLetterPrefix()) === 0;
+      if(!isDeadLetter && (job.attemptsMade === 1) && job.id) {
         // if capacity is low, saying for some failing transactions
         // add delay to job and continue
         // all failing txs due to low capacity will be delayed until next epoch
         const capacity = await this.blockchainService.capacityInfo(this.configService.getProviderId());
         const blocksRemaining = capacity.nextEpochStart - capacity.currentBlockNumber;
-        const delay = blocksRemaining * SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
+        let blockDelay = SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
+        const delay = e instanceof CapacityLowError ? blocksRemaining * blockDelay : blockDelay;
         this.logger.debug(`Adding delay to job ${job.id} for ${delay}ms`);
         const {key: delayJobId, data: delayJobData} = createGraphUpdateJob(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
-        await this.graphUpdateQueue.add(delayJobId, delayJobData, {delay});
-        return;
+        const deadLetterDelayedJobId = `${this.configService.getDeadLetterPrefix()}${delayJobId}`
+        await this.graphUpdateQueue.remove(deadLetterDelayedJobId);
+        await this.graphUpdateQueue.remove(job.id);
+        await this.graphUpdateQueue.add(`graphUpdate:${delayJobData.dsnpId}`, delayJobData, {jobId: deadLetterDelayedJobId, delay});
       }
       throw e;
     } finally {
@@ -121,12 +127,6 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     if (!this.capacityExhausted) {
       await this.graphUpdateQueue.resume();
     }
-  }
-
-  @OnEvent('error.graph', { async: true, promisify: true })
-  private async handleUnknownError(error: Error) {
-    this.logger.error(`Received error.graph event: ${error.message}`);
-    process.exit(1);
   }
 
   @OnEvent('capacity.exhausted', { async: true, promisify: true })

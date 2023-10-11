@@ -19,6 +19,7 @@ import { ConfigService } from '../config/config.service';
 import { ProviderWebhookService } from './provider-webhook.service';
 
 import * as errors from './errors';
+import { SECONDS_PER_BLOCK } from './queue-consumer.service';
 
 @Injectable()
 export class ReconnectionGraphService {
@@ -61,6 +62,10 @@ export class ReconnectionGraphService {
       // using graphConnections form Action[] and update the user's DSNP Graph
       const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, updateConnections, graphConnections);
       try {
+        if (actions.length === 0) {
+          this.logger.debug(`No actions to apply for user ${dsnpUserId.toString()}`);
+          return {};
+        }
         this.graphStateManager.applyActions(actions, true);
       } catch (e: any) {
         const errMessage = e instanceof Error ? e.message : '';
@@ -128,15 +133,8 @@ export class ReconnectionGraphService {
         throw new Error(`Error re-importing bundles for ${dsnpUserId.toString()}`);
       }
       return totalCapacityUsed;
-    } catch (err: any) {
+    } catch (err) {
       this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${(err as Error).stack}`);
-      if (err instanceof errors.UnknownError || err instanceof errors.GetUserGraphError) {
-        if (updateConnections) {
-          /// if updateConnections is true, we want to queue a graph update job and pause the queue
-          this.graphUpdateQueue.add('graphUpdate', dataNT, { jobId: jobIdNT });
-        }
-        this.eventEmitter.emitAsync('error.graph', err);
-      }
       throw err;
     } finally {
       this.graphStateManager.removeUserGraph(dsnpUserId.toString());
@@ -252,8 +250,7 @@ export class ReconnectionGraphService {
     }
 
     // If no pages to import, import at least one empty page so that user graph will be created
-    if (publicFollows.length + privateFollows.length + privateFriendships.length === 0) {
-      this.logger.verbose(`No graph pages to import for user ${dsnpUserId.toString()}; creating empty or keys-only import bundle`);
+    if (privateFollows.length + privateFriendships.length === 0 && (graphKeyPairs.length > 0 || dsnpKeys?.keys.length > 0)) {
       let builder = importBundleBuilder.withDsnpUserId(dsnpUserId.toString()).withSchemaId(privateFollowSchemaId);
 
       if (dsnpKeys?.keys?.length > 0) {
@@ -350,7 +347,8 @@ export class ReconnectionGraphService {
           case 'connectionFrom': {
             if (isTransitive && isDelegatedConnection.unwrap_or([]).some((grant) => grant.schema_id.toNumber() === schemaId)) {
               const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-              this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+              this.graphUpdateQueue.remove(jobId);
+              this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
             }
             break;
           }
@@ -372,7 +370,8 @@ export class ReconnectionGraphService {
 
             if (isTransitive && isDelegatedConnection.unwrap_or([]).some((grant) => grant.schema_id.toNumber() === schemaId)) {
               const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-              this.graphUpdateQueue.add('graphUpdate', data, { jobId });
+              this.graphUpdateQueue.remove(jobId);
+              this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
             }
             break;
           }
@@ -411,7 +410,10 @@ export class ReconnectionGraphService {
 
       this.logger.debug(`Processing ${batchPromises.length} batches for user ${dsnpUserId.toString()}`);
       const totalCapUsedPerEpoch = await Promise.all(batchPromises);
-      this.logger.debug(`Processed ${batchPromises.length} batches for user ${dsnpUserId.toString()}`);
+      this.logger.debug(`Processed ${batchPromises.length} batches for user ${dsnpUserId.toString()}`);      
+      if (totalCapUsedPerEpoch.length === 0) {
+        return {};
+      }
       const totalCapacityUsed = totalCapUsedPerEpoch.reduce((acc, curr) => {
         const epoch = Object.keys(curr)[0];
         if (acc[epoch]) {
@@ -429,21 +431,21 @@ export class ReconnectionGraphService {
   }
 
   async processSingleBatch(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]): Promise<{[key: string]: bigint}> {
-    this.logger.debug(`Submitting batch for user ${dsnpUserId.toString()}`);
+    this.logger.debug(`Submitting batch for user ${dsnpUserId.toString()}, batch length: ${batch.length}, batch: ${JSON.stringify(batch)}`);
     try {
       const currrentEpoch = await this.blockchainService.getCurrentCapacityEpoch();
       const [event, eventMap] = await this.blockchainService
         .createExtrinsic({ pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, { eventPallet: 'utility', event: 'BatchCompleted' }, providerKeys, batch)
         .signAndSend();
       if (!event || !this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
-        // if we dont get any events, covering any unexpected connection errors
-        throw new Error(`No events were found for ${dsnpUserId.toString()}`);
+        // if we dont get code events, covering any unexpected connection errors
+        throw new Error(`Unexpected event received: ${JSON.stringify(event)}: re-trying to refresh graph state`);
       }
       const capacityWithDrawn = BigInt(eventMap['capacity.CapacityWithdrawn'].data[1].toString());
       this.logger.debug(`Batch submitted for user ${dsnpUserId.toString()}`);
       this.logger.debug(`Capacity withdrawn for user ${dsnpUserId.toString()}: ${capacityWithDrawn}`);
       return { [currrentEpoch.toString()]: capacityWithDrawn };
-    } catch (e) {
+    } catch (e: any) {
       this.logger.error(`Error processing batch for ${dsnpUserId.toString()}: ${e}`);
       // Following errors includes are checked against
       // 1. Inability to pay some fees`
@@ -455,7 +457,7 @@ export class ReconnectionGraphService {
       }
       /// any errors we dont recognize, such as bad schema_id, etc
       /// in such cases we should not retry the job
-      throw new errors.UnknownError(JSON.stringify(e));
+      throw new errors.UnknownError(e as Error);
     }
   }
 }
