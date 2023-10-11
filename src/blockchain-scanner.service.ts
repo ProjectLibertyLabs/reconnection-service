@@ -93,7 +93,7 @@ export class BlockchainScannerService implements OnApplicationBootstrap {
         const jobs = filteredEvents.map(async ({event}) => {
           const { key: jobId, data } = createGraphUpdateJob(event.data.delegatorId, event.data.providerId, UpdateTransitiveGraphs);
           const job = await this.graphUpdateQueue.getJob(jobId);
-          if (job) {
+          if (job && (await job.isCompleted() || await job.isFailed())) {
             await job.retry();
           } else {
             await this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
