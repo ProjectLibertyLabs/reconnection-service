@@ -90,7 +90,7 @@ export class BlockchainScannerService implements OnApplicationBootstrap {
         if (filteredEvents.length > 0) {
           this.logger.debug(`Found ${filteredEvents.length} delegations at block #${currentBlockNumber}`);
         }
-        const jobs = filteredEvents.map(async (event) => {
+        const jobs = filteredEvents.map(async ({event}) => {
           const { key: jobId, data } = createGraphUpdateJob(event.data.delegatorId, event.data.providerId, UpdateTransitiveGraphs);
           const job = await this.graphUpdateQueue.getJob(jobId);
           if (job) {
