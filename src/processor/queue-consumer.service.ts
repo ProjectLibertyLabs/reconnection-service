@@ -105,7 +105,6 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
         const deadLetterDelayedJobId = `${this.configService.getDeadLetterPrefix()}${delayJobId}`
         await this.graphUpdateQueue.remove(deadLetterDelayedJobId);
         await this.graphUpdateQueue.add(`graphUpdate:${delayJobData.dsnpId}`, delayJobData, {jobId: deadLetterDelayedJobId, delay});
-        throw e;
       }
       throw e;
     } finally {
