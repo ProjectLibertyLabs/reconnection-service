@@ -92,7 +92,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     } catch (e) {
       this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);
       const isDeadLetter  = job.id?.search(this.configService.getDeadLetterPrefix()) === 0;
-      if(!isDeadLetter && (job.attemptsMade === 0) && job.id) {
+      if(!isDeadLetter && (job.attemptsMade === 1) && job.id) {
         // if capacity is low, saying for some failing transactions
         // add delay to job and continue
         // all failing txs due to low capacity will be delayed until next epoch
