@@ -135,4 +135,8 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     const epochLength: u32 = await this.query('capacity', 'epochLength');
     return typeof epochLength === 'number' ? epochLength : epochLength.toNumber();
   }
+
+  public async getNonce(account: Uint8Array): Promise<number> {
+    return this.rpc('system', 'accountNextIndex', account);
+  }
 }

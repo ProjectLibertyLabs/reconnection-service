@@ -20,6 +20,7 @@ import { ProviderWebhookService } from './provider-webhook.service';
 
 import * as errors from './errors';
 import { SECONDS_PER_BLOCK } from './queue-consumer.service';
+import { NonceService } from './nonce.service';
 
 @Injectable()
 export class ReconnectionGraphService {
@@ -32,6 +33,7 @@ export class ReconnectionGraphService {
     private blockchainService: BlockchainService,
     private providerWebhookService: ProviderWebhookService,
     private eventEmitter: EventEmitter2,
+    private nonceService: NonceService,
   ) {
     this.logger = new Logger(ReconnectionGraphService.name);
   }
@@ -434,9 +436,10 @@ export class ReconnectionGraphService {
     this.logger.debug(`Submitting batch for user ${dsnpUserId.toString()}, batch length: ${batch.length}, batch: ${JSON.stringify(batch)}`);
     try {
       const currrentEpoch = await this.blockchainService.getCurrentCapacityEpoch();
+      const nonce = await this.nonceService.getNextNonce();
       const [event, eventMap] = await this.blockchainService
         .createExtrinsic({ pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, { eventPallet: 'utility', event: 'BatchCompleted' }, providerKeys, batch)
-        .signAndSend();
+        .signAndSend(nonce);
       if (!event || !this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
         // if we dont get code events, covering any unexpected connection errors
         throw new Error(`Unexpected event received: ${JSON.stringify(event)}: re-trying to refresh graph state`);
