@@ -32,15 +32,15 @@ export class NonceService implements OnApplicationBootstrap {
   }
 
   async getNextNonce(): Promise<number> {
-    const nonce = await this.blockchainService.getNonce(this.accountId);
-    const keys = this.getNextPossibleKeys(nonce);
+    const nonceNumber = (await this.blockchainService.getNonce(this.accountId)).toNumber();
+    const keys = this.getNextPossibleKeys(nonceNumber);
     // @ts-ignore
     const nextNonceIndex = await this.redis.incrementNonce(...keys, keys.length, RedisUtils.NONCE_KEY_EXPIRE_SECONDS);
     if (nextNonceIndex === -1) {
-      this.logger.warn(`nextNonce was full even with ${RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK} ${nonce}`);
-      return Number(nonce) + RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK;
+      this.logger.warn(`nextNonce was full even with ${RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK} ${nonceNumber}`);
+      return nonceNumber + RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK;
     }
-    const nextNonce = Number(nonce) + nextNonceIndex - 1;
+    const nextNonce = nonceNumber + nextNonceIndex - 1;
     this.logger.debug(`nextNonce ${nextNonce}`);
     return nextNonce;
   }

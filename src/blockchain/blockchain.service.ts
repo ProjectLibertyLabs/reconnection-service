@@ -5,7 +5,7 @@ import { ApiPromise, ApiRx, HttpProvider, WsProvider } from '@polkadot/api';
 import { firstValueFrom } from 'rxjs';
 import { options } from '@frequency-chain/api-augment';
 import { KeyringPair } from '@polkadot/keyring/types';
-import { BlockHash, BlockNumber } from '@polkadot/types/interfaces';
+import { BlockHash, BlockNumber, Index } from '@polkadot/types/interfaces';
 import { SubmittableExtrinsic } from '@polkadot/api/types';
 import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
 import { u32, Option, u128 } from '@polkadot/types';
@@ -136,7 +136,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     return typeof epochLength === 'number' ? epochLength : epochLength.toNumber();
   }
 
-  public async getNonce(account: Uint8Array): Promise<number> {
+  public async getNonce(account: Uint8Array): Promise<Index> {
     return this.rpc('system', 'accountNextIndex', account);
   }
 }
