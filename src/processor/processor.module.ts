@@ -16,6 +16,7 @@ import { ProviderWebhookService } from './provider-webhook.service';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
+import { NonceService } from './nonce.service';
 
 @Module({
   imports: [
@@ -69,7 +70,7 @@ import { ExpressAdapter } from '@bull-board/express';
     BlockchainModule,
   ],
   controllers: [],
-  providers: [QueueConsumerService, ReconnectionGraphService, GraphStateManager, ProviderWebhookService],
+  providers: [QueueConsumerService, ReconnectionGraphService, GraphStateManager, ProviderWebhookService, NonceService],
   exports: [ReconnectionGraphService, BullModule],
 })
 export class ProcessorModule {}
