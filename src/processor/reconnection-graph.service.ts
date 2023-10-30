@@ -136,7 +136,6 @@ export class ReconnectionGraphService {
       }
       return totalCapacityUsed;
     } catch (err) {
-      this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${(err as Error).stack}`);
       throw err;
     } finally {
       this.graphStateManager.removeUserGraph(dsnpUserId.toString());
@@ -449,7 +448,6 @@ export class ReconnectionGraphService {
       this.logger.debug(`Capacity withdrawn for user ${dsnpUserId.toString()}: ${capacityWithDrawn}`);
       return { [currrentEpoch.toString()]: capacityWithDrawn };
     } catch (e: any) {
-      this.logger.error(`Error processing batch for ${dsnpUserId.toString()}: ${e}`);
       // Following errors includes are checked against
       // 1. Inability to pay some fees`
       // 2. Transaction is not valid due to `Target page hash does not match current page hash`

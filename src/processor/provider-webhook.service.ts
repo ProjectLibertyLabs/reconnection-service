@@ -66,7 +66,6 @@ export class ProviderWebhookService implements OnModuleDestroy {
         return;
       }
       this.logger.warn(`Provider webhook failed health check ${this.failedHealthChecks} times`);
-      this.schedulerRegistry.deleteTimeout(HEALTH_CHECK_TIMEOUT_NAME);
       this.schedulerRegistry.addTimeout(
         HEALTH_CHECK_TIMEOUT_NAME,
         setTimeout(
@@ -80,7 +79,6 @@ export class ProviderWebhookService implements OnModuleDestroy {
         this.eventEmitter.emit('webhook.healthy');
       } else {
         this.logger.debug(`Provider webhook responded to health check (attempts: ${this.successfulHealthChecks})`);
-        this.schedulerRegistry.deleteTimeout(HEALTH_CHECK_TIMEOUT_NAME);
         this.schedulerRegistry.addTimeout(
           HEALTH_CHECK_TIMEOUT_NAME,
           setTimeout(() => this.checkProviderWebhook(), this.configService.getWebhookRetryIntervalSeconds()),
