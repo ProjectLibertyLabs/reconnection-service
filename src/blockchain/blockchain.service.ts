@@ -26,7 +26,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     const providerUrl = this.configService.frequencyUrl!;
     let provider: any;
     if (/^ws/.test(providerUrl.toString())) {
-      provider = new WsProvider(providerUrl.toString());
+      provider = new WsProvider(providerUrl.toString(), this.configService.getWebhookRetryIntervalSeconds() * 1000);
     } else if (/^http/.test(providerUrl.toString())) {
       provider = new HttpProvider(providerUrl.toString());
     } else {
