@@ -95,9 +95,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
       const isLowPriority = e instanceof TxLowPriorityError;
       const isUnknownError = e instanceof UnknownError;
       const isDeadLetter  = job.id?.search(this.configService.getDeadLetterPrefix()) === 0;
-      // if tx gets outdated we would want to delay it further to next block
-      // even if it is a dead letter
-      if((!isDeadLetter && (job.attemptsMade === 1) || isOutdatedJob) && job.id) {
+      if(!isDeadLetter && job.attemptsMade === 1 && job.id) {
         // if capacity is low, saying for some failing transactions
         // add delay to job and continue
         // all failing txs due to low capacity will be delayed until next epoch
