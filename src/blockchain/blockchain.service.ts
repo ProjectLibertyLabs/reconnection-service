@@ -11,6 +11,7 @@ import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
 import { u32, Option, u128 } from '@polkadot/types';
 import { PalletCapacityCapacityDetails, PalletCapacityEpochInfo } from '@polkadot/types/lookup';
 import { Extrinsic } from './extrinsic';
+import { ProviderInterface } from '@polkadot/rpc-provider/types';
 
 @Injectable()
 export class BlockchainService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -22,23 +23,38 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
 
   private logger: Logger;
 
+  private provider: ProviderInterface;
   public async onApplicationBootstrap() {
     const providerUrl = this.configService.frequencyUrl!;
-    let provider: any;
     if (/^ws/.test(providerUrl.toString())) {
-      provider = new WsProvider(providerUrl.toString());
+      this.provider = new WsProvider(providerUrl.toString());
     } else if (/^http/.test(providerUrl.toString())) {
-      provider = new HttpProvider(providerUrl.toString());
+      this.provider = new HttpProvider(providerUrl.toString());
     } else {
       this.logger.error(`Unrecognized chain URL type: ${providerUrl.toString()}`);
       throw new Error('Unrecognized chain URL type');
     }
-    this.api = await firstValueFrom(ApiRx.create({ provider, ...options }));
-    this.apiPromise = await ApiPromise.create({ provider, ...options });
+    this.api = await firstValueFrom(ApiRx.create({ provider:this.provider, ...options }));
+    this.apiPromise = await ApiPromise.create({ provider:this.provider, ...options });
     await Promise.all([firstValueFrom(this.api.isReady), this.apiPromise.isReady]);
     this.logger.log('Blockchain API ready.');
   }
 
+  public async ensureApiReady(): Promise<void> {
+    try {
+      await Promise.all([firstValueFrom(this.api.isReady), this.apiPromise.isReady]);
+    } catch (e) {
+      let retries = 0;
+      while (retries < this.configService.getHealthCheckMaxRetries()) {
+        try {
+          await this.provider.connect();
+          break;
+        } catch (e) {
+          retries += 1;
+        }
+      }
+    }
+  }
   public async onApplicationShutdown(signal?: string | undefined) {
     const promises: Promise<any>[] = [];
     if (this.api) {
@@ -49,6 +65,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
       promises.push(this.apiPromise.disconnect());
     }
     await Promise.all(promises);
+    await this.provider.disconnect();
   }
 
   constructor(configService: ConfigService) {

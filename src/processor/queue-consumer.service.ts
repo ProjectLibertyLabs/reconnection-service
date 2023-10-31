@@ -8,7 +8,7 @@ import { ConfigService } from '#app/config/config.service';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { CapacityLowError, StaleHashError, UnknownError } from './errors';
+import { CapacityLowError, OutDatedTxError, StaleHashError, TxLowPriorityError, UnknownError } from './errors';
 import { InjectRedis } from '@liaoliaots/nestjs-redis';
 import Redis from 'ioredis';
 
@@ -91,6 +91,9 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
       this.logger.verbose(`Successfully completed job ${job.id}`);
     } catch (e) {
       this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);
+      const isOutdatedJob = e instanceof OutDatedTxError;
+      const isLowPriority = e instanceof TxLowPriorityError;
+      const isUnknownError = e instanceof UnknownError;
       const isDeadLetter  = job.id?.search(this.configService.getDeadLetterPrefix()) === 0;
       if(!isDeadLetter && (job.attemptsMade === 1) && job.id) {
         // if capacity is low, saying for some failing transactions
@@ -106,6 +109,10 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
         await this.graphUpdateQueue.remove(deadLetterDelayedJobId);
         await this.graphUpdateQueue.remove(job.id);
         await this.graphUpdateQueue.add(`graphUpdate:${delayJobData.dsnpId}`, delayJobData, {jobId: deadLetterDelayedJobId, delay});
+      } 
+      if (isOutdatedJob || isLowPriority || isUnknownError || isDeadLetter) {
+        // for all known errors, service does a dead letter and pass through the old job
+        return {success: false, error: e};
       }
       throw e;
     } finally {

@@ -435,6 +435,7 @@ export class ReconnectionGraphService {
   async processSingleBatch(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]): Promise<{[key: string]: bigint}> {
     this.logger.debug(`Submitting batch for user ${dsnpUserId.toString()}, batch length: ${batch.length}, batch: ${JSON.stringify(batch)}`);
     try {
+      await this.blockchainService.ensureApiReady();
       const currrentEpoch = await this.blockchainService.getCurrentCapacityEpoch();
       const nonce = await this.nonceService.getNextNonce();
       const [event, eventMap] = await this.blockchainService
@@ -457,6 +458,10 @@ export class ReconnectionGraphService {
         throw new errors.CapacityLowError(e.message);
       } else if (e instanceof Error && e.message.includes('Target page hash does not match current page hash')) {
         throw new errors.StaleHashError(e.message);
+      } else if(e instanceof Error && e.message.includes('Outdated')) {
+        throw new errors.OutDatedTxError(e.message);
+      } else if(e instanceof Error && e.message.includes('The transaction has too low priority')) {
+        throw new errors.TxLowPriorityError(e.message);
       }
       /// any errors we dont recognize, such as bad schema_id, etc
       /// in such cases we should not retry the job
