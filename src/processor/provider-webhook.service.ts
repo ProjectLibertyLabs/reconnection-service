@@ -1,10 +1,8 @@
 import { ConfigService } from '#app/config/config.service';
-import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import axios, { AxiosInstance } from 'axios';
-import { Queue } from 'bullmq';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 
 const HEALTH_CHECK_TIMEOUT_NAME = 'health_check';
@@ -21,18 +19,15 @@ export class ProviderWebhookService implements OnModuleDestroy {
 
   public onModuleDestroy() {
     try {
-      this.schedulerRegistry.deleteTimeout(HEALTH_CHECK_TIMEOUT_NAME);
+      if (this.schedulerRegistry.doesExist('timeout', HEALTH_CHECK_TIMEOUT_NAME)) {
+        this.schedulerRegistry.deleteTimeout(HEALTH_CHECK_TIMEOUT_NAME);
+      }
     } catch (e) {
       this.logger.debug(`Caught error deleting timeouts: ${e}`);
     }
   }
 
-  constructor(
-    private configService: ConfigService,
-    private eventEmitter: EventEmitter2,
-    private schedulerRegistry: SchedulerRegistry,
-    @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
-  ) {
+  constructor(private configService: ConfigService, private eventEmitter: EventEmitter2, private schedulerRegistry: SchedulerRegistry) {
     this.logger = new Logger(this.constructor.name);
     this.webhook = axios.create({
       baseURL: this.configService.providerBaseUrl.toString(),

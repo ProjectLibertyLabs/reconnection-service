@@ -127,7 +127,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
   }
 
   public async getCurrentCapacityEpoch(): Promise<bigint> {
-    const currentEpoch: u32  = await this.query('capacity', 'currentEpoch');
+    const currentEpoch: u32 = await this.query('capacity', 'currentEpoch');
     return typeof currentEpoch === 'number' ? BigInt(currentEpoch) : currentEpoch.toBigInt();
   }
 

@@ -168,48 +168,54 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     }
   }
 
-  private async setEpochCapacity(totalCapacityUsed: {[key: string]: bigint}): Promise<void> {
+  private async setEpochCapacity(totalCapacityUsed: { [key: string]: bigint }): Promise<void> {
+    // eslint-disable-next-line no-restricted-syntax
     for (const [epoch, capacityUsed] of Object.entries(totalCapacityUsed)) {
       const epochCapacityKey = `epochCapacity:${epoch}`;
-      const epochCapacity = BigInt(await this.cacheManager.get(epochCapacityKey) ?? 0);
+      // eslint-disable-next-line no-await-in-loop
+      const epochCapacity = BigInt((await this.cacheManager.get(epochCapacityKey)) ?? 0);
       const newEpochCapacity = epochCapacity + capacityUsed;
+      // eslint-disable-next-line no-await-in-loop
       const epochDurationBlocks = await this.blockchainService.getCurrentEpochLength();
       const epochDuration = epochDurationBlocks * SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
+      // eslint-disable-next-line no-await-in-loop
       await this.cacheManager.setex(epochCapacityKey, epochDuration, newEpochCapacity.toString());
     }
   }
 
   private async checkCapacity(): Promise<void> {
-    const capacityLimit = this.configService.getCapacityLimit();
-    const capacity = await this.blockchainService.capacityInfo(this.configService.getProviderId());
-    const remainingCapacity = capacity.remainingCapacity;
-    const currentEpoch = capacity.currentEpoch;
-    const epochCapacityKey = `epochCapacity:${currentEpoch}`;
-    const epochUsedCapacity = BigInt(await this.cacheManager.get(epochCapacityKey) ?? 0); // Fetch capacity used by the service
-    let outOfCapacity = remainingCapacity <= 0n;
+    try {
+      const capacityLimit = this.configService.getCapacityLimit();
+      const capacity = await this.blockchainService.capacityInfo(this.configService.getProviderId());
+      const { remainingCapacity } = capacity;
+      const { currentEpoch } = capacity;
+      const epochCapacityKey = `epochCapacity:${currentEpoch}`;
+      const epochUsedCapacity = BigInt((await this.cacheManager.get(epochCapacityKey)) ?? 0); // Fetch capacity used by the service
+      let outOfCapacity = remainingCapacity <= 0n;
 
-    if(!outOfCapacity) {
+      if (!outOfCapacity) {
         this.logger.debug(`Capacity remaining: ${remainingCapacity}`);
         if (capacityLimit.type === 'percentage') {
-            const capacityLimitPercentage = BigInt(capacityLimit.value);
-            const capacityLimitThreshold = (capacity.totalCapacityIssued * capacityLimitPercentage) / 100n;
-            this.logger.debug(`Capacity limit threshold: ${capacityLimitThreshold}`);
-            if (epochUsedCapacity >= capacityLimitThreshold) {
-                outOfCapacity = true;
-                this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimitThreshold}`);
-            }
-        } else {
-            if (epochUsedCapacity >= capacityLimit.value) {
-                outOfCapacity = true;
-                this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimit.value}`);
-            }
+          const capacityLimitPercentage = BigInt(capacityLimit.value);
+          const capacityLimitThreshold = (capacity.totalCapacityIssued * capacityLimitPercentage) / 100n;
+          this.logger.debug(`Capacity limit threshold: ${capacityLimitThreshold}`);
+          if (epochUsedCapacity >= capacityLimitThreshold) {
+            outOfCapacity = true;
+            this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimitThreshold}`);
+          }
+        } else if (epochUsedCapacity >= capacityLimit.value) {
+          outOfCapacity = true;
+          this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimit.value}`);
         }
-    }
+      }
 
-    if (outOfCapacity) {
+      if (outOfCapacity) {
         await this.eventEmitter.emitAsync('capacity.exhausted');
-    } else {
+      } else {
         await this.eventEmitter.emitAsync('capacity.refilled');
+      }
+    } catch (err) {
+      this.logger.error('Caught error in checkCapacity', err);
     }
   }
 }

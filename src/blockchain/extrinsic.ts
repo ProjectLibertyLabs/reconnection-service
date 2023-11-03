@@ -31,8 +31,8 @@ import { IsEvent } from '@polkadot/types/metadata/decorate/types';
 import { Codec, ISubmittableResult, AnyTuple } from '@polkadot/types/types';
 import { filter, firstValueFrom, map, pipe, tap, throwError } from 'rxjs';
 import { KeyringPair } from '@polkadot/keyring/types';
-import { EventError } from './event-error';
 import { timeout } from 'rxjs/operators';
+import { EventError } from './event-error';
 
 export type EventMap = { [key: string]: Event };
 
@@ -70,16 +70,11 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
     return firstValueFrom(
       this.extrinsic.signAndSend(this.keys, { nonce }).pipe(
         timeout({ each: this.timeOutSeconds * 1000 }),
-        tap(({ status }) => {
-          if (!status.isInBlock || !status.isFinalized) {
-            this.signAndSend(nonce);
-          }
-        }),
+        filter(({ status }) => status.isInBlock || status.isFinalized),
         this.parseResult(this.event),
       ),
     );
   }
-  
 
   public payWithCapacity(nonce?: number): Promise<ParsedEventResult> {
     return firstValueFrom(
