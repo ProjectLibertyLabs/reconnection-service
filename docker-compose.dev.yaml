@@ -1,10 +1,27 @@
 version: '3'
 
 services:
+  reconnection-service-standalone:
+    # container_name: reconnection-service-standalone
+    image: amplicalabs/reconnection-service:standalone-latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    env_file:
+      - .env.docker.dev
+    networks:
+      - reconnection-service-network-dev
+    # volumes:
+    # - redis_data:/var/lib/redis
+
   redis:
     image: redis:latest
+    hostname: redis
     ports:
       - 6379:6379
+    container_name: redis
     networks:
       - reconnection-service-network-dev
     volumes:
@@ -12,14 +29,31 @@ services:
 
   frequency:
     image: frequencychain/instant-seal-node:latest
+    command: --sealing=interval --sealing-interval 3 --sealing-create-empty-blocks
+    hostname: frequency
     ports:
       - 9944:9944
     networks:
       - reconnection-service-network-dev
-    container_name: frequency-node
+    container_name: frequency-interval
+    volumes:
+      - chainstorage:/data
+
+  frequency-instant:
+    image: frequencychain/instant-seal-node:latest
+    command: --sealing=instant
+    hostname: frequency
+    ports:
+      - 9944:9944
+    networks:
+      - reconnection-service-network-dev
+    container_name: frequency-instant
+    volumes:
+      - chainstorage:/data
 
   webhook:
     container_name: webhook
+    hostname: webhook
     build:
       context: .
       dockerfile: webhook-specification/mock-webhook-server/Dockerfile
@@ -29,6 +63,7 @@ services:
       - ./webhook-specification/mock-webhook-server:/app
     networks:
       - reconnection-service-network-dev
+
   reconnection-service:
     depends_on:
       - redis
@@ -48,6 +83,8 @@ services:
 
 volumes:
   redis_data:
+  chainstorage:
+    external: false
 
 networks:
   reconnection-service-network-dev:

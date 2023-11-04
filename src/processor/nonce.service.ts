@@ -23,12 +23,30 @@ export class NonceService implements OnApplicationBootstrap {
       numberOfKeys: RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK,
       lua: fs.readFileSync('lua/incrementNonce.lua', 'utf8'),
     });
+    redis.defineCommand('peekNonce', {
+      numberOfKeys: RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK,
+      lua: fs.readFileSync('lua/peekNonce.lua', 'utf-8'),
+    });
   }
 
   async onApplicationBootstrap() {
     this.accountId = createKeys(this.configService.getProviderAccountSeedPhrase()).publicKey;
-    const nextNonce = await this.getNextNonce();
-    this.logger.log(`nonce is set to ${nextNonce}`);
+    const nextNonce = await this.peekNextNonce();
+    this.logger.log(`Initialized nonce to ${nextNonce}`);
+  }
+
+  async peekNextNonce(): Promise<number> {
+    const nonceNumber = (await this.blockchainService.getNonce(this.accountId)).toNumber();
+    const keys = this.getNextPossibleKeys(nonceNumber);
+    // @ts-ignore
+    const nextNonceIndex = await this.redis.peekNonce(...keys, keys.length);
+    if (nextNonceIndex === -1) {
+      this.logger.warn(`nextNonce was full even with ${RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK} ${nonceNumber}`);
+      return nonceNumber + RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK;
+    }
+    const nextNonce = nonceNumber + nextNonceIndex - 1;
+    this.logger.debug(`nextNonce ${nextNonce}`);
+    return nextNonce;
   }
 
   async getNextNonce(): Promise<number> {

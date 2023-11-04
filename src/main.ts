@@ -35,4 +35,6 @@ async function bootstrap() {
   }
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  logger.error('Unhandled exception in main', err);
+});

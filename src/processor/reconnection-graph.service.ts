@@ -19,7 +19,6 @@ import { ConfigService } from '../config/config.service';
 import { ProviderWebhookService } from './provider-webhook.service';
 
 import * as errors from './errors';
-import { SECONDS_PER_BLOCK } from './queue-consumer.service';
 import { NonceService } from './nonce.service';
 
 @Injectable()
@@ -42,7 +41,7 @@ export class ReconnectionGraphService {
     return this.blockchainService.api.consts.frequencyTxPayment.maximumCapacityBatchLength.toNumber();
   }
 
-  public async updateUserGraph(dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<{[key: string]: bigint}> {
+  public async updateUserGraph(dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<{ [key: string]: bigint }> {
     this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
     const dsnpUserId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', dsnpUserStr);
     const providerId: ProviderId = this.blockchainService.api.registry.createType('ProviderId', providerStr);
@@ -251,8 +250,10 @@ export class ReconnectionGraphService {
       throw new errors.GetUserGraphError('Only X25519 keys are supported for now');
     }
 
+    let importBundles: ImportBundle[];
+
     // If no pages to import, import at least one empty page so that user graph will be created
-    if (privateFollows.length + privateFriendships.length === 0 && (graphKeyPairs.length > 0 || dsnpKeys?.keys.length > 0)) {
+    if (publicFollows.length + privateFollows.length + privateFriendships.length === 0 && (graphKeyPairs.length > 0 || dsnpKeys?.keys.length > 0)) {
       let builder = importBundleBuilder.withDsnpUserId(dsnpUserId.toString()).withSchemaId(privateFollowSchemaId);
 
       if (dsnpKeys?.keys?.length > 0) {
@@ -262,26 +263,28 @@ export class ReconnectionGraphService {
         builder = builder.withGraphKeyPairs(graphKeyPairsSdk);
       }
 
-      return [builder.build()];
+      importBundles = [builder.build()];
+    } else {
+      importBundles = [publicFollows, privateFollows, privateFriendships].flatMap((pageResponses: PaginatedStorageResponse[]) =>
+        pageResponses.map((pageResponse) => {
+          let builder = importBundleBuilder
+            .withDsnpUserId(pageResponse.msa_id.toString())
+            .withSchemaId(pageResponse.schema_id.toNumber())
+            .withPageData(pageResponse.page_id.toNumber(), pageResponse.payload, pageResponse.content_hash.toNumber());
+
+          if (dsnpKeys?.keys?.length > 0) {
+            builder = builder.withDsnpKeys(dsnpKeys);
+          }
+          if (graphKeyPairs?.length > 0) {
+            builder = builder.withGraphKeyPairs(graphKeyPairsSdk);
+          }
+
+          return builder.build();
+        }),
+      );
     }
 
-    return [publicFollows, privateFollows, privateFriendships].flatMap((pageResponses: PaginatedStorageResponse[]) =>
-      pageResponses.map((pageResponse) => {
-        let builder = importBundleBuilder
-          .withDsnpUserId(pageResponse.msa_id.toString())
-          .withSchemaId(pageResponse.schema_id.toNumber())
-          .withPageData(pageResponse.page_id.toNumber(), pageResponse.payload, pageResponse.content_hash.toNumber());
-
-        if (dsnpKeys?.keys?.length > 0) {
-          builder = builder.withDsnpKeys(dsnpKeys);
-        }
-        if (graphKeyPairs?.length > 0) {
-          builder = builder.withGraphKeyPairs(graphKeyPairsSdk);
-        }
-
-        return builder.build();
-      }),
-    );
+    return importBundles;
   }
 
   private async importConnectionKeys(graphConnections: ProviderGraph[]): Promise<void> {
@@ -401,18 +404,22 @@ export class ReconnectionGraphService {
     return dsnpKeys;
   }
 
-  async sendAndProcessChainEvents(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batchesMap: SubmittableExtrinsic<'rxjs', ISubmittableResult>[][]): Promise<{[key: string]: bigint}> {
+  async sendAndProcessChainEvents(
+    dsnpUserId: MessageSourceId,
+    providerKeys: KeyringPair,
+    batchesMap: SubmittableExtrinsic<'rxjs', ISubmittableResult>[][],
+  ): Promise<{ [key: string]: bigint }> {
     try {
       // iterate over batches and send them to the chain returning the capacity withdrawn
-      const batchPromises: Promise<{[key: string]: bigint}>[] = [];
-
-      batchesMap.forEach(async (batch) => {
-        batchPromises.push(this.processSingleBatch(dsnpUserId, providerKeys, batch));
-      });
-
-      this.logger.debug(`Processing ${batchPromises.length} batches for user ${dsnpUserId.toString()}`);
-      const totalCapUsedPerEpoch = await Promise.all(batchPromises);
-      this.logger.debug(`Processed ${batchPromises.length} batches for user ${dsnpUserId.toString()}`);      
+      const totalCapUsedPerEpoch: {}[] = [];
+      this.logger.debug(`Processing ${batchesMap.length} batches for user ${dsnpUserId.toString()}`);
+      // eslint-disable-next-line no-restricted-syntax
+      for (const batch of batchesMap) {
+        // eslint-disable-next-line no-await-in-loop
+        const epoch = await this.processSingleBatch(dsnpUserId, providerKeys, batch);
+        totalCapUsedPerEpoch.push(epoch);
+      }
+      this.logger.debug(`Processed ${batchesMap.length} batches for user ${dsnpUserId.toString()}`);
       if (totalCapUsedPerEpoch.length === 0) {
         return {};
       }
@@ -423,7 +430,7 @@ export class ReconnectionGraphService {
         }
         acc[epoch] = curr[epoch];
         return acc;
-      }, {} as {[key: string]: bigint});
+      }, {} as { [key: string]: bigint });
 
       return totalCapacityUsed;
     } catch (e) {
@@ -432,7 +439,7 @@ export class ReconnectionGraphService {
     }
   }
 
-  async processSingleBatch(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]): Promise<{[key: string]: bigint}> {
+  async processSingleBatch(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]): Promise<{ [key: string]: bigint }> {
     this.logger.debug(`Submitting batch for user ${dsnpUserId.toString()}, batch length: ${batch.length}, batch: ${JSON.stringify(batch)}`);
     try {
       const currrentEpoch = await this.blockchainService.getCurrentCapacityEpoch();
