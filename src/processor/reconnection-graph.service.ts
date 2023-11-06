@@ -1,7 +1,7 @@
 /* eslint-disable no-continue */
 import { AxiosError, AxiosResponse } from 'axios';
 import { Injectable, Logger } from '@nestjs/common';
-import { ItemizedStoragePageResponse, MessageSourceId, PaginatedStorageResponse, ProviderId } from '@frequency-chain/api-augment/interfaces';
+import { ItemizedStoragePageResponse, MessageSourceId, PaginatedStorageResponse, ProviderId, SchemaGrantResponse } from '@frequency-chain/api-augment/interfaces';
 import { ImportBundleBuilder, ConnectAction, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, GraphKeyPair } from '@dsnp/graph-sdk';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -10,6 +10,7 @@ import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
 import { KeyringPair } from '@polkadot/keyring/types';
 import { hexToU8a } from '@polkadot/util';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Option, Vec } from '@polkadot/types';
 import { SkipTransitiveGraphs, createGraphUpdateJob } from '../interfaces/graph-update-job.interface';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { createKeys } from '../blockchain/create-keys';
@@ -318,17 +319,31 @@ export class ReconnectionGraphService {
         const privacyType = connection.privacyType.toLowerCase();
         const schemaId = this.graphStateManager.getSchemaIdFromConfig(connectionType as ConnectionType, privacyType as PrivacyType);
         /// make sure user has delegation for schemaId
-        const isDelegated = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
-        /// make sure incoming user connection is also delegated for queuing updates non-transitively
-        const isDelegatedConnection = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', connection.dsnpId, providerId);
-        if (
-          !isDelegated.isSome ||
-          !isDelegated
-            .unwrap()
-            .map((grant) => grant.schema_id.toNumber())
-            .includes(schemaId)
-        ) {
+        let delegations: Option<Vec<SchemaGrantResponse>> = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
+        let isDelegated = false;
+        if (delegations.isSome) {
+          isDelegated =
+            delegations
+              .unwrap()
+              .toArray()
+              .findIndex((grant) => grant.schema_id.toNumber() === schemaId) !== -1;
+        }
+
+        if (!isDelegated) {
           return;
+        }
+
+        /// make sure incoming user connection is also delegated for queuing updates non-transitively
+        let isDelegatedConnection = false;
+        if (isTransitive && (connection.direction === 'connectionFrom' || connection.direction === 'bidirectional')) {
+          delegations = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', connection.dsnpId, providerId);
+          if (delegations.isSome) {
+            isDelegatedConnection =
+              delegations
+                .unwrap()
+                .toArray()
+                .findIndex((grant) => grant.schema_id.toNumber() === schemaId) !== -1;
+          }
         }
 
         switch (connection.direction) {
@@ -350,7 +365,7 @@ export class ReconnectionGraphService {
             break;
           }
           case 'connectionFrom': {
-            if (isTransitive && isDelegatedConnection.unwrap_or([]).some((grant) => grant.schema_id.toNumber() === schemaId)) {
+            if (isDelegatedConnection) {
               const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
               this.graphUpdateQueue.remove(jobId);
               this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
@@ -373,7 +388,7 @@ export class ReconnectionGraphService {
 
             actions.push(connectionAction);
 
-            if (isTransitive && isDelegatedConnection.unwrap_or([]).some((grant) => grant.schema_id.toNumber() === schemaId)) {
+            if (isDelegatedConnection) {
               const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
               this.graphUpdateQueue.remove(jobId);
               this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });

@@ -2,6 +2,9 @@ import Joi from 'joi';
 import { ConfigModuleOptions } from '@nestjs/config';
 import { mnemonicValidate } from '@polkadot/util-crypto';
 
+// eslint-disable-next-line no-useless-escape
+const devUriRegEx = /^\/\/(Alice|Bob|Charlie|Dave|Eve|Ferdie)(\/[\/]?\d+)?$/;
+
 export const configModuleOptions: ConfigModuleOptions = {
   isGlobal: true,
   validationSchema: Joi.object({
@@ -27,6 +30,9 @@ export const configModuleOptions: ConfigModuleOptions = {
     PROVIDER_ACCOUNT_SEED_PHRASE: Joi.string()
       .required()
       .custom((value: string, helpers) => {
+        if (process.env?.ENVIRONMENT === 'dev' && devUriRegEx.test(value)) {
+          return value;
+        }
         if (!mnemonicValidate(value)) {
           return helpers.error('any.invalid');
         }

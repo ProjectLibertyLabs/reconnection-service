@@ -1,7 +1,7 @@
 export interface ProviderGraph {
   dsnpId: string;
   privacyType: string;
-  direction: string;
+  direction: 'connectionTo' | 'connectionFrom' | 'bidirectional';
   connectionType: string;
 }
 
