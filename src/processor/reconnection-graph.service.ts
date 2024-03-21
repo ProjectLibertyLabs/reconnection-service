@@ -438,14 +438,17 @@ export class ReconnectionGraphService {
       if (totalCapUsedPerEpoch.length === 0) {
         return {};
       }
-      const totalCapacityUsed = totalCapUsedPerEpoch.reduce((acc, curr) => {
-        const epoch = Object.keys(curr)[0];
-        if (acc[epoch]) {
-          acc[epoch] += curr[epoch];
-        }
-        acc[epoch] = curr[epoch];
-        return acc;
-      }, {} as { [key: string]: bigint });
+      const totalCapacityUsed = totalCapUsedPerEpoch.reduce(
+        (acc, curr) => {
+          const epoch = Object.keys(curr)[0];
+          if (acc[epoch]) {
+            acc[epoch] += curr[epoch];
+          }
+          acc[epoch] = curr[epoch];
+          return acc;
+        },
+        {} as { [key: string]: bigint },
+      );
 
       return totalCapacityUsed;
     } catch (e) {

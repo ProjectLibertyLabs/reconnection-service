@@ -1,34 +1,35 @@
+/* eslint-disable max-classes-per-file */
 export class GetUserGraphError extends Error {
-    constructor(message: string) {
-      super(message);
-      this.name = "GetUserGraphError";
-    }
+  constructor(message: string) {
+    super(message);
+    this.name = 'GetUserGraphError';
+  }
 }
-  
+
 export class ApplyActionsError extends Error {
-    constructor(message: string) {
-      super(message);
-      this.name = "ApplyActionsError";
-    }
+  constructor(message: string) {
+    super(message);
+    this.name = 'ApplyActionsError';
+  }
 }
-  
+
 export class CapacityLowError extends Error {
-    constructor(message: string) {
-      super(message);
-      this.name = "CapacityLowError";
-    }
+  constructor(message: string) {
+    super(message);
+    this.name = 'CapacityLowError';
+  }
 }
 
 export class StaleHashError extends Error {
-    constructor(message: string) {
-      super(message);
-      this.name = "StaleHashError";
-    }
+  constructor(message: string) {
+    super(message);
+    this.name = 'StaleHashError';
+  }
 }
 
 export class UnknownError extends Error {
-    constructor(error: Error) {
-      super(error.message);
-      this.name = "UnknownError";
-    }
+  constructor(error: Error) {
+    super(error.message);
+    this.name = 'UnknownError';
+  }
 }

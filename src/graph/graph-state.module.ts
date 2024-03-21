@@ -3,8 +3,8 @@ import { GraphStateManager } from './graph-state-manager';
 import { ConfigModule } from '../config/config.module';
 
 @Module({
-    imports: [ConfigModule],
-    providers: [GraphStateManager],
-    exports: [GraphStateManager],
+  imports: [ConfigModule],
+  providers: [GraphStateManager],
+  exports: [GraphStateManager],
 })
 export class GraphManagerModule {}

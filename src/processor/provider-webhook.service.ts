@@ -27,7 +27,11 @@ export class ProviderWebhookService implements OnModuleDestroy {
     }
   }
 
-  constructor(private configService: ConfigService, private eventEmitter: EventEmitter2, private schedulerRegistry: SchedulerRegistry) {
+  constructor(
+    private configService: ConfigService,
+    private eventEmitter: EventEmitter2,
+    private schedulerRegistry: SchedulerRegistry,
+  ) {
     this.logger = new Logger(this.constructor.name);
     this.webhook = axios.create({
       baseURL: this.configService.providerBaseUrl.toString(),

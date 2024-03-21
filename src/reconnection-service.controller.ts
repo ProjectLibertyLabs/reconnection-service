@@ -9,7 +9,10 @@ type JobStatus = 'active' | 'completed' | 'failed' | 'delayed' | 'waiting';
 export class ReconnectionServiceController {
   private readonly logger: Logger;
 
-  constructor(private scannerService: BlockchainScannerService, @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue) {
+  constructor(
+    private scannerService: BlockchainScannerService,
+    @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
+  ) {
     this.logger = new Logger(this.constructor.name);
   }
 
