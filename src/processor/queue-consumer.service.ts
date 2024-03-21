@@ -25,7 +25,9 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
   private webhookOk = true;
 
   public async onApplicationBootstrap() {
+    await Promise.all([this.blockchainService.api.isReady, this.blockchainService.apiPromise.isReady]);
     await this.checkCapacity();
+    this.graphUpdateQueue.resume();
   }
 
   public onModuleDestroy() {
@@ -47,6 +49,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
   ) {
     super();
     this.logger = new Logger(this.constructor.name);
+    graphUpdateQueue.pause(); // pause queue until we're ready to start processing
   }
 
   async process(job: Job<IGraphUpdateJob, any, string>) {
