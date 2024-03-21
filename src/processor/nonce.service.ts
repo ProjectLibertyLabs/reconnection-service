@@ -65,7 +65,9 @@ export class NonceService implements OnApplicationBootstrap {
 
   // eslint-disable-next-line class-methods-use-this
   getNextPossibleKeys(currentNonce: number): string[] {
-    const keys: string[] = Array(RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK).fill(null).map((_entry, i) => RedisUtils.getNonceKey(`${currentNonce + i}`));
+    const keys: string[] = Array(RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK)
+      .fill(null)
+      .map((_entry, i) => RedisUtils.getNonceKey(`${currentNonce + i}`));
     return keys;
   }
 }

@@ -8,14 +8,14 @@ import { ConfigModule } from '#app/config/config.module';
 import { ConfigService } from '#app/config/config.service';
 import { BlockchainModule } from '#app/blockchain/blockchain.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { BullBoardModule } from '@bull-board/nestjs';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
+import { ExpressAdapter } from '@bull-board/express';
 import { QueueConsumerService } from './queue-consumer.service';
 import { ReconnectionGraphService } from './reconnection-graph.service';
 import { GraphManagerModule } from '../graph/graph-state.module';
 import { GraphStateManager } from '../graph/graph-state-manager';
 import { ProviderWebhookService } from './provider-webhook.service';
-import { BullBoardModule } from '@bull-board/nestjs';
-import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
-import { ExpressAdapter } from '@bull-board/express';
 import { NonceService } from './nonce.service';
 
 @Module({

@@ -8,9 +8,9 @@ import { ConfigService } from '#app/config/config.service';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { CapacityLowError, StaleHashError, UnknownError } from './errors';
 import { InjectRedis } from '@liaoliaots/nestjs-redis';
 import Redis from 'ioredis';
+import { CapacityLowError } from './errors';
 
 export const SECONDS_PER_BLOCK = 12;
 const CAPACITY_EPOCH_TIMEOUT_NAME = 'capacity_check';
@@ -25,7 +25,9 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
   private webhookOk = true;
 
   public async onApplicationBootstrap() {
+    await Promise.all([this.blockchainService.api.isReady, this.blockchainService.apiPromise.isReady]);
     await this.checkCapacity();
+    this.graphUpdateQueue.resume();
   }
 
   public onModuleDestroy() {
@@ -47,9 +49,9 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
   ) {
     super();
     this.logger = new Logger(this.constructor.name);
+    graphUpdateQueue.pause(); // pause queue until we're ready to start processing
   }
 
-  // eslint-disable-next-line class-methods-use-this
   async process(job: Job<IGraphUpdateJob, any, string>) {
     this.logger.debug(`Processing job ${job.id}, attempts: ${job.attemptsMade}`);
 
@@ -91,21 +93,21 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
       this.logger.verbose(`Successfully completed job ${job.id}`);
     } catch (e) {
       this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);
-      const isDeadLetter  = job.id?.search(this.configService.getDeadLetterPrefix()) === 0;
-      if(!isDeadLetter && (job.attemptsMade === 1) && job.id) {
+      const isDeadLetter = job.id?.search(this.configService.getDeadLetterPrefix()) === 0;
+      if (!isDeadLetter && job.attemptsMade === 1 && job.id) {
         // if capacity is low, saying for some failing transactions
         // add delay to job and continue
         // all failing txs due to low capacity will be delayed until next epoch
         const capacity = await this.blockchainService.capacityInfo(this.configService.getProviderId());
         const blocksRemaining = capacity.nextEpochStart - capacity.currentBlockNumber;
-        let blockDelay = SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
+        const blockDelay = SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
         const delay = e instanceof CapacityLowError ? blocksRemaining * blockDelay : blockDelay;
         this.logger.debug(`Adding delay to job ${job.id} for ${delay}ms`);
-        const {key: delayJobId, data: delayJobData} = createGraphUpdateJob(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
-        const deadLetterDelayedJobId = `${this.configService.getDeadLetterPrefix()}${delayJobId}`
+        const { key: delayJobId, data: delayJobData } = createGraphUpdateJob(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
+        const deadLetterDelayedJobId = `${this.configService.getDeadLetterPrefix()}${delayJobId}`;
         await this.graphUpdateQueue.remove(deadLetterDelayedJobId);
         await this.graphUpdateQueue.remove(job.id);
-        await this.graphUpdateQueue.add(`graphUpdate:${delayJobData.dsnpId}`, delayJobData, {jobId: deadLetterDelayedJobId, delay});
+        await this.graphUpdateQueue.add(`graphUpdate:${delayJobData.dsnpId}`, delayJobData, { jobId: deadLetterDelayedJobId, delay });
       }
       throw e;
     } finally {
