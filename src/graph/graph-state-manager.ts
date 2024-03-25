@@ -27,7 +27,7 @@ export class GraphStateManager implements OnApplicationBootstrap {
   private graphKeySchemaId: number;
 
   public onApplicationBootstrap() {
-    const graphState = this.getGraphState();
+    const graphState = this.createGraphState();
 
     const publicFollow = graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Public);
     const privateFollow = graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Private);
@@ -59,7 +59,7 @@ export class GraphStateManager implements OnApplicationBootstrap {
     }
   }
 
-  public getGraphState(): Graph {
+  public createGraphState(): Graph {
     return new Graph(this.environment);
   }
 
@@ -84,14 +84,6 @@ export class GraphStateManager implements OnApplicationBootstrap {
 
   public static deserializeDsnpKeys(keys: DsnpKeys): DsnpPublicKey[] {
     return Graph.deserializeDsnpKeys(keys);
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  public importUserData(graphState: Graph, payload: ImportBundle[]): boolean {
-    if (graphState) {
-      return graphState.importUserData(payload);
-    }
-    return false;
   }
 
   // eslint-disable-next-line class-methods-use-this

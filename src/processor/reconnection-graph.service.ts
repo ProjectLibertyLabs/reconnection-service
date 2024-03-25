@@ -45,7 +45,7 @@ export class ReconnectionGraphService {
   public async updateUserGraph(dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<{ [key: string]: bigint }> {
     this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
     // Acquire a graph state for the job
-    const graphState = this.graphStateManager.getGraphState();
+    const graphState = this.graphStateManager.createGraphState();
 
     const dsnpUserId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', dsnpUserStr);
     const providerId: ProviderId = this.blockchainService.api.registry.createType('ProviderId', providerStr);
@@ -142,7 +142,6 @@ export class ReconnectionGraphService {
       this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${(err as Error).stack}`);
       throw err;
     } finally {
-      this.graphStateManager.removeUserGraph(graphState, dsnpUserId.toString());
       this.graphStateManager.freeGraphState(graphState);
     }
   }
@@ -228,7 +227,7 @@ export class ReconnectionGraphService {
 
   async importBundles(graphState: Graph, dsnpUserId: MessageSourceId, graphKeyPairs: ProviderKeyPair[]): Promise<boolean> {
     const importBundles = await this.formImportBundles(dsnpUserId, graphKeyPairs);
-    return this.graphStateManager.importUserData(graphState, importBundles);
+    return graphState.importUserData(importBundles);
   }
 
   async formImportBundles(dsnpUserId: MessageSourceId, graphKeyPairs: ProviderKeyPair[]): Promise<ImportBundle[]> {
@@ -303,7 +302,7 @@ export class ReconnectionGraphService {
 
     const bundles = keys.map((dsnpKeys) => new ImportBundleBuilder().withDsnpUserId(dsnpKeys.dsnpUserId).withDsnpKeys(dsnpKeys).build());
 
-    this.graphStateManager.importUserData(graphState, bundles);
+    graphState.importUserData(bundles);
   }
 
   async formConnections(
