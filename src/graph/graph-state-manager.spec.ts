@@ -27,11 +27,16 @@ describe('GraphStateManager', () => {
 
   it('should be defined', () => {
     expect(graphStateManager).toBeDefined();
+    const graphState = graphStateManager.getGraphState();
+    expect(graphState).toBeDefined();
+    graphStateManager.freeGraphState(graphState);
   });
 
   it('should return graph config', async () => {
-    const graphConfig = graphStateManager.getGraphConfig();
+    const graphState = graphStateManager.getGraphState();
+    const graphConfig = graphStateManager.getGraphConfig(graphState);
     expect(graphConfig).toBeDefined();
+    graphStateManager.freeGraphState(graphState);
   });
 
   it('should initialize state and import bundle upon request', async () => {
@@ -68,18 +73,20 @@ describe('GraphStateManager', () => {
       pages: [pageData1],
     };
 
-    const importResult1 = graphStateManager.importUserData([importBundle1]);
+    const graphState = graphStateManager.getGraphState();
+    const importResult1 = graphStateManager.importUserData(graphState, [importBundle1]);
     expect(importResult1).toBe(true);
 
     // if import is successful and not state is created, it should have a state
-    const graphConfig = graphStateManager.getGraphConfig();
+    const graphConfig = graphStateManager.getGraphConfig(graphState);
 
     expect(graphConfig).toBeDefined();
     expect(graphConfig.maxGraphPageSizeBytes).toBeDefined();
 
-    const exportUpdates = graphStateManager.exportGraphUpdates();
+    const exportUpdates = graphStateManager.exportGraphUpdates(graphState);
     expect(exportUpdates).toBeDefined();
     expect(exportUpdates.length).toBe(0);
+    graphStateManager.freeGraphState(graphState);
   });
 
   it('should apply actions and export graph updates', async () => {
@@ -101,22 +108,26 @@ describe('GraphStateManager', () => {
 
     actions.push(action1);
 
-    const applyActionsResult = await graphStateManager.applyActions(actions, true);
+    const graphState = graphStateManager.getGraphState();
+    const applyActionsResult = await graphStateManager.applyActions(graphState, actions, true);
     expect(applyActionsResult).toBe(true);
 
-    const exportUpdates = await graphStateManager.exportGraphUpdates();
+    const exportUpdates = await graphStateManager.exportGraphUpdates(graphState);
     expect(exportUpdates).toBeDefined();
     expect(exportUpdates.length).toBe(1);
+    graphStateManager.freeGraphState(graphState);
   });
 
   it('getConnectionsWithoutKeys with empty connections should return empty array', async () => {
-    const connections = await graphStateManager.getConnectionWithoutKeys();
+    const graphState = graphStateManager.getGraphState();
+    const connections = await graphStateManager.getConnectionWithoutKeys(graphState);
     expect(connections).toBeDefined();
     expect(connections.length).toBe(0);
   });
 
   it('getPublicKeys with empty connections should return empty array', async () => {
-    const publicKeys = await graphStateManager.getPublicKeys('1');
+    const graphState = graphStateManager.getGraphState();
+    const publicKeys = await graphStateManager.getPublicKeys(graphState, '1');
     expect(publicKeys).toBeDefined();
     expect(publicKeys.length).toBe(0);
   });
@@ -151,12 +162,14 @@ describe('GraphStateManager', () => {
   });
 
   it('should remove user graph', async () => {
-    const removeUserGraphResult = await graphStateManager.removeUserGraph('1');
+    const graphState = graphStateManager.getGraphState();
+    const removeUserGraphResult = await graphStateManager.removeUserGraph(graphState, '1');
     expect(removeUserGraphResult).toBe(true);
   });
 
   it('should return false if graph does not contain user', async () => {
-    const containsUserGraphResult = await graphStateManager.graphContainsUser('1');
+    const graphState = graphStateManager.getGraphState();
+    const containsUserGraphResult = await graphStateManager.graphContainsUser(graphState, '1');
     expect(containsUserGraphResult).toBe(false);
   });
 
