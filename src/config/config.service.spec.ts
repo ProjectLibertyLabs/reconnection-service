@@ -54,7 +54,7 @@ describe('ReconnectionConfigService', () => {
     CAPACITY_LIMIT: undefined,
     FREQUENCY_TX_TIMEOUT_SECONDS: undefined,
     DEAD_LETTER_JOB_PREFIX: undefined,
-    CONNECTIONS_PER_PAGE: undefined,
+    CONNECTIONS_PER_PROVIDER_RESPONSE_PAGE: undefined,
   };
 
   beforeAll(() => {
@@ -290,7 +290,7 @@ describe('ReconnectionConfigService', () => {
     });
 
     it('should get connections per page', () => {
-      expect(reconnectionConfigService.getPageSize()).toStrictEqual(parseInt(ALL_ENV.CONNECTIONS_PER_PAGE as string, 10));
+      expect(reconnectionConfigService.getPageSize()).toStrictEqual(parseInt(ALL_ENV.CONNECTIONS_PER_PROVIDER_RESPONSE_PAGE as string, 10));
     });
   });
 });

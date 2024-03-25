@@ -26,7 +26,7 @@ export interface ConfigEnvironmentVariables {
   CAPACITY_LIMIT: ICapacityLimit;
   FREQUENCY_TX_TIMEOUT_SECONDS: number;
   DEAD_LETTER_JOB_PREFIX: string;
-  CONNECTIONS_PER_PAGE: number;
+  CONNECTIONS_PER_PROVIDER_RESPONSE_PAGE: number;
 }
 
 /// Config service to get global app and provider-specific config values.
@@ -111,6 +111,6 @@ export class ConfigService {
   }
 
   public getPageSize(): number {
-    return this.nestConfigService.get<number>('CONNECTIONS_PER_PAGE')!;
+    return this.nestConfigService.get<number>('CONNECTIONS_PER_PROVIDER_RESPONSE_PAGE')!;
   }
 }
