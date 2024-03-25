@@ -71,7 +71,7 @@ export class ReconnectionGraphService {
           this.logger.debug(`No actions to apply for user ${dsnpUserId.toString()}`);
           return {};
         }
-        this.graphStateManager.applyActions(graphState, actions, true);
+        graphState.applyActions(actions, { ignoreExistingConnections: true });
       } catch (e: any) {
         const errMessage = e instanceof Error ? e.message : '';
         if (errMessage.includes('already exists')) {
@@ -81,7 +81,7 @@ export class ReconnectionGraphService {
         }
       }
 
-      const exportedUpdates = this.graphStateManager.exportUserGraphUpdates(graphState, dsnpUserId.toString());
+      const exportedUpdates = graphState.exportUserGraphUpdates(dsnpUserId.toString());
 
       const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
 
@@ -130,7 +130,7 @@ export class ReconnectionGraphService {
       const reImported = await this.importBundles(graphState, dsnpUserId, graphKeyPairs);
       if (reImported) {
         // eslint-disable-next-line no-await-in-loop
-        const userGraphExists = this.graphStateManager.graphContainsUser(graphState, dsnpUserId.toString());
+        const userGraphExists = graphState.containsUserGraph(dsnpUserId.toString());
         if (!userGraphExists) {
           throw new Error(`User graph does not exist for ${dsnpUserId.toString()}`);
         }
@@ -142,7 +142,7 @@ export class ReconnectionGraphService {
       this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${(err as Error).stack}`);
       throw err;
     } finally {
-      this.graphStateManager.freeGraphState(graphState);
+      graphState.freeGraphState();
     }
   }
 
