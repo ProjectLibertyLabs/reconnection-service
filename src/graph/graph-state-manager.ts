@@ -20,30 +20,20 @@ import { ConfigService } from '../config/config.service';
 
 @Injectable()
 export class GraphStateManager implements OnApplicationBootstrap {
-  private graphState: Graph;
-
   private environment: EnvironmentInterface; // Environment details
 
   private schemaIds: { [key: string]: { [key: string]: number } };
 
   private graphKeySchemaId: number;
 
-  private static graphStateFinalizer = new FinalizationRegistry((graphState: Graph) => {
-    if (graphState) {
-      graphState.freeGraphState();
-    }
-  });
-
   public onApplicationBootstrap() {
-    if (!this.graphState) {
-      throw new Error('Unable to initialize schema ids');
-    }
+    const graphState = this.getGraphState();
 
-    const publicFollow = this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Public);
-    const privateFollow = this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Private);
-    const privateFriend = this.graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Friendship, PrivacyType.Private);
+    const publicFollow = graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Public);
+    const privateFollow = graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Follow, PrivacyType.Private);
+    const privateFriend = graphState.getSchemaIdFromConfig(this.environment, ConnectionType.Friendship, PrivacyType.Private);
 
-    this.graphKeySchemaId = this.graphState.getGraphConfig(this.environment).graphPublicKeySchemaId;
+    this.graphKeySchemaId = graphState.getGraphConfig(this.environment).graphPublicKeySchemaId;
 
     this.schemaIds = {
       [ConnectionType.Follow]: {
@@ -54,6 +44,7 @@ export class GraphStateManager implements OnApplicationBootstrap {
         [PrivacyType.Private]: privateFriend,
       },
     };
+    graphState.freeGraphState();
   }
 
   constructor(configService: ConfigService) {
@@ -66,21 +57,15 @@ export class GraphStateManager implements OnApplicationBootstrap {
     } else {
       this.environment = { environmentType: EnvironmentType[environmentType] };
     }
-    this.graphState = new Graph(this.environment);
-
-    GraphStateManager.graphStateFinalizer.register(this, this.graphState);
   }
 
   public getGraphState(): Graph {
-    if (this.graphState) {
-      return this.graphState;
-    }
-    return {} as Graph;
+    return new Graph(this.environment);
   }
 
-  public getGraphConfig(): Config {
-    if (this.graphState) {
-      return this.graphState.getGraphConfig(this.environment);
+  public getGraphConfig(graphState: Graph): Config {
+    if (graphState) {
+      return graphState.getGraphConfig(this.environment);
     }
     return {} as Config;
   }
@@ -101,81 +86,99 @@ export class GraphStateManager implements OnApplicationBootstrap {
     return Graph.deserializeDsnpKeys(keys);
   }
 
-  public importUserData(payload: ImportBundle[]): boolean {
-    if (this.graphState) {
-      return this.graphState.importUserData(payload);
+  // eslint-disable-next-line class-methods-use-this
+  public importUserData(graphState: Graph, payload: ImportBundle[]): boolean {
+    if (graphState) {
+      return graphState.importUserData(payload);
     }
     return false;
   }
 
-  public applyActions(actions: Action[], ignoreExistingConnection: boolean): boolean {
-    if (this.graphState) {
-      return this.graphState.applyActions(actions, { ignoreExistingConnections: ignoreExistingConnection });
+  // eslint-disable-next-line class-methods-use-this
+  public applyActions(graphState: Graph, actions: Action[], ignoreExistingConnection: boolean): boolean {
+    if (graphState) {
+      return graphState.applyActions(actions, { ignoreExistingConnections: ignoreExistingConnection });
     }
     return false;
   }
 
-  public exportGraphUpdates(): Update[] {
-    if (this.graphState) {
-      return this.graphState.exportUpdates();
+  // eslint-disable-next-line class-methods-use-this
+  public exportGraphUpdates(graphState: Graph): Update[] {
+    if (graphState) {
+      return graphState.exportUpdates();
     }
     return [];
   }
 
-  public exportUserGraphUpdates(dsnpId: string): Update[] {
-    if (this.graphState) {
-      return this.graphState.exportUserGraphUpdates(dsnpId);
+  // eslint-disable-next-line class-methods-use-this
+  public exportUserGraphUpdates(graphState: Graph, dsnpId: string): Update[] {
+    if (graphState) {
+      return graphState.exportUserGraphUpdates(dsnpId);
     }
 
     return [];
   }
 
-  public removeUserGraph(dsnpUserId: string): boolean {
-    if (this.graphState) {
-      return this.graphState.removeUserGraph(dsnpUserId);
+  // eslint-disable-next-line class-methods-use-this
+  public removeUserGraph(graphState: Graph, dsnpUserId: string): boolean {
+    if (graphState) {
+      return graphState.removeUserGraph(dsnpUserId);
     }
     return false;
   }
 
-  public graphContainsUser(dsnpUserId: string): boolean {
-    if (this.graphState) {
-      return this.graphState.containsUserGraph(dsnpUserId);
+  // eslint-disable-next-line class-methods-use-this
+  public graphContainsUser(graphState: Graph, dsnpUserId: string): boolean {
+    if (graphState) {
+      return graphState.containsUserGraph(dsnpUserId);
     }
     return false;
   }
 
-  public getConnectionsForUserGraph(dsnpUserId: string, schemaId: number, includePending: boolean): DsnpGraphEdge[] {
-    if (this.graphState) {
-      return this.graphState.getConnectionsForUserGraph(dsnpUserId, schemaId, includePending);
+  // eslint-disable-next-line class-methods-use-this
+  public getConnectionsForUserGraph(graphState: Graph, dsnpUserId: string, schemaId: number, includePending: boolean): DsnpGraphEdge[] {
+    if (graphState) {
+      return graphState.getConnectionsForUserGraph(dsnpUserId, schemaId, includePending);
     }
     return [];
   }
 
-  public getConnectionWithoutKeys(): string[] {
-    if (this.graphState) {
-      return this.graphState.getConnectionsWithoutKeys();
+  // eslint-disable-next-line class-methods-use-this
+  public getConnectionWithoutKeys(graphState: Graph): string[] {
+    if (graphState) {
+      return graphState.getConnectionsWithoutKeys();
     }
     return [];
   }
 
-  public getOneSidedPrivateFriendshipConnections(dsnpUserId: string): DsnpGraphEdge[] {
-    if (this.graphState) {
-      return this.graphState.getOneSidedPrivateFriendshipConnections(dsnpUserId);
+  // eslint-disable-next-line class-methods-use-this
+  public getOneSidedPrivateFriendshipConnections(graphState: Graph, dsnpUserId: string): DsnpGraphEdge[] {
+    if (graphState) {
+      return graphState.getOneSidedPrivateFriendshipConnections(dsnpUserId);
     }
     return [];
   }
 
-  public getPublicKeys(dsnpUserId: string): DsnpPublicKey[] {
-    if (this.graphState) {
-      return this.graphState.getPublicKeys(dsnpUserId);
+  // eslint-disable-next-line class-methods-use-this
+  public getPublicKeys(graphState: Graph, dsnpUserId: string): DsnpPublicKey[] {
+    if (graphState) {
+      return graphState.getPublicKeys(dsnpUserId);
     }
     return [];
   }
 
-  public forceCalculateGraphs(dsnpUserId: string): Update[] {
-    if (this.graphState) {
-      return this.graphState.forceCalculateGraphs(dsnpUserId);
+  // eslint-disable-next-line class-methods-use-this
+  public forceCalculateGraphs(graphState: Graph, dsnpUserId: string): Update[] {
+    if (graphState) {
+      return graphState.forceCalculateGraphs(dsnpUserId);
     }
     return [];
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  public freeGraphState(graphState: Graph): void {
+    if (graphState) {
+      graphState.freeGraphState();
+    }
   }
 }
