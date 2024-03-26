@@ -2,7 +2,7 @@
 import { AxiosError, AxiosResponse } from 'axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { ItemizedStoragePageResponse, MessageSourceId, PaginatedStorageResponse, ProviderId, SchemaGrantResponse } from '@frequency-chain/api-augment/interfaces';
-import { ImportBundleBuilder, ConnectAction, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, GraphKeyPair } from '@dsnp/graph-sdk';
+import { ImportBundleBuilder, ConnectAction, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, GraphKeyPair, Graph } from '@dsnp/graph-sdk';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
@@ -44,6 +44,9 @@ export class ReconnectionGraphService {
 
   public async updateUserGraph(dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<{ [key: string]: bigint }> {
     this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
+    // Acquire a graph state for the job
+    const graphState = this.graphStateManager.createGraphState();
+
     const dsnpUserId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', dsnpUserStr);
     const providerId: ProviderId = this.blockchainService.api.registry.createType('ProviderId', providerStr);
     const { key: jobIdNT, data: dataNT } = createGraphUpdateJob(dsnpUserId, providerId, SkipTransitiveGraphs);
@@ -60,15 +63,15 @@ export class ReconnectionGraphService {
     try {
       // get the user's DSNP Graph from the blockchain and form import bundles
       // import bundles are used to import the user's DSNP Graph into the graph SDK
-      await this.importBundles(dsnpUserId, graphKeyPairs);
+      await this.importBundles(graphState, dsnpUserId, graphKeyPairs);
       // using graphConnections form Action[] and update the user's DSNP Graph
-      const actions: ConnectAction[] = await this.formConnections(dsnpUserId, providerId, updateConnections, graphConnections);
+      const actions: ConnectAction[] = await this.formConnections(graphState, dsnpUserId, providerId, updateConnections, graphConnections);
       try {
         if (actions.length === 0) {
           this.logger.debug(`No actions to apply for user ${dsnpUserId.toString()}`);
           return {};
         }
-        this.graphStateManager.applyActions(actions, true);
+        graphState.applyActions(actions, { ignoreExistingConnections: true });
       } catch (e: any) {
         const errMessage = e instanceof Error ? e.message : '';
         if (errMessage.includes('already exists')) {
@@ -78,7 +81,7 @@ export class ReconnectionGraphService {
         }
       }
 
-      const exportedUpdates = this.graphStateManager.exportUserGraphUpdates(dsnpUserId.toString());
+      const exportedUpdates = graphState.exportUserGraphUpdates(dsnpUserId.toString());
 
       const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
 
@@ -124,10 +127,10 @@ export class ReconnectionGraphService {
       // import bundles are used to import the user's DSNP Graph into the graph SDK
       // check if user graph exists in the graph SDK else queue a graph update job
       // eslint-disable-next-line no-await-in-loop
-      const reImported = await this.importBundles(dsnpUserId, graphKeyPairs);
+      const reImported = await this.importBundles(graphState, dsnpUserId, graphKeyPairs);
       if (reImported) {
         // eslint-disable-next-line no-await-in-loop
-        const userGraphExists = this.graphStateManager.graphContainsUser(dsnpUserId.toString());
+        const userGraphExists = graphState.containsUserGraph(dsnpUserId.toString());
         if (!userGraphExists) {
           throw new Error(`User graph does not exist for ${dsnpUserId.toString()}`);
         }
@@ -139,7 +142,7 @@ export class ReconnectionGraphService {
       this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${(err as Error).stack}`);
       throw err;
     } finally {
-      this.graphStateManager.removeUserGraph(dsnpUserId.toString());
+      graphState.freeGraphState();
     }
   }
 
@@ -222,9 +225,9 @@ export class ReconnectionGraphService {
     return [allConnections, keyPairs];
   }
 
-  async importBundles(dsnpUserId: MessageSourceId, graphKeyPairs: ProviderKeyPair[]): Promise<boolean> {
+  async importBundles(graphState: Graph, dsnpUserId: MessageSourceId, graphKeyPairs: ProviderKeyPair[]): Promise<boolean> {
     const importBundles = await this.formImportBundles(dsnpUserId, graphKeyPairs);
-    return this.graphStateManager.importUserData(importBundles);
+    return graphState.importUserData(importBundles);
   }
 
   async formImportBundles(dsnpUserId: MessageSourceId, graphKeyPairs: ProviderKeyPair[]): Promise<ImportBundle[]> {
@@ -288,7 +291,7 @@ export class ReconnectionGraphService {
     return importBundles;
   }
 
-  private async importConnectionKeys(graphConnections: ProviderGraph[]): Promise<void> {
+  private async importConnectionKeys(graphState: Graph, graphConnections: ProviderGraph[]): Promise<void> {
     const keyPromises = graphConnections
       .filter(
         ({ direction, privacyType, connectionType }) =>
@@ -299,10 +302,11 @@ export class ReconnectionGraphService {
 
     const bundles = keys.map((dsnpKeys) => new ImportBundleBuilder().withDsnpUserId(dsnpKeys.dsnpUserId).withDsnpKeys(dsnpKeys).build());
 
-    this.graphStateManager.importUserData(bundles);
+    graphState.importUserData(bundles);
   }
 
   async formConnections(
+    graphState: Graph,
     dsnpUserId: MessageSourceId | AnyNumber,
     providerId: MessageSourceId | AnyNumber,
     isTransitive: boolean,
@@ -312,7 +316,7 @@ export class ReconnectionGraphService {
     const actions: ConnectAction[] = [];
     // this.logger.debug(`Graph connections for user ${dsnpUserId.toString()}: ${JSON.stringify(graphConnections)}`);
     // Import DSNP public graph keys for connected users in private friendship connections
-    await this.importConnectionKeys(graphConnections);
+    await this.importConnectionKeys(graphState, graphConnections);
     await Promise.all(
       graphConnections.map(async (connection): Promise<void> => {
         const connectionType = connection.connectionType.toLowerCase();
