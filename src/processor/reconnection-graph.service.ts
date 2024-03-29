@@ -59,6 +59,7 @@ export class ReconnectionGraphService {
       this.logger.error(`Error getting user graph from provider: ${e}`);
       throw e;
     }
+    this.logger.debug(`Retrieved ${graphConnections.length} connections for user ${dsnpUserId.toString()}`);
 
     try {
       // get the user's DSNP Graph from the blockchain and form import bundles
@@ -334,6 +335,7 @@ export class ReconnectionGraphService {
         }
 
         if (!isDelegated) {
+          this.logger.error(`No delegation for user ${dsnpUserId.toString()} for schema ${schemaId}`);
           return;
         }
 
@@ -373,6 +375,9 @@ export class ReconnectionGraphService {
               const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
               this.graphUpdateQueue.remove(jobId);
               this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
+              this.logger.debug(`Queued transitive graph update job ${jobId}`);
+            } else {
+              this.logger.warn(`No delegation for user ${connection.dsnpId} for schema ${schemaId}`);
             }
             break;
           }

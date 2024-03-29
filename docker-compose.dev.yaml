@@ -71,7 +71,7 @@ services:
   reconnection-service:
     depends_on:
       - redis
-      - frequency-instant
+      - frequency
       - webhook
     build:
       context: .

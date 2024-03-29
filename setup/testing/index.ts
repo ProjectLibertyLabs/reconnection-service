@@ -1,162 +1,437 @@
+/* eslint-disable no-plusplus */
+/* eslint-disable no-restricted-syntax */
+/* eslint-disable no-await-in-loop */
 import '@frequency-chain/api-augment';
 import { MessageSourceId } from '@frequency-chain/api-augment/interfaces';
 import { Keyring } from '@polkadot/keyring';
 import { KeyringPair } from '@polkadot/keyring/types';
-import { u32 } from '@polkadot/types';
+import { Vec } from '@polkadot/types';
 import { cryptoWaitReady } from '@polkadot/util-crypto';
-import { AddProviderPayload, ExtrinsicHelper, UserBuilder, signPayloadSr25519, initialize } from 'frequency-scenario-template'
+import {
+  AddProviderPayload,
+  ExtrinsicHelper,
+  UserBuilder,
+  signPayloadSr25519,
+  initialize,
+  Sr25519Signature,
+  ItemizedSignaturePayloadV2,
+  EventError,
+} from 'frequency-scenario-template';
 import log from 'loglevel';
-import { ProviderGraph, GraphKeyPair } from "reconnection-service/src/interfaces/provider-graph.interface"
+import { ProviderGraph, GraphKeyPair as ProviderGraphKeyPair } from 'reconnection-service/src/interfaces/provider-graph.interface';
 import fs from 'node:fs';
+import { SubmittableExtrinsic } from '@polkadot/api-base/types';
+import { Codec, ISubmittableResult } from '@polkadot/types/types';
+import { FrameSystemEventRecord } from '@polkadot/types/lookup';
+import { isArray, u8aToHex } from '@polkadot/util';
+import { AddGraphKeyAction, AddKeyUpdate, ConnectionType, EnvironmentInterface, EnvironmentType, Graph, GraphKeyPair, GraphKeyType, PrivacyType } from '@dsnp/graph-sdk';
+import { HexString } from '@polkadot/util/types';
+import { ApiPromise } from '@polkadot/api';
 
 type ChainUser = {
-    uri?: string;
-    keys?: KeyringPair;
-    msaId?: MessageSourceId;
-}
+  uri?: string;
+  keys?: KeyringPair;
+  msaId?: MessageSourceId;
+  create?: () => SubmittableExtrinsic<'promise', ISubmittableResult>;
+  addGraphKey?: () => SubmittableExtrinsic<'promise', ISubmittableResult>;
+  resetGraph?: (() => SubmittableExtrinsic<'promise', ISubmittableResult>)[];
+};
 
 type ProviderResponse = {
-    dsnpId: string;
-    connections: {
-        data: ProviderGraph[],
-        pagination?: {
-            pageNumber: number;
-            pageSize: number;
-            pageCount: number;
-        },
-    },
-    graphKeyPairs: GraphKeyPair[]
-}
+  dsnpId: string;
+  connections: {
+    data: ProviderGraph[];
+    pagination?: {
+      pageNumber: number;
+      pageSize: number;
+      pageCount: number;
+    };
+  };
+  graphKeyPairs: ProviderGraphKeyPair[];
+};
+
+let graphPublicKey: HexString;
+let graphPrivateKey: HexString;
+let graphKeyPair: GraphKeyPair;
+let privateFollowSchemaId: number;
+const CAPACITY_AMOUNT_TO_STAKE = 1_000_000_000_000_000n;
 
 const keyring = new Keyring({ type: 'sr25519' });
 const DEFAULT_SCHEMAS = [5, 7, 8, 9, 10];
-let nonce: u32;
+let nonce: number;
+let graph: Graph;
 
-async function createUserWithProvider(follower: ChainUser, provider: ChainUser) {
-    const existingUser = await ExtrinsicHelper.apiPromise.query.msa.publicKeyToMsaId(follower.keys!.publicKey);
-    if (existingUser.isSome) {
-        follower.msaId = existingUser.unwrap();
-        console.log(`Existing user ${follower.msaId.toString()} found`);
-        return;
-    }
-    const block = await ExtrinsicHelper.apiPromise.rpc.chain.getBlock();
-    const blockNumber = block.block.header.number.toNumber();
-    const addProvider: AddProviderPayload = {
-        authorizedMsaId: provider.msaId,
-        schemaIds: DEFAULT_SCHEMAS,
-        expiration: blockNumber + 50,
-    }
-    const payload = ExtrinsicHelper.apiPromise.registry.createType('PalletMsaAddProvider', addProvider);
-    const proof = signPayloadSr25519(follower.keys!, payload);
-    const [creationEvent] = await ExtrinsicHelper.createSponsoredAccountWithDelegation(follower.keys!, provider.keys!, proof, addProvider).payWithCapacity();
-    // eslint-disable-next-line new-cap
-    // nonce = new u32(ExtrinsicHelper.apiPromise.registry, nonce.iaddn(1));
-    if (creationEvent && ExtrinsicHelper.apiPromise.events.msa.MsaCreated.is(creationEvent)) {
-        follower.msaId = creationEvent.data.msaId;
-        console.log(`Created follower ${creationEvent.data.msaId.toString()}`);
-    }
+function mapToArray<K, V>(map: Map<K, V>): [Array<K>, Array<V>] {
+  return [Array.from(map.keys()), Array.from(map.values())];
+}
+
+let graphKeyAction: any;
+async function getAddGraphKeyPayload(graph: Graph, user: ChainUser): Promise<{ payload: ItemizedSignaturePayloadV2; proof: Sr25519Signature }> {
+  if (!graphKeyAction) {
+    const actions = [
+      {
+        type: 'AddGraphKey',
+        ownerDsnpUserId: '1',
+        newPublicKey: graphKeyPair.publicKey,
+      } as AddGraphKeyAction,
+    ];
+    graph.applyActions(actions);
+    const keyExport = graph.exportUserGraphUpdates('1');
+
+    const bundle = keyExport[0] as AddKeyUpdate;
+
+    const addAction = [
+      {
+        Add: {
+          data: u8aToHex(bundle.payload),
+        },
+      },
+    ];
+    graphKeyAction = {
+      targetHash: 0,
+      schemaId: 7,
+      actions: addAction,
+    };
+  }
+
+  const currentBlockNumber = (await ExtrinsicHelper.apiPromise.rpc.chain.getBlock()).block.header.number.toNumber();
+  graphKeyAction.expiration = currentBlockNumber + ExtrinsicHelper.apiPromise.consts.msa.mortalityWindowSize.toNumber();
+  const payloadBytes = ExtrinsicHelper.api.registry.createType('PalletStatefulStorageItemizedSignaturePayloadV2', graphKeyAction);
+  const proof = signPayloadSr25519(user.keys!, payloadBytes);
+  return { payload: { ...graphKeyAction }, proof };
+}
+
+async function getAddProviderPayload(user: ChainUser, provider: ChainUser): Promise<{ payload: AddProviderPayload; proof: Sr25519Signature }> {
+  const block = await ExtrinsicHelper.apiPromise.rpc.chain.getBlock();
+  const blockNumber = block.block.header.number.toNumber();
+  const mortalityWindowSize = ExtrinsicHelper.apiPromise.consts.msa.mortalityWindowSize.toNumber();
+  const addProvider: AddProviderPayload = {
+    authorizedMsaId: provider.msaId,
+    schemaIds: DEFAULT_SCHEMAS,
+    expiration: blockNumber + mortalityWindowSize,
+  };
+  const payload = ExtrinsicHelper.apiPromise.registry.createType('PalletMsaAddProvider', addProvider);
+  const proof = signPayloadSr25519(user.keys!, payload);
+
+  return { payload: addProvider, proof };
+}
+
+async function populateExtrinsics(follower: ChainUser, provider: ChainUser): Promise<void> {
+  if (follower.msaId) {
+    //   const existingUser = await ExtrinsicHelper.apiPromise.query.msa.publicKeyToMsaId(follower.keys!.publicKey);
+    //   if (existingUser.isSome) {
+    //     follower.msaId = existingUser.unwrap();
+    console.log(`Existing user ${follower.msaId.toString()} found`);
+
+    const pages = await ExtrinsicHelper.apiPromise.rpc.statefulStorage.getPaginatedStorage(follower.msaId, privateFollowSchemaId);
+    // console.log('pages: ', pages.toHuman());
+    pages.toArray().forEach((page) => {
+      console.log(`Enqueuing graph page removal for user ${follower.msaId?.toString()}, page ${page.page_id}`);
+      follower.resetGraph?.push(() => ExtrinsicHelper.apiPromise.tx.statefulStorage.deletePage(msaId, privateFollowSchemaId, page.page_id, page.content_hash));
+    });
+
+    return;
+  }
+  const { payload: addProviderPayload, proof } = await getAddProviderPayload(follower, provider);
+  follower.create = () => ExtrinsicHelper.apiPromise.tx.msa.createSponsoredAccountWithDelegation(follower.keys!.publicKey, proof, addProviderPayload);
+
+  const { payload: addGraphKeyPayload, proof: addGraphKeyProof } = await getAddGraphKeyPayload(graph, follower);
+  follower.addGraphKey = () => ExtrinsicHelper.apiPromise.tx.statefulStorage.applyItemActionsWithSignatureV2(follower.keys!.publicKey, addGraphKeyProof, addGraphKeyPayload);
+}
+
+function getUnresolvedFollowerCount(followers: Map<string, ChainUser>): number {
+  return Array.from(followers.values()).filter((f) => !f?.msaId)?.length ?? 0;
 }
 
 async function main() {
-    await cryptoWaitReady();
-    console.log('Connecting...');
-    await initialize('ws://127.0.0.1:9944');
-    log.setLevel('trace');
-    const { apiPromise } = ExtrinsicHelper;
+  await cryptoWaitReady();
+  console.log('Connecting...');
+  await initialize('ws://127.0.0.1:9944');
+  log.setLevel('trace');
+  const { apiPromise } = ExtrinsicHelper;
 
-    // Create all keypairs
-    const provider: ChainUser = { keys: keyring.addFromUri('//Alice') };
-    const famousUser: ChainUser = { uri: '//Bob', keys: keyring.addFromUri('//Bob') };
-    const followers: ChainUser[] = new Array(7_000).fill(0).map((_, index) => {
-        console.log(`Creating keypair for //Charlie//${index}`);
-        return { uri: `//Charlie//${index}`, keys: keyring.addFromUri(`//Charlie//${index}`)};
-     });
-    console.log('Created keypairs');
+  const provider: ChainUser = { keys: keyring.addFromUri('//Alice') };
+  const famousUser: ChainUser = { uri: '//Bob', keys: keyring.addFromUri('//Bob') };
+  const followers = new Map<string, ChainUser>();
 
-    // Create graph keys for all users
+  // Create provider
+  console.log('Creating provider...');
+  const builder = new UserBuilder();
+  const providerUser = await builder.withKeypair(provider.keys!).asProvider('Alice Provider').withFundingSource(provider.keys).build();
+  provider.msaId = providerUser.msaId;
+  console.log(`Created provider ${provider.msaId.toString()}`);
 
-    // Create provider
-    console.log('Creating provider...');
-    const builder = new UserBuilder();
-    const providerUser = await builder.withKeypair(provider.keys!).asProvider('Alice Provider').withFundingSource(provider.keys).build();
-    provider.msaId = providerUser.msaId;
-    await ExtrinsicHelper.stake(provider.keys!, provider.msaId, 100_000_000_000).signAndSend();
-    console.log(`Created provider ${provider.msaId.toString()}`);
+  // Ensure provider is staked
+  const capacity = await ExtrinsicHelper.apiPromise.query.capacity.capacityLedger(provider.msaId);
+  if (capacity.isNone || capacity.unwrap().totalTokensStaked.toBigInt() < CAPACITY_AMOUNT_TO_STAKE) {
+    await ExtrinsicHelper.stake(provider.keys!, provider.msaId, CAPACITY_AMOUNT_TO_STAKE).signAndSend();
+    console.log(`Staked to provider`);
+  }
 
-    nonce = (await apiPromise.query.system.account(provider.keys!.publicKey)).nonce;
+  // Create all keypairs
+  console.log('Creating keypairs...');
+  new Array(7000).fill(0).forEach((_, index) => {
+    const keys = keyring.addFromUri(`//Charlie//${index}`);
+    followers.set(keys.address, { uri: `//Charlie//${index}`, keys, resetGraph: [] });
+  });
+  const [followerAddresses] = mapToArray(followers);
+  console.log('Created keypairs');
 
-    // Create followers
-    // eslint-disable-next-line no-restricted-syntax
-    for (const follower of followers) {
-        // eslint-disable-next-line no-await-in-loop
-        await createUserWithProvider(follower, provider);
+  // Create graph keys for all users
+  const graphEnvironment: EnvironmentInterface = { environmentType: EnvironmentType.Mainnet }; // use Mainnet for @dsnp/instant-seal-node-with-deployed-schemas
+  graph = new Graph(graphEnvironment);
+  graphKeyPair = Graph.generateKeyPair(GraphKeyType.X25519);
+  graphPublicKey = u8aToHex(graphKeyPair.publicKey);
+  graphPrivateKey = u8aToHex(graphKeyPair.secretKey);
+  privateFollowSchemaId = graph.getSchemaIdFromConfig(graphEnvironment, ConnectionType.Follow, PrivacyType.Private);
+  console.log(`dsnp:private-follows schema ID is ${privateFollowSchemaId}`);
+
+  // Get existing users
+  const allMsas = await ExtrinsicHelper.apiPromise.query.msa.publicKeyToMsaId.multi([...followerAddresses]);
+  followerAddresses.forEach((address, index) => {
+    if (!allMsas[index].isNone) {
+      followers.get(address)!.msaId = allMsas[index].unwrap();
     }
+  });
+  const famouseMsa = await ExtrinsicHelper.apiPromise.query.msa.publicKeyToMsaId(famousUser.keys!.address);
+  if (famouseMsa.isSome) {
+    famousUser.msaId = famouseMsa.unwrap();
+  }
 
-    // Create famous, followed user
-    // NOTE: Must be AFTER other users created, we want this to be the last event on the chain
-    await createUserWithProvider(famousUser, provider);
-    const famousBlock = await apiPromise.rpc.chain.getBlock();
-    console.log('Famous user created at block: ', famousBlock.block.header.number.toNumber());
+  interface PromiseTracker {
+    resolve?: () => void;
+    reject?: (reason?: any) => void;
+    promise?: Promise<void>;
+    numberPending: number;
+  }
 
-    // Create JSON responses for each follower
-    if (!fs.existsSync('../../webhook-specification/mock-webhook-server/responses')) {
-        fs.mkdirSync('../../webhook-specification/mock-webhook-server/responses');
-    };
-    followers.forEach((follower) => {
-        const response: ProviderResponse = {
-            dsnpId: follower.msaId!.toString(),
-            connections: {
-                data: [
-                    {
-                        dsnpId: famousUser.msaId!.toString(),
-                        privacyType: 'Private',
-                        direction: 'connectionTo',
-                        connectionType: 'Follow'
-                    }
-                ]
-            },
-            graphKeyPairs: []
-        }
+  const allBatchesTracker: PromiseTracker = { numberPending: 0 };
 
-        fs.writeFileSync(`../../webhook-specification/mock-webhook-server/responses/response.${follower.msaId?.toString()}.json`, JSON.stringify(response, undefined, 4));
+  let followersToCreate = 0;
+  let graphsToClear = 0;
+
+  // Create followers
+  await Promise.all([
+    ...followerAddresses.map((a) => {
+      const follower = followers.get(a)!;
+      return populateExtrinsics(follower, provider);
+    }),
+    populateExtrinsics(famousUser, provider),
+  ]);
+  const extrinsics: SubmittableExtrinsic<'promise', ISubmittableResult>[] = [];
+  for (const follower of followers.values()) {
+    if (follower?.create) {
+      extrinsics.push(follower.create());
+      followersToCreate++;
+    }
+    if (follower?.addGraphKey) {
+      extrinsics.push(follower.addGraphKey());
+    }
+    if (follower?.resetGraph?.length && follower.resetGraph?.length > 0) {
+      extrinsics.push(...follower.resetGraph.map((e) => e()));
+      graphsToClear++;
+    }
+  }
+
+  if (famousUser?.create) {
+    extrinsics.push(famousUser.create());
+    followersToCreate++;
+  }
+  if (famousUser?.addGraphKey) {
+    extrinsics.push(famousUser.addGraphKey());
+  }
+  if (famousUser?.resetGraph?.length && famousUser.resetGraph?.length > 0) {
+    extrinsics.push(...famousUser.resetGraph.map((e) => e()));
+    graphsToClear++;
+  }
+
+  console.log(`
+MSAs to create: ${followersToCreate}
+User graphs to clear: ${graphsToClear}
+`);
+
+  let famousUserCreatedBlockHash: HexString | undefined;
+
+  if (extrinsics.length !== 0) {
+    console.log(`Enqueuing ${extrinsics.length} extrinsics for execution`);
+
+    const maxBatch = apiPromise.consts.frequencyTxPayment.maximumCapacityBatchLength.toNumber();
+    allBatchesTracker.promise = new Promise((resolve, reject) => {
+      allBatchesTracker.resolve = resolve;
+      allBatchesTracker.reject = reject;
+      allBatchesTracker.numberPending = 0;
     });
 
-    const famousUserResponse = {
-        dsnpId: famousUser.msaId!.toString(),
-        graphKeyPairs: [
-            {
-            keyType: "X25519",
-            publicKey: "0xe3b18e1aa5c84175ec0c516838fb89dd9c947dd348fa38fe2082764bbc82a86f",
-            privateKey: "0xa55688dc2ffcf0f2b7e819029ad686a3c896c585725f5ac38dddace7de703451"
-            } as GraphKeyPair
-        ]
+    // Subscribe to events on-chain and update accounts as MSAs are created
+    const unsubscribeEvents = await ExtrinsicHelper.apiPromise.query.system.events((events: Vec<FrameSystemEventRecord>) => {
+      events.forEach((eventRecord) => {
+        const { event } = eventRecord;
+        if (ExtrinsicHelper.api.events.utility.BatchCompleted.is(event)) {
+          allBatchesTracker.numberPending -= 1;
+          if (allBatchesTracker.numberPending < 1) {
+            allBatchesTracker.numberPending = 0;
+            (allBatchesTracker?.resolve ?? (() => {}))();
+          }
+        } else if (ExtrinsicHelper.api.events.msa.MsaCreated.is(event)) {
+          const { msaId, key } = event.data;
+          const address = key.toString();
+          const follower = followers.get(address);
+          if (follower) {
+            follower.msaId = msaId;
+            followers.set(address, follower);
+          } else if (address === famousUser.keys!.address) {
+            famousUser.msaId = msaId;
+            famousUserCreatedBlockHash = events.createdAtHash?.toHex();
+          } else {
+            console.error('Cannot find follower ', address);
+          }
+        }
+      });
+    });
+
+    const unsubBlocks = await ExtrinsicHelper.apiPromise.rpc.chain.subscribeFinalizedHeads(() => {
+      const count = extrinsics.length + allBatchesTracker.numberPending;
+      console.log(`Extrinsincs remaining: ${count}`);
+      if (count === 0) {
+        unsubBlocks();
+      }
+    });
+
+    nonce = (await apiPromise.query.system.account(provider.keys!.publicKey)).nonce.toNumber();
+
+    while (extrinsics.length > 0) {
+      if (allBatchesTracker.numberPending < 100) {
+        const xToPost = extrinsics.splice(0, maxBatch);
+        allBatchesTracker.numberPending += 1;
+        // eslint-disable-next-line no-loop-func
+        const unsub = await ExtrinsicHelper.apiPromise.tx.frequencyTxPayment.payWithCapacityBatchAll(xToPost).signAndSend(provider.keys!, { nonce: nonce++ }, (x) => {
+          const { status } = x;
+          // console.log(status.type);
+          // console.dir(x.toHuman());
+          //   x.events.forEach((e) => console.dir(e.event.toHuman()));
+          if (x.dispatchError) {
+            unsub();
+            (allBatchesTracker?.reject ?? (() => {}))(new EventError(x.dispatchError));
+          } else if (status.isInvalid) {
+            unsub();
+            console.log(x.toHuman());
+            (allBatchesTracker?.reject ?? (() => {}))(new Error('Extrinsic failed: Invalid'));
+          } else if (x.isFinalized) {
+            unsub();
+          }
+        });
+      } else {
+        await allBatchesTracker.promise;
+        allBatchesTracker.promise = new Promise((resolve, reject) => {
+          allBatchesTracker.resolve = resolve;
+          allBatchesTracker.reject = reject;
+        });
+      }
     }
 
-    const responses: ProviderResponse[] = [];
-    while (followers.length > 0) {
-        const followerSlice = followers.splice(0, Math.min(followers.length, 100));
-        const response = {
-            ...famousUserResponse,
-            connections: {
-                data: followerSlice.map((follower) => ({
-                    dsnpId: follower.msaId!.toString(),
-                    privacyType: 'Private',
-                    direction: "connectionFrom",
-                    connectionType: 'Follow'
-                } as ProviderGraph))
-            }
-        }
-        responses.push(response);
-    }
+    await allBatchesTracker.promise;
+    unsubscribeEvents();
+  }
 
-    responses.forEach((response, index) => {
-        response.connections.pagination = {
-            pageNumber: index + 1,
-            pageCount: responses.length,
-            pageSize: response.connections.data.length
-        }
-        fs.writeFileSync(`../../webhook-specification/mock-webhook-server/responses/response.${famousUser.msaId!.toString()}.${index + 1}.json`, JSON.stringify(response, undefined, 4));
-    })
+  // Create famous, followed user
+  // NOTE: Must be AFTER other users created, we want this to be the last event on the chain
+  //   await populateExtrinsics(famousUser, provider);
+  //   if (!famousUser.msaId) {
+  //     console.log('Creating "famous" user...');
+  //     const famousTxns = [famousUser.create!(), famousUser.addGraphKey!()];
+  //     const [_unused, eventMap] = await ExtrinsicHelper.payWithCapacityBatchAll(provider.keys!, famousTxns).signAndSend();
+  //     const msaEvent = eventMap['msa.MsaCreated'];
+  //     if (msaEvent && !isArray(msaEvent)) {
+  //       if (ExtrinsicHelper.api.events.msa.MsaCreated.is(msaEvent)) {
+  //         famousUser.msaId = msaEvent.data.msaId.toString();
+  //       }
+  //     }
+  //     const famousBlock = await apiPromise.rpc.chain.getBlock();
+  //     console.log(`Famous user ${famousUser.msaId} created at block: ${famousBlock.block.header.number.toNumber()}`);
+  //   } else if (famousUser?.resetGraph?.length) {
+  //   }
+
+  if (famousUserCreatedBlockHash) {
+    const block = await apiPromise.rpc.chain.getBlock(famousUserCreatedBlockHash);
+    console.log(`Famous user created at block ${block.block.header.number.toNumber()}`);
+  }
+
+  // Create JSON responses for each follower
+  if (!fs.existsSync('webhook-specification/mock-webhook-server/responses')) {
+    fs.mkdirSync('webhook-specification/mock-webhook-server/responses');
+  }
+  followers.forEach((follower) => {
+    const response: ProviderResponse = {
+      dsnpId: follower.msaId!.toString(),
+      connections: {
+        data: [
+          {
+            dsnpId: famousUser.msaId!.toString(),
+            privacyType: 'Private',
+            direction: 'connectionTo',
+            connectionType: 'Follow',
+          },
+        ],
+      },
+      graphKeyPairs: [
+        {
+          keyType: 'X25519',
+          publicKey: graphPublicKey,
+          privateKey: graphPrivateKey,
+        } as ProviderGraphKeyPair,
+      ],
+    };
+
+    fs.writeFileSync(`webhook-specification/mock-webhook-server/responses/response.${follower.msaId?.toString()}.json`, JSON.stringify(response, undefined, 4));
+  });
+
+  const famousUserResponse = {
+    dsnpId: famousUser.msaId!.toString(),
+    graphKeyPairs: [
+      {
+        keyType: 'X25519',
+        publicKey: '0xe3b18e1aa5c84175ec0c516838fb89dd9c947dd348fa38fe2082764bbc82a86f',
+        privateKey: '0xa55688dc2ffcf0f2b7e819029ad686a3c896c585725f5ac38dddace7de703451',
+      } as ProviderGraphKeyPair,
+    ],
+  };
+
+  const responses: ProviderResponse[] = [];
+  const [_, allFollowers] = mapToArray(followers);
+  while (allFollowers.length > 0) {
+    const followerSlice = allFollowers.splice(0, Math.min(allFollowers.length, 50));
+    const response = {
+      ...famousUserResponse,
+      connections: {
+        data: followerSlice.flatMap((follower) => [
+          {
+            dsnpId: follower.msaId!.toString(),
+            privacyType: 'Private',
+            direction: 'connectionFrom',
+            connectionType: 'Follow',
+          } as ProviderGraph,
+          {
+            dsnpId: follower.msaId!.toString(),
+            privacyType: 'Private',
+            direction: 'connectionTo',
+            connectionType: 'Follow',
+          } as ProviderGraph,
+        ]),
+      },
+    };
+    responses.push(response);
+  }
+
+  responses.forEach((response, index) => {
+    response.connections.pagination = {
+      pageNumber: index + 1,
+      pageCount: responses.length,
+      pageSize: response.connections.data.length,
+    };
+    fs.writeFileSync(`webhook-specification/mock-webhook-server/responses/response.${famousUser.msaId!.toString()}.${index + 1}.json`, JSON.stringify(response, undefined, 4));
+  });
 }
 
-main().catch(e => console.error(e)).finally(async () => ExtrinsicHelper.disconnect());
+main()
+  .catch((e) => console.error(e))
+  .finally(async () => ExtrinsicHelper.disconnect());

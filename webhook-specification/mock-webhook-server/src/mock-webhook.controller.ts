@@ -4,7 +4,7 @@
 https://docs.nestjs.com/controllers#controllers
 */
 
-import { Body, Controller, Get, HttpException, HttpStatus, Logger, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, HttpStatus, Logger, Param, Post, Query, Req } from '@nestjs/common';
 import fs from 'fs';
 
 class ProviderRequestDto {
@@ -37,7 +37,7 @@ export class MockWebhookController {
   }
 
   @Get('/api/v1.0.0/connections/:dsnpId')
-  public getConnections(@Param('dsnpId') dsnpId: string, @Body() params: ProviderRequestDto) {
+  public getConnections(@Req() request, @Param('dsnpId') dsnpId: string, @Query() params: ProviderRequestDto) {
     if (this.healthResponse !== HttpStatus.OK) {
       this.logger.log(`/connections returning ${this.healthResponse}`);
       throw new HttpException('Bad endpoint', this.healthResponse);
@@ -57,6 +57,7 @@ export class MockWebhookController {
     } else if (fs.existsSync('./responses/response.default.json')) {
       filename = './responses/response.default.json';
     }
+    this.logger.log(`Returning file ${filename}`);
 
     if (filename) {
       const content = fs.readFileSync(filename);
