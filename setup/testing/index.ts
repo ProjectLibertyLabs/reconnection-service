@@ -127,7 +127,7 @@ async function populateExtrinsics(follower: ChainUser, provider: ChainUser): Pro
     // console.log('pages: ', pages.toHuman());
     pages.toArray().forEach((page) => {
       console.log(`Enqueuing graph page removal for user ${follower.msaId?.toString()}, page ${page.page_id}`);
-      follower.resetGraph?.push(() => ExtrinsicHelper.apiPromise.tx.statefulStorage.deletePage(msaId, privateFollowSchemaId, page.page_id, page.content_hash));
+      follower.resetGraph?.push(() => ExtrinsicHelper.apiPromise.tx.statefulStorage.deletePage(follower.msaId, privateFollowSchemaId, page.page_id, page.content_hash));
     });
 
     return;
@@ -390,8 +390,8 @@ User graphs to clear: ${graphsToClear}
     graphKeyPairs: [
       {
         keyType: 'X25519',
-        publicKey: '0xe3b18e1aa5c84175ec0c516838fb89dd9c947dd348fa38fe2082764bbc82a86f',
-        privateKey: '0xa55688dc2ffcf0f2b7e819029ad686a3c896c585725f5ac38dddace7de703451',
+        publicKey: graphPublicKey,
+        privateKey: graphPrivateKey,
       } as ProviderGraphKeyPair,
     ],
   };

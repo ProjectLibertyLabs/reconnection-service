@@ -371,13 +371,15 @@ export class ReconnectionGraphService {
             break;
           }
           case 'connectionFrom': {
-            if (isDelegatedConnection) {
-              const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-              this.graphUpdateQueue.remove(jobId);
-              this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
-              this.logger.debug(`Queued transitive graph update job ${jobId}`);
-            } else {
-              this.logger.warn(`No delegation for user ${connection.dsnpId} for schema ${schemaId}`);
+            if (isTransitive) {
+              if (isDelegatedConnection) {
+                const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
+                this.graphUpdateQueue.remove(jobId);
+                this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
+                this.logger.debug(`Queued transitive graph update job ${jobId}`);
+              } else {
+                this.logger.warn(`No delegation for user ${connection.dsnpId} for schema ${schemaId}`);
+              }
             }
             break;
           }
@@ -397,10 +399,14 @@ export class ReconnectionGraphService {
 
             actions.push(connectionAction);
 
-            if (isDelegatedConnection) {
-              const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-              this.graphUpdateQueue.remove(jobId);
-              this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
+            if (isTransitive) {
+              if (isDelegatedConnection) {
+                const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
+                this.graphUpdateQueue.remove(jobId);
+                this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
+              }
+            } else {
+              this.logger.warn(`No delegation for user ${connection.dsnpId} for schema ${schemaId}`);
             }
             break;
           }
