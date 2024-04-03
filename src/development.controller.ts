@@ -29,10 +29,10 @@ export class DevelopmentController {
     this.graphUpdateQueue.on('paused', () => this.logger.debug('Queue is paused'));
     this.graphUpdateQueue.on('resumed', () => this.logger.debug('Queue has resumed'));
     this.graphUpdateQueue.on('error', (err) => this.logger.error(`Queue encountered an error: ${err}`));
-    this.graphUpdateQueue.on('waiting', (job) =>
-      this.logger.debug(`Queued job ${job.id}:
-    ${JSON.stringify(job.data)}`),
-    );
+    // this.graphUpdateQueue.on('waiting', (job) =>
+    //   this.logger.debug(`Queued job ${job.id}:
+    // ${JSON.stringify(job.data)}`),
+    // );
   }
 
   @Post('queue/clear')
