@@ -10,9 +10,9 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { InjectRedis } from '@liaoliaots/nestjs-redis';
 import Redis from 'ioredis';
+import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
 import { CapacityLowError } from './errors';
 
-export const SECONDS_PER_BLOCK = 12;
 const CAPACITY_EPOCH_TIMEOUT_NAME = 'capacity_check';
 
 @Injectable()
@@ -86,10 +86,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     }
 
     try {
-      const totalCapacityUsed = await this.graphSdkService.updateUserGraph(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
-      if (Object.keys(totalCapacityUsed).length > 0) {
-        await this.setEpochCapacity(totalCapacityUsed);
-      }
+      await this.graphSdkService.updateUserGraph(job.id ?? '', job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
       this.logger.verbose(`Successfully completed job ${job.id}`);
     } catch (e) {
       this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);
@@ -100,7 +97,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
         // all failing txs due to low capacity will be delayed until next epoch
         const capacity = await this.blockchainService.capacityInfo(this.configService.getProviderId());
         const blocksRemaining = capacity.nextEpochStart - capacity.currentBlockNumber;
-        const blockDelay = SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
+        const blockDelay = BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
         const delay = e instanceof CapacityLowError ? blocksRemaining * blockDelay : blockDelay;
         this.logger.debug(`Adding delay to job ${job.id} for ${delay}ms`);
         const { key: delayJobId, data: delayJobData } = createGraphUpdateJob(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
@@ -148,7 +145,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     try {
       this.schedulerRegistry.addTimeout(
         CAPACITY_EPOCH_TIMEOUT_NAME,
-        setTimeout(() => this.checkCapacity(), blocksRemaining * SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND),
+        setTimeout(() => this.checkCapacity(), blocksRemaining * BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND),
       );
     } catch (err) {
       // ignore duplicate timeout
@@ -167,21 +164,6 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
 
     if (this.webhookOk) {
       await this.graphUpdateQueue.resume();
-    }
-  }
-
-  private async setEpochCapacity(totalCapacityUsed: { [key: string]: bigint }): Promise<void> {
-    // eslint-disable-next-line no-restricted-syntax
-    for (const [epoch, capacityUsed] of Object.entries(totalCapacityUsed)) {
-      const epochCapacityKey = `epochCapacity:${epoch}`;
-      // eslint-disable-next-line no-await-in-loop
-      const epochCapacity = BigInt((await this.cacheManager.get(epochCapacityKey)) ?? 0);
-      const newEpochCapacity = epochCapacity + capacityUsed;
-      // eslint-disable-next-line no-await-in-loop
-      const epochDurationBlocks = await this.blockchainService.getCurrentEpochLength();
-      const epochDuration = epochDurationBlocks * SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
-      // eslint-disable-next-line no-await-in-loop
-      await this.cacheManager.setex(epochCapacityKey, epochDuration, newEpochCapacity.toString());
     }
   }
 

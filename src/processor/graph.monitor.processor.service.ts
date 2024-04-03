@@ -6,11 +6,9 @@ import Redis from 'ioredis';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { RegistryError } from '@polkadot/types/types';
 import { BlockchainService } from '#app/blockchain/blockchain.service';
-import { ConfigService } from '#app/config/config.service';
 import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
 import { ITxMonitorJob } from '#app/interfaces/monitor.job.interface';
-import { GraphUpdateJobDto } from '#app/interfaces/graph-update-job.dto';
-import { SECONDS_PER_BLOCK } from './queue-consumer.service';
+import { IGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
 
 @Injectable()
 @Processor('graphTxMonitorQueue')
@@ -76,7 +74,7 @@ export class GraphNotifierService extends WorkerHost {
 
   private async retryRequestJob(requestReferenceId: string): Promise<void> {
     this.logger.debug(`Retrying graph change request job ${requestReferenceId}`);
-    const requestJob: Job<GraphUpdateJobDto, any, string> | undefined = await this.reconnectionQueue.getJob(requestReferenceId);
+    const requestJob: Job<IGraphUpdateJob, any, string> | undefined = await this.reconnectionQueue.getJob(requestReferenceId);
     if (!requestJob) {
       this.logger.debug(`Job ${requestReferenceId} not found in queue`);
       return;
@@ -96,7 +94,7 @@ export class GraphNotifierService extends WorkerHost {
       const newEpochCapacity = epochCapacity + capacityWithdrew;
 
       const epochDurationBlocks = await this.blockchainService.getCurrentEpochLength();
-      const epochDuration = epochDurationBlocks * SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
+      const epochDuration = epochDurationBlocks * BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
       await this.cacheManager.setex(epochCapacityKey, epochDuration, newEpochCapacity.toString());
     } catch (error) {
       this.logger.error(`Error setting epoch capacity: ${error}`);
