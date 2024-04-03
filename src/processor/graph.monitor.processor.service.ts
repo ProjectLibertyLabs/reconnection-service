@@ -52,7 +52,7 @@ export class GraphNotifierService extends WorkerHost {
             await this.reconnectionQueue.pause();
           }
           if (errorReport.retry) {
-            await this.retryRequestJob(job.data.referencePublishJob.toGraphUpdateJob().key);
+            await this.retryRequestJob(job.data.id);
           } else {
             throw new Error(`Job ${job.data.id} failed with error ${JSON.stringify(txResult.error)}`);
           }
@@ -60,7 +60,7 @@ export class GraphNotifierService extends WorkerHost {
 
         if (txResult.success) {
           this.logger.verbose(`Successfully found ${job.data.txHash} found in block ${txResult.blockHash}`);
-          await this.removeSuccessJobs(job.data.referencePublishJob.toGraphUpdateJob().key);
+          await this.removeSuccessJobs(job.data.id);
         }
       }
     } catch (e) {
