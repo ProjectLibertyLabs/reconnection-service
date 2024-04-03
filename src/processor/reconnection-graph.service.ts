@@ -315,7 +315,12 @@ export class ReconnectionGraphService {
   ): Promise<ConnectAction[]> {
     const dsnpKeys: DsnpKeys = await this.formDsnpKeys(dsnpUserId);
     const actions: ConnectAction[] = [];
-    // this.logger.debug(`Graph connections for user ${dsnpUserId.toString()}: ${JSON.stringify(graphConnections)}`);
+    const delegationResult: Option<Vec<SchemaGrantResponse>> = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
+    if (delegationResult.isNone) {
+      this.logger.log(`User ${dsnpUserId} has no delegations to provider ${providerId}`);
+      return actions;
+    }
+    const delegations = delegationResult.unwrap().toArray();
     // Import DSNP public graph keys for connected users in private friendship connections
     await this.importConnectionKeys(graphState, graphConnections);
     await Promise.all(
@@ -324,15 +329,7 @@ export class ReconnectionGraphService {
         const privacyType = connection.privacyType.toLowerCase();
         const schemaId = this.graphStateManager.getSchemaIdFromConfig(connectionType as ConnectionType, privacyType as PrivacyType);
         /// make sure user has delegation for schemaId
-        let delegations: Option<Vec<SchemaGrantResponse>> = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
-        let isDelegated = false;
-        if (delegations.isSome) {
-          isDelegated =
-            delegations
-              .unwrap()
-              .toArray()
-              .findIndex((grant) => grant.schema_id.toNumber() === schemaId) !== -1;
-        }
+        const isDelegated = delegations.findIndex((grant) => grant.schema_id.toNumber() === schemaId) !== -1;
 
         if (!isDelegated) {
           this.logger.error(`No delegation for user ${dsnpUserId.toString()} for schema ${schemaId}`);
@@ -342,10 +339,10 @@ export class ReconnectionGraphService {
         /// make sure incoming user connection is also delegated for queuing updates non-transitively
         let isDelegatedConnection = false;
         if (isTransitive && (connection.direction === 'connectionFrom' || connection.direction === 'bidirectional')) {
-          delegations = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', connection.dsnpId, providerId);
-          if (delegations.isSome) {
+          const connectionDelegations = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', connection.dsnpId, providerId);
+          if (connectionDelegations.isSome) {
             isDelegatedConnection =
-              delegations
+              connectionDelegations
                 .unwrap()
                 .toArray()
                 .findIndex((grant) => grant.schema_id.toNumber() === schemaId) !== -1;
