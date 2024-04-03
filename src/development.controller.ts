@@ -105,7 +105,7 @@ export class DevelopmentController {
 
   @Post('update/graph')
   updateGraph(@Body() payload: GraphUpdateJobDto) {
-    this.graphService.updateUserGraph(payload.dsnpId, payload.providerId, true);
+    this.graphService.updateUserGraph(payload.toGraphUpdateJob().key, payload.dsnpId, payload.providerId, true);
   }
 
   @Post('scan/:blockNumber')

@@ -427,7 +427,7 @@ export class ReconnectionGraphService {
       );
       const nonce = await this.nonceService.getNextNonce();
       this.logger.debug(`Capacity Wrapped Extrinsic: ${ext}, nonce:${nonce}`);
-      const [txHash, _] = await ext.signAndSend(nonce);
+      const [txHash, _] = await ext.signAndSendNoWait(nonce);
       if (!txHash) {
         throw new Error('Tx hash is undefined');
       }
