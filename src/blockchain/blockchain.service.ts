@@ -140,8 +140,8 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     return this.rpc('system', 'accountNextIndex', account);
   }
 
-  public getBlock(block: BlockHash): Promise<SignedBlock> {
-    return firstValueFrom(this.api.rpc.chain.getBlock(block));
+  public async getBlock(block: BlockHash): Promise<SignedBlock> {
+    return (await this.apiPromise.rpc.chain.getBlock(block)) as SignedBlock;
   }
 
   public async getLatestFinalizedBlockNumber(): Promise<bigint> {
