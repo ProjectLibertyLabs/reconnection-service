@@ -5,7 +5,7 @@
   "main": "dist/src/main.js",
   "scripts": {
     "build": "npx tsc",
-    "start": "env TS_NODE_BASEURL=./dist/src node -r tsconfig-paths/register dist/src/main.js",
+    "start": "env TS_NODE_BASEURL=./dist/src node --inspect -r tsconfig-paths/register dist/src/main.js",
     "start:dev": "set -a ; . .env.dev ; ts-node-dev -r tsconfig-paths/register src/main.ts",
     "start:dev:docker": "npm i && ts-node-dev -r tsconfig-paths/register src/main.ts",
     "docker-build": "docker build -t reconnection-service .",
@@ -17,7 +17,9 @@
     "lint": "prettier --check ./src && eslint \"**/*.ts\"",
     "lint:fix": "prettier --write ./src && eslint \"**/*.ts\" --fix",
     "pretest": "cp env.template .env",
-    "test": "jest --coverage --verbose"
+    "test": "jest --coverage --verbose",
+    "chain-setup": "tsx setup/testing/index.ts",
+    "reset-chain": "setup/testing/reset_chain"
   },
   "repository": {
     "type": "git",
@@ -35,7 +37,7 @@
     "@bull-board/express": "^5.8.4",
     "@bull-board/nestjs": "^5.8.4",
     "@bull-board/ui": "^5.8.4",
-    "@dsnp/graph-sdk": "^1.0.3",
+    "@dsnp/graph-sdk": "^1.1.0",
     "@frequency-chain/api-augment": "^1.11.0",
     "@liaoliaots/nestjs-redis": "^9.0.5",
     "@nestjs/axios": "^2.0.0",
@@ -87,6 +89,7 @@
     "ts-node": "^10.9.1",
     "ts-node-dev": "^2.0.0",
     "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.7.1",
     "typescript": "^5.1.3"
   }
 }

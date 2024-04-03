@@ -59,6 +59,7 @@ export class ReconnectionGraphService {
       this.logger.error(`Error getting user graph from provider: ${e}`);
       throw e;
     }
+    this.logger.debug(`Retrieved ${graphConnections.length} connections for user ${dsnpUserId.toString()}`);
 
     try {
       // get the user's DSNP Graph from the blockchain and form import bundles
@@ -314,7 +315,12 @@ export class ReconnectionGraphService {
   ): Promise<ConnectAction[]> {
     const dsnpKeys: DsnpKeys = await this.formDsnpKeys(dsnpUserId);
     const actions: ConnectAction[] = [];
-    // this.logger.debug(`Graph connections for user ${dsnpUserId.toString()}: ${JSON.stringify(graphConnections)}`);
+    const delegationResult: Option<Vec<SchemaGrantResponse>> = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
+    if (delegationResult.isNone) {
+      this.logger.log(`User ${dsnpUserId} has no delegations to provider ${providerId}`);
+      return actions;
+    }
+    const delegations = delegationResult.unwrap().toArray();
     // Import DSNP public graph keys for connected users in private friendship connections
     await this.importConnectionKeys(graphState, graphConnections);
     await Promise.all(
@@ -323,27 +329,20 @@ export class ReconnectionGraphService {
         const privacyType = connection.privacyType.toLowerCase();
         const schemaId = this.graphStateManager.getSchemaIdFromConfig(connectionType as ConnectionType, privacyType as PrivacyType);
         /// make sure user has delegation for schemaId
-        let delegations: Option<Vec<SchemaGrantResponse>> = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
-        let isDelegated = false;
-        if (delegations.isSome) {
-          isDelegated =
-            delegations
-              .unwrap()
-              .toArray()
-              .findIndex((grant) => grant.schema_id.toNumber() === schemaId) !== -1;
-        }
+        const isDelegated = delegations.findIndex((grant) => grant.schema_id.toNumber() === schemaId) !== -1;
 
         if (!isDelegated) {
+          this.logger.error(`No delegation for user ${dsnpUserId.toString()} for schema ${schemaId}`);
           return;
         }
 
         /// make sure incoming user connection is also delegated for queuing updates non-transitively
         let isDelegatedConnection = false;
         if (isTransitive && (connection.direction === 'connectionFrom' || connection.direction === 'bidirectional')) {
-          delegations = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', connection.dsnpId, providerId);
-          if (delegations.isSome) {
+          const connectionDelegations = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', connection.dsnpId, providerId);
+          if (connectionDelegations.isSome) {
             isDelegatedConnection =
-              delegations
+              connectionDelegations
                 .unwrap()
                 .toArray()
                 .findIndex((grant) => grant.schema_id.toNumber() === schemaId) !== -1;
@@ -369,10 +368,15 @@ export class ReconnectionGraphService {
             break;
           }
           case 'connectionFrom': {
-            if (isDelegatedConnection) {
-              const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-              this.graphUpdateQueue.remove(jobId);
-              this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
+            if (isTransitive) {
+              if (isDelegatedConnection) {
+                const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
+                this.graphUpdateQueue.remove(jobId);
+                this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
+                this.logger.debug(`Queued transitive graph update job ${jobId}`);
+              } else {
+                this.logger.warn(`No delegation for user ${connection.dsnpId} for schema ${schemaId}`);
+              }
             }
             break;
           }
@@ -392,10 +396,14 @@ export class ReconnectionGraphService {
 
             actions.push(connectionAction);
 
-            if (isDelegatedConnection) {
-              const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
-              this.graphUpdateQueue.remove(jobId);
-              this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
+            if (isTransitive) {
+              if (isDelegatedConnection) {
+                const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
+                this.graphUpdateQueue.remove(jobId);
+                this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
+              }
+            } else {
+              this.logger.warn(`No delegation for user ${connection.dsnpId} for schema ${schemaId}`);
             }
             break;
           }
