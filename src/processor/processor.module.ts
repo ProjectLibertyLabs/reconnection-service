@@ -51,11 +51,21 @@ import { NonceService } from './nonce.service';
         backoff: {
           type: 'exponential',
         },
+        removeOnComplete: false,
+        removeOnFail: false,
+      },
+    }),
+    BullModule.registerQueue({
+      name: 'graphTxMonitorQueue',
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+        },
         removeOnComplete: true,
         removeOnFail: false,
       },
     }),
-
     // Bullboard UI
     BullBoardModule.forRoot({
       route: '/queues',
