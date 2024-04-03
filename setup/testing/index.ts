@@ -21,12 +21,11 @@ import log from 'loglevel';
 import { ProviderGraph, GraphKeyPair as ProviderGraphKeyPair } from 'reconnection-service/src/interfaces/provider-graph.interface';
 import fs from 'node:fs';
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
-import { Codec, ISubmittableResult } from '@polkadot/types/types';
+import { ISubmittableResult } from '@polkadot/types/types';
 import { FrameSystemEventRecord } from '@polkadot/types/lookup';
-import { isArray, u8aToHex } from '@polkadot/util';
-import { AddGraphKeyAction, AddKeyUpdate, ConnectionType, EnvironmentInterface, EnvironmentType, Graph, GraphKeyPair, GraphKeyType, PrivacyType } from '@dsnp/graph-sdk';
+import { hexToU8a, u8aToHex } from '@polkadot/util';
+import { AddGraphKeyAction, AddKeyUpdate, ConnectionType, EnvironmentInterface, EnvironmentType, Graph, PrivacyType } from '@dsnp/graph-sdk';
 import { HexString } from '@polkadot/util/types';
-import { ApiPromise } from '@polkadot/api';
 
 type ChainUser = {
   uri?: string;
@@ -50,9 +49,8 @@ type ProviderResponse = {
   graphKeyPairs: ProviderGraphKeyPair[];
 };
 
-let graphPublicKey: HexString;
-let graphPrivateKey: HexString;
-let graphKeyPair: GraphKeyPair;
+let graphPublicKey: HexString = '0x0514f63edc89d414061bf451cc99b1f2b43fac920c351be60774559a31523c75';
+let graphPrivateKey: HexString = '0x1c15b6d1af4716615a4eb83a2dfba3284e1c0a199603572e7b95c164f7ad90e3';
 let privateFollowSchemaId: number;
 const CAPACITY_AMOUNT_TO_STAKE = 1_000_000_000_000_000n;
 
@@ -72,7 +70,7 @@ async function getAddGraphKeyPayload(graph: Graph, user: ChainUser): Promise<{ p
       {
         type: 'AddGraphKey',
         ownerDsnpUserId: '1',
-        newPublicKey: graphKeyPair.publicKey,
+        newPublicKey: hexToU8a(graphPublicKey),
       } as AddGraphKeyAction,
     ];
     graph.applyActions(actions);
@@ -122,12 +120,15 @@ async function populateExtrinsics(follower: ChainUser, provider: ChainUser): Pro
     //   if (existingUser.isSome) {
     //     follower.msaId = existingUser.unwrap();
     console.log(`Existing user ${follower.msaId.toString()} found`);
+    follower.resetGraph = [];
 
     const pages = await ExtrinsicHelper.apiPromise.rpc.statefulStorage.getPaginatedStorage(follower.msaId, privateFollowSchemaId);
     // console.log('pages: ', pages.toHuman());
     pages.toArray().forEach((page) => {
-      console.log(`Enqueuing graph page removal for user ${follower.msaId?.toString()}, page ${page.page_id}`);
-      follower.resetGraph?.push(() => ExtrinsicHelper.apiPromise.tx.statefulStorage.deletePage(follower.msaId, privateFollowSchemaId, page.page_id, page.content_hash));
+      console.log(`Enqueuing graph page removal for user ${follower.msaId?.toString()}, page ${page.page_id}, content_hash: ${page.content_hash.toNumber()}`);
+      follower.resetGraph?.push(() =>
+        ExtrinsicHelper.apiPromise.tx.statefulStorage.deletePage(follower.msaId, privateFollowSchemaId, page.page_id.toNumber(), page.content_hash.toNumber()),
+      );
     });
 
     return;
@@ -137,10 +138,6 @@ async function populateExtrinsics(follower: ChainUser, provider: ChainUser): Pro
 
   const { payload: addGraphKeyPayload, proof: addGraphKeyProof } = await getAddGraphKeyPayload(graph, follower);
   follower.addGraphKey = () => ExtrinsicHelper.apiPromise.tx.statefulStorage.applyItemActionsWithSignatureV2(follower.keys!.publicKey, addGraphKeyProof, addGraphKeyPayload);
-}
-
-function getUnresolvedFollowerCount(followers: Map<string, ChainUser>): number {
-  return Array.from(followers.values()).filter((f) => !f?.msaId)?.length ?? 0;
 }
 
 async function main() {
@@ -159,7 +156,7 @@ async function main() {
   const builder = new UserBuilder();
   const providerUser = await builder.withKeypair(provider.keys!).asProvider('Alice Provider').withFundingSource(provider.keys).build();
   provider.msaId = providerUser.msaId;
-  console.log(`Created provider ${provider.msaId.toString()}`);
+  console.log(`Created provider ${provider.msaId!.toString()}`);
 
   // Ensure provider is staked
   const capacity = await ExtrinsicHelper.apiPromise.query.capacity.capacityLedger(provider.msaId);
@@ -180,9 +177,6 @@ async function main() {
   // Create graph keys for all users
   const graphEnvironment: EnvironmentInterface = { environmentType: EnvironmentType.Mainnet }; // use Mainnet for @dsnp/instant-seal-node-with-deployed-schemas
   graph = new Graph(graphEnvironment);
-  graphKeyPair = Graph.generateKeyPair(GraphKeyType.X25519);
-  graphPublicKey = u8aToHex(graphKeyPair.publicKey);
-  graphPrivateKey = u8aToHex(graphKeyPair.secretKey);
   privateFollowSchemaId = graph.getSchemaIdFromConfig(graphEnvironment, ConnectionType.Follow, PrivacyType.Private);
   console.log(`dsnp:private-follows schema ID is ${privateFollowSchemaId}`);
 
@@ -333,27 +327,9 @@ User graphs to clear: ${graphsToClear}
     unsubscribeEvents();
   }
 
-  // Create famous, followed user
-  // NOTE: Must be AFTER other users created, we want this to be the last event on the chain
-  //   await populateExtrinsics(famousUser, provider);
-  //   if (!famousUser.msaId) {
-  //     console.log('Creating "famous" user...');
-  //     const famousTxns = [famousUser.create!(), famousUser.addGraphKey!()];
-  //     const [_unused, eventMap] = await ExtrinsicHelper.payWithCapacityBatchAll(provider.keys!, famousTxns).signAndSend();
-  //     const msaEvent = eventMap['msa.MsaCreated'];
-  //     if (msaEvent && !isArray(msaEvent)) {
-  //       if (ExtrinsicHelper.api.events.msa.MsaCreated.is(msaEvent)) {
-  //         famousUser.msaId = msaEvent.data.msaId.toString();
-  //       }
-  //     }
-  //     const famousBlock = await apiPromise.rpc.chain.getBlock();
-  //     console.log(`Famous user ${famousUser.msaId} created at block: ${famousBlock.block.header.number.toNumber()}`);
-  //   } else if (famousUser?.resetGraph?.length) {
-  //   }
-
   if (famousUserCreatedBlockHash) {
     const block = await apiPromise.rpc.chain.getBlock(famousUserCreatedBlockHash);
-    console.log(`Famous user created at block ${block.block.header.number.toNumber()}`);
+    console.log(`Famous user ${famousUser.msaId!.toString()} created at block ${block.block.header.number.toNumber()}`);
   }
 
   // Create JSON responses for each follower
