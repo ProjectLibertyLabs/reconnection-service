@@ -28,20 +28,18 @@ export class GraphNotifierService extends WorkerHost {
     this.logger.log(`Processing job ${job.id} of type ${job.name}`);
     try {
       const numberBlocksToParse = BlockchainConstants.NUMBER_BLOCKS_TO_CRAWL;
-      const txCapacityEpoch = job.data.epoch;
       const previousKnownBlockNumber = (await this.blockchainService.getBlock(job.data.lastFinalizedBlockHash)).block.header.number.toBigInt();
       const currentFinalizedBlockNumber = await this.blockchainService.getLatestFinalizedBlockNumber();
       const blockList = Array.from(
         { length: Math.min(Number(numberBlocksToParse), Number(currentFinalizedBlockNumber) - Number(previousKnownBlockNumber)) },
         (_, index) => previousKnownBlockNumber + BigInt(index) + 1n,
       );
-      const txResult = await this.blockchainService.crawlBlockListForTx(job.data.txHash, blockList, [{ pallet: 'system', event: 'ExtrinsicSuccess' }]);
+      const txResult = await this.blockchainService.crawlBlockListForTx(job.data.txHash, blockList, [this.blockchainService.api.events.system.ExtrinsicSuccess]);
       if (!txResult.found) {
-        this.logger.error(`Tx ${job.data.txHash} not found in block list`);
         throw new Error(`Tx ${job.data.txHash} not found in block list`);
       } else {
         // Set current epoch capacity
-        await this.setEpochCapacity(txCapacityEpoch, BigInt(txResult.capacityWithDrawn ?? 0n));
+        await this.setEpochCapacity(txResult.capacityEpoch ?? -1, txResult.capacityWithdrawn ?? 0n);
         if (txResult.error) {
           this.logger.debug(`Error found in tx result: ${JSON.stringify(txResult.error)}`);
           const errorReport = await this.handleMessagesFailure(txResult.error);
@@ -84,13 +82,13 @@ export class GraphNotifierService extends WorkerHost {
     });
   }
 
-  private async setEpochCapacity(epoch: string, capacityWithdrew: bigint): Promise<void> {
+  private async setEpochCapacity(epoch: number, capacityWithdrawn: bigint): Promise<void> {
     const epochCapacityKey = `epochCapacity:${epoch}`;
 
     try {
       const savedCapacity = await this.cacheManager.get(epochCapacityKey);
       const epochCapacity = BigInt(savedCapacity ?? 0);
-      const newEpochCapacity = epochCapacity + capacityWithdrew;
+      const newEpochCapacity = epochCapacity + capacityWithdrawn;
 
       const epochDurationBlocks = await this.blockchainService.getCurrentEpochLength();
       const epochDuration = epochDurationBlocks * BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
@@ -101,36 +99,38 @@ export class GraphNotifierService extends WorkerHost {
   }
 
   private async handleMessagesFailure(moduleError: RegistryError): Promise<{ pause: boolean; retry: boolean }> {
-    try {
-      switch (moduleError.method) {
-        case 'StalePageState':
-        case 'ProofHasExpired':
-        case 'ProofNotYetValid':
-        case 'InvalidSignature':
-          // Re-try the job in the request change queue
-          return { pause: false, retry: true };
-        case 'InvalidSchemaId':
-          return { pause: true, retry: false };
-        case 'InvalidMessageSourceAccount':
-        case 'UnauthorizedDelegate':
-        case 'CorruptedState':
-        case 'InvalidItemAction':
-        case 'PageIdExceedsMaxAllowed':
-        case 'PageExceedsMaxPageSizeBytes':
-        case 'UnsupportedOperationForSchema':
-        case 'InvalidPayloadLocation':
-        case 'SchemaPayloadLocationMismatch':
-          // fail the job since this is unrecoverable
-          return { pause: false, retry: false };
-        default:
-          this.logger.error(`Unknown module error ${moduleError}`);
-          break;
-      }
-    } catch (error) {
-      this.logger.error(`Error handling module error: ${error}`);
+    let retval = { pause: false, retry: false };
+    switch (moduleError.method) {
+      case 'StalePageState':
+      case 'ProofHasExpired':
+      case 'ProofNotYetValid':
+      case 'InvalidSignature':
+        // Re-try the job in the request change queue
+        retval = { pause: false, retry: true };
+        break;
+
+      case 'InvalidSchemaId':
+        retval = { pause: true, retry: false };
+        break;
+
+      case 'InvalidMessageSourceAccount':
+      case 'UnauthorizedDelegate':
+      case 'CorruptedState':
+      case 'InvalidItemAction':
+      case 'PageIdExceedsMaxAllowed':
+      case 'PageExceedsMaxPageSizeBytes':
+      case 'UnsupportedOperationForSchema':
+      case 'InvalidPayloadLocation':
+      case 'SchemaPayloadLocationMismatch':
+        // fail the job since this is unrecoverable
+        retval = { pause: false, retry: false };
+        break;
+
+      default:
+        this.logger.error(`Unknown module error ${moduleError}`);
+        break;
     }
 
-    // unknown error, pause the queue
-    return { pause: false, retry: false };
+    return retval;
   }
 }

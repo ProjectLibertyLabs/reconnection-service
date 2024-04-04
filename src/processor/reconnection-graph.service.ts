@@ -115,7 +115,6 @@ export class ReconnectionGraphService {
             txMonitorJob = {
               id: jobId,
               txHash: statefulStorageTxHash,
-              epoch: currentCapacityEpoch.toString(),
               lastFinalizedBlockHash,
             };
             this.logger.debug(`Adding job to graph change notify queue: ${txMonitorJob.id}`);
