@@ -31,7 +31,10 @@ export class GraphNotifierService extends WorkerHost {
       const txCapacityEpoch = job.data.epoch;
       const previousKnownBlockNumber = (await this.blockchainService.getBlock(job.data.lastFinalizedBlockHash)).block.header.number.toBigInt();
       const currentFinalizedBlockNumber = await this.blockchainService.getLatestFinalizedBlockNumber();
-const blockList = Array.from({ length: Math.min(numberBlocksToParse, currentFinalizedBlockNumber - previousKnownBlockNumber) }, (_, index) => previousKnownBlockNumber + index + 1);
+      const blockList = Array.from(
+        { length: Math.min(Number(numberBlocksToParse), Number(currentFinalizedBlockNumber) - Number(previousKnownBlockNumber)) },
+        (_, index) => previousKnownBlockNumber + BigInt(index) + 1n,
+      );
       const txResult = await this.blockchainService.crawlBlockListForTx(job.data.txHash, blockList, [{ pallet: 'system', event: 'ExtrinsicSuccess' }]);
       if (!txResult.found) {
         this.logger.error(`Tx ${job.data.txHash} not found in block list`);
