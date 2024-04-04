@@ -12,7 +12,7 @@ import { BullBoardModule } from '@bull-board/nestjs';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { QueueConsumerService } from './queue-consumer.service';
-import { GraphNotifierService } from './graph.monitor.processor.service';
+import { GraphNotifierService } from './graph-notifier.service';
 import { ReconnectionGraphService } from './reconnection-graph.service';
 import { GraphManagerModule } from '../graph/graph-state.module';
 import { GraphStateManager } from '../graph/graph-state-manager';
