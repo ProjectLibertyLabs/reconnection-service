@@ -8,7 +8,7 @@ import { Queue } from 'bullmq';
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
 import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
 import { KeyringPair } from '@polkadot/keyring/types';
-import { hexToU8a } from '@polkadot/util';
+import { hexToU8a, u8aToHex } from '@polkadot/util';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Option, Vec } from '@polkadot/types';
 import { SkipTransitiveGraphs, createGraphUpdateJob } from '../interfaces/graph-update-job.interface';
@@ -49,7 +49,7 @@ export class ReconnectionGraphService {
 
     const dsnpUserId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', dsnpUserStr);
     const providerId: ProviderId = this.blockchainService.api.registry.createType('ProviderId', providerStr);
-    const { key: jobIdNT, data: dataNT } = createGraphUpdateJob(dsnpUserId, providerId, SkipTransitiveGraphs);
+    createGraphUpdateJob(dsnpUserId, providerId, SkipTransitiveGraphs);
 
     let graphConnections: ProviderGraph[] = [];
     let graphKeyPairs: ProviderKeyPair[] = [];
@@ -65,6 +65,7 @@ export class ReconnectionGraphService {
       // get the user's DSNP Graph from the blockchain and form import bundles
       // import bundles are used to import the user's DSNP Graph into the graph SDK
       await this.importBundles(graphState, dsnpUserId, graphKeyPairs);
+      this.logger.debug(`Graph for user ${dsnpUserId} has ${graphState.getConnectionsForUserGraph(dsnpUserId.toString(), 9, false).length} connections after import from chain`);
       // using graphConnections form Action[] and update the user's DSNP Graph
       const actions: ConnectAction[] = await this.formConnections(graphState, dsnpUserId, providerId, updateConnections, graphConnections);
       try {
@@ -82,6 +83,9 @@ export class ReconnectionGraphService {
         }
       }
 
+      this.logger.debug(
+        `Graph after applying provider connections has ${graphState.getConnectionsForUserGraph(dsnpUserId.toString(), 9, true).length} current and pending connections`,
+      );
       const exportedUpdates = graphState.exportUserGraphUpdates(dsnpUserId.toString());
 
       const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
@@ -162,8 +166,6 @@ export class ReconnectionGraphService {
     let webhookFailures: number = 0;
 
     while (hasNextPage) {
-      this.logger.debug(`Fetching connections page ${params.pageNumber} for user ${dsnpUserId.toString()} from provider ${providerId.toString()}`);
-
       let response: AxiosResponse<any, any>;
       try {
         // eslint-disable-next-line no-await-in-loop
@@ -195,6 +197,7 @@ export class ReconnectionGraphService {
         } else {
           // No more pages available, exit the loop
           hasNextPage = false;
+          this.logger.debug(`Fetched ${params.pageNumber} connections pages for user ${dsnpUserId.toString()} from provider ${providerId.toString()}`);
         }
       } catch (error: any) {
         let newError = error;
@@ -256,39 +259,39 @@ export class ReconnectionGraphService {
     }
 
     let importBundles: ImportBundle[];
+    let builder = importBundleBuilder.withDsnpUserId(dsnpUserId.toString());
+
+    if (dsnpKeys?.keys?.length > 0) {
+      builder = builder.withDsnpKeys(dsnpKeys);
+    }
+    if (graphKeyPairs?.length > 0) {
+      builder = builder.withGraphKeyPairs(graphKeyPairsSdk);
+    }
 
     // If no pages to import, import at least one empty page so that user graph will be created
     if (publicFollows.length + privateFollows.length + privateFriendships.length === 0 && (graphKeyPairs.length > 0 || dsnpKeys?.keys.length > 0)) {
-      let builder = importBundleBuilder.withDsnpUserId(dsnpUserId.toString()).withSchemaId(privateFollowSchemaId);
-
-      if (dsnpKeys?.keys?.length > 0) {
-        builder = builder.withDsnpKeys(dsnpKeys);
-      }
-      if (graphKeyPairs?.length > 0) {
-        builder = builder.withGraphKeyPairs(graphKeyPairsSdk);
-      }
-
-      importBundles = [builder.build()];
+      importBundles = [builder.withSchemaId(privateFollowSchemaId).build()];
     } else {
-      importBundles = [publicFollows, privateFollows, privateFriendships].flatMap((pageResponses: PaginatedStorageResponse[]) =>
-        pageResponses.map((pageResponse) => {
-          let builder = importBundleBuilder
-            .withDsnpUserId(pageResponse.msa_id.toString())
-            .withSchemaId(pageResponse.schema_id.toNumber())
-            .withPageData(pageResponse.page_id.toNumber(), pageResponse.payload, pageResponse.content_hash.toNumber());
+      const schemasToProcess: PaginatedStorageResponse[][] = [];
+      if (publicFollows.length > 0) {
+        schemasToProcess.push(publicFollows);
+      }
+      if (privateFollows.length > 0) {
+        schemasToProcess.push(privateFollows);
+      }
+      if (privateFriendships.length > 0) {
+        schemasToProcess.push(privateFriendships);
+      }
+      importBundles = [];
+      schemasToProcess.forEach((pageResponses: PaginatedStorageResponse[]) => {
+        builder = builder.withDsnpUserId(dsnpUserId.toString()).withSchemaId(pageResponses[0].schema_id.toNumber());
+        pageResponses.forEach((pageResponse) => {
+          builder = builder.withPageData(pageResponse.page_id.toNumber(), pageResponse.payload, pageResponse.content_hash.toNumber());
+        });
 
-          if (dsnpKeys?.keys?.length > 0) {
-            builder = builder.withDsnpKeys(dsnpKeys);
-          }
-          if (graphKeyPairs?.length > 0) {
-            builder = builder.withGraphKeyPairs(graphKeyPairsSdk);
-          }
-
-          return builder.build();
-        }),
-      );
+        importBundles.push(builder.build());
+      });
     }
-
     return importBundles;
   }
 
@@ -470,7 +473,7 @@ export class ReconnectionGraphService {
   }
 
   async processSingleBatch(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]): Promise<{ [key: string]: bigint }> {
-    this.logger.debug(`Submitting batch for user ${dsnpUserId.toString()}, batch length: ${batch.length}, batch: ${JSON.stringify(batch)}`);
+    this.logger.debug(`Submitting batch for user ${dsnpUserId.toString()}, batch length: ${batch.length}, batch: ${JSON.stringify(batch, (_, v) => v, 2)}`);
     try {
       const currrentEpoch = await this.blockchainService.getCurrentCapacityEpoch();
       const nonce = await this.nonceService.getNextNonce();
