@@ -11,6 +11,10 @@ import { KeyringPair } from '@polkadot/keyring/types';
 import { hexToU8a, u8aToHex } from '@polkadot/util';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Option, Vec } from '@polkadot/types';
+import { Hash } from '@polkadot/types/interfaces';
+import { ITxMonitorJob } from '#app/interfaces/monitor.job.interface';
+import { MILLISECONDS_PER_SECOND } from 'time-constants';
+import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
 import { SkipTransitiveGraphs, createGraphUpdateJob } from '../interfaces/graph-update-job.interface';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { createKeys } from '../blockchain/create-keys';
@@ -30,6 +34,7 @@ export class ReconnectionGraphService {
     private configService: ConfigService,
     private graphStateManager: GraphStateManager,
     @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
+    @InjectQueue('graphTxMonitorQueue') private graphTxMonitorQueue: Queue,
     private blockchainService: BlockchainService,
     private providerWebhookService: ProviderWebhookService,
     private eventEmitter: EventEmitter2,
@@ -42,14 +47,14 @@ export class ReconnectionGraphService {
     return this.blockchainService.api.consts.frequencyTxPayment.maximumCapacityBatchLength.toNumber();
   }
 
-  public async updateUserGraph(dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<{ [key: string]: bigint }> {
+  public async updateUserGraph(jobId: string, dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<any> {
     this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
     // Acquire a graph state for the job
     const graphState = this.graphStateManager.createGraphState();
-
+    const lastFinalizedBlockHash = await this.blockchainService.getLatestFinalizedBlockHash();
+    const currentCapacityEpoch = await this.blockchainService.getCurrentCapacityEpoch();
     const dsnpUserId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', dsnpUserStr);
     const providerId: ProviderId = this.blockchainService.api.registry.createType('ProviderId', providerStr);
-    createGraphUpdateJob(dsnpUserId, providerId, SkipTransitiveGraphs);
 
     let graphConnections: ProviderGraph[] = [];
     let graphKeyPairs: ProviderKeyPair[] = [];
@@ -89,60 +94,39 @@ export class ReconnectionGraphService {
       const exportedUpdates = graphState.exportUserGraphUpdates(dsnpUserId.toString());
 
       const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
-
-      let batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
-      let batchItemCount = 0;
-      let batchCount = 0;
-      const batches: SubmittableExtrinsic<'rxjs', ISubmittableResult>[][] = [];
-      exportedUpdates.forEach((bundle) => {
+      const blockDelay = BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
+      let statefulStorageTxHash: Hash;
+      let txMonitorJob: ITxMonitorJob;
+      let tx: SubmittableExtrinsic<'rxjs', ISubmittableResult>;
+      // eslint-disable-next-line no-restricted-syntax
+      for (const bundle of exportedUpdates) {
         switch (bundle.type) {
           case 'PersistPage':
-            batch.push(
-              this.blockchainService.createExtrinsicCall(
-                { pallet: 'statefulStorage', extrinsic: 'upsertPage' },
-                bundle.ownerDsnpUserId,
-                bundle.schemaId,
-                bundle.pageId,
-                bundle.prevHash,
-                Array.from(Array.prototype.slice.call(bundle.payload)),
-              ),
+            tx = this.blockchainService.createExtrinsicCall(
+              { pallet: 'statefulStorage', extrinsic: 'upsertPage' },
+              bundle.ownerDsnpUserId,
+              bundle.schemaId,
+              bundle.pageId,
+              bundle.prevHash,
+              Array.from(Array.prototype.slice.call(bundle.payload)),
             );
-            batchItemCount += 1;
-            // If the batch size exceeds the capacityBatchLimit, send the batch to the chain
-            if (batchItemCount === this.capacityBatchLimit) {
-              // Reset the batch and count for the next batch
-              batches.push(batch);
-              batchCount += 1;
-              batch = [];
-              batchItemCount = 0;
-            }
+            // eslint-disable-next-line no-await-in-loop
+            statefulStorageTxHash = await this.processSingleBatch(providerKeys, tx);
+            txMonitorJob = {
+              id: jobId,
+              txHash: statefulStorageTxHash,
+              lastFinalizedBlockHash,
+            };
+            this.logger.debug(`Adding job to graph change notify queue: ${txMonitorJob.id}`);
+            this.graphTxMonitorQueue.add(`Graph Change Notify Job - ${txMonitorJob.id}`, txMonitorJob, {
+              delay: blockDelay,
+            });
             break;
-
           default:
             break;
         }
-      });
-
-      if (batch.length > 0) {
-        batches.push(batch);
       }
-      // eslint-disable-next-line no-await-in-loop
-      const totalCapacityUsed = await this.sendAndProcessChainEvents(dsnpUserId, providerKeys, batches);
-      // On successful export to chain, re-import the user's DSNP Graph from the blockchain and form import bundles
-      // import bundles are used to import the user's DSNP Graph into the graph SDK
-      // check if user graph exists in the graph SDK else queue a graph update job
-      // eslint-disable-next-line no-await-in-loop
-      const reImported = await this.importBundles(graphState, dsnpUserId, graphKeyPairs);
-      if (reImported) {
-        // eslint-disable-next-line no-await-in-loop
-        const userGraphExists = graphState.containsUserGraph(dsnpUserId.toString());
-        if (!userGraphExists) {
-          throw new Error(`User graph does not exist for ${dsnpUserId.toString()}`);
-        }
-      } else {
-        throw new Error(`Error re-importing bundles for ${dsnpUserId.toString()}`);
-      }
-      return totalCapacityUsed;
+      return {};
     } catch (err) {
       this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${(err as Error).stack}`);
       throw err;
@@ -434,73 +418,34 @@ export class ReconnectionGraphService {
     return dsnpKeys;
   }
 
-  async sendAndProcessChainEvents(
-    dsnpUserId: MessageSourceId,
-    providerKeys: KeyringPair,
-    batchesMap: SubmittableExtrinsic<'rxjs', ISubmittableResult>[][],
-  ): Promise<{ [key: string]: bigint }> {
+  /**
+   * Processes a single batch by submitting a transaction to the blockchain.
+   *
+   * @param providerKeys The key pair used for signing the transaction.
+   * @param tx The transaction to be submitted.
+   * @returns The hash of the submitted transaction.
+   * @throws Error if the transaction hash is undefined or if there is an error processing the batch.
+   */
+  async processSingleBatch(providerKeys: KeyringPair, tx: SubmittableExtrinsic<'rxjs', ISubmittableResult>): Promise<Hash> {
+    this.logger.debug(`Submitting tx of size ${tx.length}, nonce:${tx.nonce}, method: ${tx.method.section}.${tx.method.method}`);
     try {
-      // iterate over batches and send them to the chain returning the capacity withdrawn
-      const totalCapUsedPerEpoch: {}[] = [];
-      this.logger.debug(`Processing ${batchesMap.length} batches for user ${dsnpUserId.toString()}`);
-      // eslint-disable-next-line no-restricted-syntax
-      for (const batch of batchesMap) {
-        // eslint-disable-next-line no-await-in-loop
-        const epoch = await this.processSingleBatch(dsnpUserId, providerKeys, batch);
-        totalCapUsedPerEpoch.push(epoch);
-      }
-      this.logger.debug(`Processed ${batchesMap.length} batches for user ${dsnpUserId.toString()}`);
-      if (totalCapUsedPerEpoch.length === 0) {
-        return {};
-      }
-      const totalCapacityUsed = totalCapUsedPerEpoch.reduce(
-        (acc, curr) => {
-          const epoch = Object.keys(curr)[0];
-          if (acc[epoch]) {
-            acc[epoch] += curr[epoch];
-          }
-          acc[epoch] = curr[epoch];
-          return acc;
-        },
-        {} as { [key: string]: bigint },
+      const ext = this.blockchainService.createExtrinsic(
+        { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacity' },
+        { eventPallet: 'frequencyTxPayment', event: 'CapacityPaid' },
+        providerKeys,
+        tx,
       );
-
-      return totalCapacityUsed;
-    } catch (e) {
-      this.logger.error(`Error processing batches for ${dsnpUserId.toString()}: ${e}`);
-      throw e;
-    }
-  }
-
-  async processSingleBatch(dsnpUserId: MessageSourceId, providerKeys: KeyringPair, batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]): Promise<{ [key: string]: bigint }> {
-    this.logger.debug(`Submitting batch for user ${dsnpUserId.toString()}, batch length: ${batch.length}, batch: ${JSON.stringify(batch, (_, v) => v, 2)}`);
-    try {
-      const currrentEpoch = await this.blockchainService.getCurrentCapacityEpoch();
       const nonce = await this.nonceService.getNextNonce();
-      const [event, eventMap] = await this.blockchainService
-        .createExtrinsic({ pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' }, { eventPallet: 'utility', event: 'BatchCompleted' }, providerKeys, batch)
-        .signAndSend(nonce);
-      if (!event || !this.blockchainService.api.events.utility.BatchCompleted.is(event)) {
-        // if we dont get code events, covering any unexpected connection errors
-        throw new Error(`Unexpected event received: ${JSON.stringify(event)}: re-trying to refresh graph state`);
+      this.logger.debug(`Capacity Wrapped Extrinsic: ${ext}, nonce:${nonce}`);
+      const [txHash, _] = await ext.signAndSendNoWait(nonce);
+      if (!txHash) {
+        throw new Error('Tx hash is undefined');
       }
-      const capacityWithDrawn = BigInt(eventMap['capacity.CapacityWithdrawn'].data[1].toString());
-      this.logger.debug(`Batch submitted for user ${dsnpUserId.toString()}`);
-      this.logger.debug(`Capacity withdrawn for user ${dsnpUserId.toString()}: ${capacityWithDrawn}`);
-      return { [currrentEpoch.toString()]: capacityWithDrawn };
-    } catch (e: any) {
-      this.logger.error(`Error processing batch for ${dsnpUserId.toString()}: ${e}`);
-      // Following errors includes are checked against
-      // 1. Inability to pay some fees`
-      // 2. Transaction is not valid due to `Target page hash does not match current page hash`
-      if (e instanceof Error && e.message.includes('Inability to pay some fees')) {
-        throw new errors.CapacityLowError(e.message);
-      } else if (e instanceof Error && e.message.includes('Target page hash does not match current page hash')) {
-        throw new errors.StaleHashError(e.message);
-      }
-      /// any errors we dont recognize, such as bad schema_id, etc
-      /// in such cases we should not retry the job
-      throw new errors.UnknownError(e as Error);
+      this.logger.debug(`Tx hash: ${txHash}`);
+      return txHash;
+    } catch (error: any) {
+      this.logger.error(`Error processing batch: ${error}`);
+      throw error;
     }
   }
 }
