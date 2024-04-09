@@ -4,15 +4,13 @@ To use it, simply rename and remove the '.dev' extension
 */
 
 // eslint-disable-next-line max-classes-per-file
-import { Controller, Logger, Post, Body, Param, Query, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Logger, Post, Body, Param, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { plainToClass } from 'class-transformer';
-import { InjectRedis } from '@liaoliaots/nestjs-redis';
-import Redis from 'ioredis';
 import { GraphUpdateJobDto } from './interfaces/graph-update-job.dto';
 import { ReconnectionGraphService } from './processor/reconnection-graph.service';
-import { BlockchainScannerService, LAST_SEEN_BLOCK_NUMBER_KEY } from './blockchain-scanner.service';
+import { GraphUpdateScannerService } from './graph-update-scanner.service';
 
 @Controller('reconnection-service/dev')
 export class DevelopmentController {
@@ -20,9 +18,8 @@ export class DevelopmentController {
 
   constructor(
     @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
-    @InjectRedis() private cacheManager: Redis,
     private graphService: ReconnectionGraphService,
-    private scannerService: BlockchainScannerService,
+    private scannerService: GraphUpdateScannerService,
   ) {
     this.logger = new Logger(this.constructor.name);
 
@@ -105,9 +102,9 @@ export class DevelopmentController {
   }
 
   @Post('scan/:blockNumber')
-  async scanChainFromBlock(@Param('blockNumber') blockNumber: string) {
-    const block = BigInt(blockNumber) - 1n;
-    await this.cacheManager.set(LAST_SEEN_BLOCK_NUMBER_KEY, block.toString());
+  async scanChainFromBlock(@Param('blockNumber') blockNumber: number) {
+    const block = blockNumber - 1;
+    await (this.scannerService as unknown as any).setLastSeenBlockNumber(block);
     this.scannerService.scan();
   }
 

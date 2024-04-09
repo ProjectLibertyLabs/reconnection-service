@@ -5,11 +5,11 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { RedisModule } from '@liaoliaots/nestjs-redis';
 import { ReconnectionServiceController } from './reconnection-service.controller';
 import { ConfigService } from './config/config.service';
-import { BlockchainScannerService } from './blockchain-scanner.service';
 import { ConfigModule } from './config/config.module';
 import { ProcessorModule } from './processor/processor.module';
 import { DevelopmentController } from './development.controller';
 import { BlockchainModule } from './blockchain/blockchain.module';
+import { GraphUpdateScannerService } from './graph-update-scanner.service';
 
 @Module({
   imports: [
@@ -47,7 +47,7 @@ import { BlockchainModule } from './blockchain/blockchain.module';
     ProcessorModule,
     BlockchainModule,
   ],
-  providers: [ConfigService, BlockchainScannerService],
+  providers: [ConfigService, GraphUpdateScannerService],
   controllers: process.env?.ENABLE_DEV_CONTROLLER === 'true' ? [DevelopmentController, ReconnectionServiceController] : [ReconnectionServiceController],
   exports: [],
 })

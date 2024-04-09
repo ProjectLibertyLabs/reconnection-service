@@ -45,7 +45,7 @@ export type ParsedEventResult = [any, EventMap];
 export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C extends Codec[] = Codec[], N = unknown> {
   private event?: IsEvent<C, N>;
 
-  private extrinsic: SubmittableExtrinsic<'rxjs', T>;
+  private extrinsicCall: SubmittableExtrinsic<'rxjs', T>;
 
   // private call: Call;
   private keys: KeyringPair;
@@ -55,7 +55,7 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
   public timeOutSeconds: number;
 
   constructor(api: ApiRx, extrinsic: SubmittableExtrinsic<'rxjs', T>, keys: KeyringPair, targetEvent?: IsEvent<C, N>, timeOutSeconds = 60) {
-    this.extrinsic = extrinsic;
+    this.extrinsicCall = extrinsic;
     this.keys = keys;
     this.event = targetEvent;
     this.api = api;
@@ -68,7 +68,7 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
 
   public signAndSend(nonce?: number): Promise<ParsedEventResult> {
     return firstValueFrom(
-      this.extrinsic.signAndSend(this.keys, { nonce }).pipe(
+      this.extrinsicCall.signAndSend(this.keys, { nonce }).pipe(
         timeout({ each: this.timeOutSeconds * 1000 }),
         filter(({ status }) => status.isInBlock || status.isFinalized),
         this.parseResult(this.event),
@@ -77,7 +77,7 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
   }
 
   public async signAndSendNoWait(nonce?: number): Promise<[Hash, EventMap]> {
-    const { status, events, txHash } = await firstValueFrom(this.extrinsic.signAndSend(this.keys, { nonce }));
+    const { status, events, txHash } = await firstValueFrom(this.extrinsicCall.signAndSend(this.keys, { nonce }));
     if (status.isFinalized || status.isInBlock) {
       const eventMap: EventMap = {};
       events.forEach((record: EventRecord) => {
@@ -92,7 +92,7 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
   public payWithCapacity(nonce?: number): Promise<ParsedEventResult> {
     return firstValueFrom(
       this.api.tx.frequencyTxPayment
-        .payWithCapacity(this.extrinsic)
+        .payWithCapacity(this.extrinsicCall)
         .signAndSend(this.keys, { nonce })
         .pipe(
           filter(({ status }) => status.isInBlock || status.isFinalized),
@@ -102,8 +102,12 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
   }
 
   public getCall(): Call {
-    const call = this.api.createType('Call', this.extrinsic);
+    const call = this.api.createType('Call', this.extrinsicCall);
     return call;
+  }
+
+  public get extrinsic(): SubmittableExtrinsic<'rxjs', T> {
+    return this.extrinsicCall;
   }
 
   // eslint-disable-next-line no-shadow

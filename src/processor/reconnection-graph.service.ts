@@ -1,3 +1,4 @@
+/* eslint-disable no-await-in-loop */
 /* eslint-disable no-continue */
 import { AxiosError, AxiosResponse } from 'axios';
 import { Injectable, Logger } from '@nestjs/common';
@@ -8,13 +9,11 @@ import { Queue } from 'bullmq';
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
 import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
 import { KeyringPair } from '@polkadot/keyring/types';
-import { hexToU8a, u8aToHex } from '@polkadot/util';
+import { hexToU8a } from '@polkadot/util';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Option, Vec } from '@polkadot/types';
-import { Hash } from '@polkadot/types/interfaces';
-import { ITxMonitorJob } from '#app/interfaces/monitor.job.interface';
-import { MILLISECONDS_PER_SECOND } from 'time-constants';
-import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
+import { ITxStatus } from '#app/interfaces/tx-status.interface';
+import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { SkipTransitiveGraphs, createGraphUpdateJob } from '../interfaces/graph-update-job.interface';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { createKeys } from '../blockchain/create-keys';
@@ -28,17 +27,17 @@ import { NonceService } from './nonce.service';
 
 @Injectable()
 export class ReconnectionGraphService {
-  private logger: Logger;
+  private readonly logger: Logger;
 
   constructor(
-    private configService: ConfigService,
-    private graphStateManager: GraphStateManager,
-    @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
-    @InjectQueue('graphTxMonitorQueue') private graphTxMonitorQueue: Queue,
-    private blockchainService: BlockchainService,
-    private providerWebhookService: ProviderWebhookService,
-    private eventEmitter: EventEmitter2,
-    private nonceService: NonceService,
+    private readonly configService: ConfigService,
+    private readonly graphStateManager: GraphStateManager,
+    @InjectQueue('graphUpdateQueue') private readonly graphUpdateQueue: Queue,
+    private readonly blockchainService: BlockchainService,
+    private readonly providerWebhookService: ProviderWebhookService,
+    private readonly eventEmitter: EventEmitter2,
+    private readonly nonceService: NonceService,
+    private readonly cacheService: ReconnectionCacheMgrService,
   ) {
     this.logger = new Logger(ReconnectionGraphService.name);
   }
@@ -51,8 +50,6 @@ export class ReconnectionGraphService {
     this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
     // Acquire a graph state for the job
     const graphState = this.graphStateManager.createGraphState();
-    const lastFinalizedBlockHash = await this.blockchainService.getLatestFinalizedBlockHash();
-    const currentCapacityEpoch = await this.blockchainService.getCurrentCapacityEpoch();
     const dsnpUserId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', dsnpUserStr);
     const providerId: ProviderId = this.blockchainService.api.registry.createType('ProviderId', providerStr);
 
@@ -94,38 +91,37 @@ export class ReconnectionGraphService {
       const exportedUpdates = graphState.exportUserGraphUpdates(dsnpUserId.toString());
 
       const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
-      const blockDelay = BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
-      let statefulStorageTxHash: Hash;
-      let txMonitorJob: ITxMonitorJob;
-      let tx: SubmittableExtrinsic<'rxjs', ISubmittableResult>;
+      let batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
       // eslint-disable-next-line no-restricted-syntax
       for (const bundle of exportedUpdates) {
         switch (bundle.type) {
           case 'PersistPage':
-            tx = this.blockchainService.createExtrinsicCall(
-              { pallet: 'statefulStorage', extrinsic: 'upsertPage' },
-              bundle.ownerDsnpUserId,
-              bundle.schemaId,
-              bundle.pageId,
-              bundle.prevHash,
-              Array.from(Array.prototype.slice.call(bundle.payload)),
+            batch.push(
+              this.blockchainService.createExtrinsicCall(
+                { pallet: 'statefulStorage', extrinsic: 'upsertPage' },
+                bundle.ownerDsnpUserId,
+                bundle.schemaId,
+                bundle.pageId,
+                bundle.prevHash,
+                Array.from(Array.prototype.slice.call(bundle.payload)),
+              ),
             );
-            // eslint-disable-next-line no-await-in-loop
-            statefulStorageTxHash = await this.processSingleBatch(providerKeys, tx);
-            txMonitorJob = {
-              id: jobId,
-              txHash: statefulStorageTxHash,
-              lastFinalizedBlockHash,
-            };
-            this.logger.debug(`Adding job to graph change notify queue: ${txMonitorJob.id}`);
-            this.graphTxMonitorQueue.add(`Graph Change Notify Job - ${txMonitorJob.id}`, txMonitorJob, {
-              delay: blockDelay,
-            });
+
+            if (batch.length === this.capacityBatchLimit) {
+              // eslint-disable-next-line no-await-in-loop
+              await this.processSingleBatch(jobId, providerKeys, batch);
+              batch = [];
+            }
             break;
           default:
             break;
         }
       }
+
+      if (batch.length > 0) {
+        await this.processSingleBatch(jobId, providerKeys, batch);
+      }
+
       return {};
     } catch (err) {
       this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${(err as Error).stack}`);
@@ -422,27 +418,35 @@ export class ReconnectionGraphService {
    * Processes a single batch by submitting a transaction to the blockchain.
    *
    * @param providerKeys The key pair used for signing the transaction.
-   * @param tx The transaction to be submitted.
+   * @param txns The transaction to be submitted.
    * @returns The hash of the submitted transaction.
    * @throws Error if the transaction hash is undefined or if there is an error processing the batch.
    */
-  async processSingleBatch(providerKeys: KeyringPair, tx: SubmittableExtrinsic<'rxjs', ISubmittableResult>): Promise<Hash> {
-    this.logger.debug(`Submitting tx of size ${tx.length}, nonce:${tx.nonce}, method: ${tx.method.section}.${tx.method.method}`);
+  async processSingleBatch(sourceJobId: string, providerKeys: KeyringPair, txns: SubmittableExtrinsic<'rxjs', ISubmittableResult>[]): Promise<void> {
+    this.logger.debug(`Submitting capacity batch tx of size ${txns.length}`);
     try {
       const ext = this.blockchainService.createExtrinsic(
-        { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacity' },
+        { pallet: 'frequencyTxPayment', extrinsic: 'payWithCapacityBatchAll' },
         { eventPallet: 'frequencyTxPayment', event: 'CapacityPaid' },
         providerKeys,
-        tx,
+        txns,
       );
-      const nonce = await this.nonceService.getNextNonce();
-      this.logger.debug(`Capacity Wrapped Extrinsic: ${ext}, nonce:${nonce}`);
+      const [blockNumber, nonce] = await Promise.all([this.blockchainService.getLatestFinalizedBlockNumber(), this.nonceService.getNextNonce()]);
+
       const [txHash, _] = await ext.signAndSendNoWait(nonce);
       if (!txHash) {
         throw new Error('Tx hash is undefined');
       }
-      this.logger.debug(`Tx hash: ${txHash}`);
-      return txHash;
+
+      const status: ITxStatus = {
+        sourceJobId,
+        txHash: txHash.toHex(),
+        birth: ext.extrinsic.era.asMortalEra.birth(blockNumber),
+        death: ext.extrinsic.era.asMortalEra.death(blockNumber),
+        status: 'pending',
+      };
+      await this.cacheService.upsertWatchedTxns(status);
+      this.logger.verbose(`Added tx ${txHash.toHex()} to watch list for job ${sourceJobId}`);
     } catch (error: any) {
       this.logger.error(`Error processing batch: ${error}`);
       throw error;
