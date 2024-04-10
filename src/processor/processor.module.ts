@@ -11,7 +11,6 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
-import { ReconnectionCacheModule } from '#app/cache/reconnection-cache.module';
 import { QueueConsumerService } from './queue-consumer.service';
 import { GraphUpdateCompletionMonitorService } from './graph-notifier.service';
 import { ReconnectionGraphService } from './reconnection-graph.service';
@@ -84,7 +83,6 @@ import { NonceService } from './nonce.service';
     ConfigModule,
     GraphManagerModule,
     BlockchainModule,
-    ReconnectionCacheModule,
   ],
   controllers: [],
   providers: [QueueConsumerService, GraphUpdateCompletionMonitorService, ReconnectionGraphService, GraphStateManager, ProviderWebhookService, NonceService],

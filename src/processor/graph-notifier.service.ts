@@ -18,13 +18,10 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
       `${this.cachePrefix}:blockchainScan`,
       setInterval(() => this.scan(), BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND),
     );
-
-    super.onApplicationBootstrap();
   }
 
   async onApplicationShutdown(signal?: string | undefined) {
-    const interval = this.schedulerRegistry.getInterval(`${this.cachePrefix}:blockchainScan`);
-    if (interval) {
+    if (this.schedulerRegistry.doesExist('interval', `${this.cachePrefix}:blockchainScan`)) {
       this.schedulerRegistry.deleteInterval(`${this.cachePrefix}:blockchainScan`);
     }
 

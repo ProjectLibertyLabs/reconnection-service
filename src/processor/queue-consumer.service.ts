@@ -197,8 +197,8 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
       } else {
         await this.eventEmitter.emitAsync('capacity.refilled');
       }
-    } catch (err) {
-      this.logger.error('Caught error in checkCapacity', err);
+    } catch (err: any) {
+      this.logger.error('Caught error in checkCapacity', err?.stack);
     }
   }
 }

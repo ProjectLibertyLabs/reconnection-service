@@ -112,21 +112,26 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     totalCapacityIssued: bigint;
     currentEpoch: bigint;
   }> {
-    const providerU64 = this.api.createType('u64', providerId);
-    const { epochStart }: PalletCapacityEpochInfo = await this.query('capacity', 'currentEpochInfo');
-    const epochBlockLength: u32 = await this.query('capacity', 'epochLength');
-    const capacityDetailsOption: Option<PalletCapacityCapacityDetails> = await this.query('capacity', 'capacityLedger', providerU64);
-    const { remainingCapacity, totalCapacityIssued } = capacityDetailsOption.unwrapOr({ remainingCapacity: 0, totalCapacityIssued: 0 });
-    const currentBlock: u32 = await this.query('system', 'number');
-    const currentEpoch = await this.getCurrentCapacityEpoch();
-    return {
-      currentEpoch,
-      providerId,
-      currentBlockNumber: currentBlock.toNumber(),
-      nextEpochStart: epochStart.add(epochBlockLength).toNumber(),
-      remainingCapacity: typeof remainingCapacity === 'number' ? BigInt(remainingCapacity) : remainingCapacity.toBigInt(),
-      totalCapacityIssued: typeof totalCapacityIssued === 'number' ? BigInt(totalCapacityIssued) : totalCapacityIssued.toBigInt(),
-    };
+    try {
+      const providerU64 = this.apiPromise.createType('u64', providerId);
+      const { epochStart }: PalletCapacityEpochInfo = await this.query('capacity', 'currentEpochInfo');
+      const epochBlockLength: u32 = await this.query('capacity', 'epochLength');
+      const capacityDetailsOption: Option<PalletCapacityCapacityDetails> = await this.query('capacity', 'capacityLedger', providerU64);
+      const { remainingCapacity, totalCapacityIssued } = capacityDetailsOption.unwrapOr({ remainingCapacity: 0, totalCapacityIssued: 0 });
+      const currentBlock: u32 = await this.query('system', 'number');
+      const currentEpoch = await this.getCurrentCapacityEpoch();
+      return {
+        currentEpoch,
+        providerId,
+        currentBlockNumber: currentBlock.toNumber(),
+        nextEpochStart: epochStart.add(epochBlockLength).toNumber(),
+        remainingCapacity: typeof remainingCapacity === 'number' ? BigInt(remainingCapacity) : remainingCapacity.toBigInt(),
+        totalCapacityIssued: typeof totalCapacityIssued === 'number' ? BigInt(totalCapacityIssued) : totalCapacityIssued.toBigInt(),
+      };
+    } catch (err: any) {
+      this.logger.error('Error in capacityInfo: ', err?.stack);
+      throw err;
+    }
   }
 
   public async getCurrentCapacityEpoch(): Promise<bigint> {
