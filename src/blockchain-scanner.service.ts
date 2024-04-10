@@ -1,6 +1,6 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { BlockHash } from '@polkadot/types/interfaces';
-import { InjectQueue } from '@nestjs/bullmq';
+import { InjectQueue, OnQueueEvent, QueueEventsHost, QueueEventsListener } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { MILLISECONDS_PER_SECOND, SECONDS_PER_MINUTE } from 'time-constants';
@@ -13,7 +13,8 @@ import { BlockchainService } from './blockchain/blockchain.service';
 export const LAST_SEEN_BLOCK_NUMBER_KEY = 'lastSeenBlockNumber';
 
 @Injectable()
-export class BlockchainScannerService implements OnApplicationBootstrap {
+@QueueEventsListener('graphUpdateQueue')
+export class BlockchainScannerService extends QueueEventsHost implements OnApplicationBootstrap, OnApplicationShutdown {
   private logger: Logger;
 
   private scanInProgress = false;
@@ -28,6 +29,18 @@ export class BlockchainScannerService implements OnApplicationBootstrap {
     this.schedulerRegistry.addTimeout('initialScan', initialTimeout);
   }
 
+  async onApplicationShutdown(signal?: string | undefined) {
+    if (this.schedulerRegistry.doesExist('timeout', 'initialScan')) {
+      this.schedulerRegistry.deleteTimeout('initialScan');
+    }
+
+    if (this.schedulerRegistry.doesExist('interval', 'blockchainScan')) {
+      this.schedulerRegistry.deleteInterval('blockchainScan');
+    }
+
+    super.onApplicationShutdown(signal);
+  }
+
   constructor(
     @InjectRedis() private cacheManager: Redis,
     @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
@@ -35,7 +48,14 @@ export class BlockchainScannerService implements OnApplicationBootstrap {
     private schedulerRegistry: SchedulerRegistry,
     private blockchainService: BlockchainService,
   ) {
+    super();
     this.logger = new Logger(BlockchainScannerService.name);
+  }
+
+  @OnQueueEvent('drained')
+  handleEmptyQueue() {
+    this.logger.log('Empty queue; resuming chain scan');
+    setTimeout(() => this.scan(), 0);
   }
 
   public async scan(): Promise<void> {

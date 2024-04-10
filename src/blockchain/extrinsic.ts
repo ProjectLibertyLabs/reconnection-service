@@ -26,7 +26,7 @@
 
 import { ApiRx } from '@polkadot/api';
 import { SubmittableExtrinsic, ApiTypes, AugmentedEvent } from '@polkadot/api/types';
-import { Call, Event } from '@polkadot/types/interfaces';
+import { Call, Event, EventRecord, Hash } from '@polkadot/types/interfaces';
 import { IsEvent } from '@polkadot/types/metadata/decorate/types';
 import { Codec, ISubmittableResult, AnyTuple } from '@polkadot/types/types';
 import { filter, firstValueFrom, map, pipe, tap, throwError } from 'rxjs';
@@ -74,6 +74,19 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
         this.parseResult(this.event),
       ),
     );
+  }
+
+  public async signAndSendNoWait(nonce?: number): Promise<[Hash, EventMap]> {
+    const { status, events, txHash } = await firstValueFrom(this.extrinsic.signAndSend(this.keys, { nonce }));
+    if (status.isFinalized || status.isInBlock) {
+      const eventMap: EventMap = {};
+      events.forEach((record: EventRecord) => {
+        const { event } = record;
+        eventMap[eventKey(event)] = event;
+      });
+      return [txHash, eventMap];
+    }
+    return [txHash, {}];
   }
 
   public payWithCapacity(nonce?: number): Promise<ParsedEventResult> {

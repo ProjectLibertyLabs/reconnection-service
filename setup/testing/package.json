@@ -1,0 +1,25 @@
+{
+  "name": "testing",
+  "version": "1.0.0",
+  "description": "e2e test setup",
+  "main": "index.ts",
+  "scripts": {
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "@dsnp/graph-sdk": "^1.1.1",
+    "@frequency-chain/api-augment": "^1.11.1",
+    "@polkadot/api-base": "^10.12.4",
+    "@polkadot/keyring": "^12.6.2",
+    "@polkadot/types": "^10.12.4",
+    "@polkadot/util": "^12.6.2",
+    "@polkadot/util-crypto": "^12.6.2",
+    "frequency-scenario-template": "file:../../../frequency-scenario-template",
+    "loglevel": "^1.9.1",
+    "reconnection-service": "file:../..",
+    "tsx": "^4.7.1"
+  },
+  "devDependencies": {
+    "prettier": "^3.2.5"
+  }
+}
