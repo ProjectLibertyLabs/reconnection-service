@@ -1,7 +1,6 @@
-import { InjectRedis } from '@liaoliaots/nestjs-redis';
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import Redis from 'ioredis';
 import fs from 'fs';
+import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { createKeys } from '../blockchain/create-keys';
 import { RedisUtils } from '../utils/redis';
 import { BlockchainService } from '../blockchain/blockchain.service';
@@ -14,16 +13,16 @@ export class NonceService implements OnApplicationBootstrap {
   private accountId: Uint8Array;
 
   constructor(
-    @InjectRedis() private redis: Redis,
+    private cacheMgr: ReconnectionCacheMgrService,
     private blockchainService: BlockchainService,
     private configService: ConfigService,
   ) {
     this.logger = new Logger(NonceService.name);
-    redis.defineCommand('incrementNonce', {
+    cacheMgr.redis.defineCommand('incrementNonce', {
       numberOfKeys: RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK,
       lua: fs.readFileSync('lua/incrementNonce.lua', 'utf8'),
     });
-    redis.defineCommand('peekNonce', {
+    cacheMgr.redis.defineCommand('peekNonce', {
       numberOfKeys: RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK,
       lua: fs.readFileSync('lua/peekNonce.lua', 'utf-8'),
     });
@@ -39,7 +38,7 @@ export class NonceService implements OnApplicationBootstrap {
     const nonceNumber = (await this.blockchainService.getNonce(this.accountId)).toNumber();
     const keys = this.getNextPossibleKeys(nonceNumber);
     // @ts-ignore
-    const nextNonceIndex = await this.redis.peekNonce(...keys, keys.length);
+    const nextNonceIndex = await this.cacheMgr.peekNonce(...keys, keys.length);
     if (nextNonceIndex === -1) {
       this.logger.warn(`nextNonce was full even with ${RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK} ${nonceNumber}`);
       return nonceNumber + RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK;
@@ -53,7 +52,7 @@ export class NonceService implements OnApplicationBootstrap {
     const nonceNumber = (await this.blockchainService.getNonce(this.accountId)).toNumber();
     const keys = this.getNextPossibleKeys(nonceNumber);
     // @ts-ignore
-    const nextNonceIndex = await this.redis.incrementNonce(...keys, keys.length, RedisUtils.NONCE_KEY_EXPIRE_SECONDS);
+    const nextNonceIndex = await this.cacheMgr.incrementNonce(...keys, keys.length, RedisUtils.NONCE_KEY_EXPIRE_SECONDS);
     if (nextNonceIndex === -1) {
       this.logger.warn(`nextNonce was full even with ${RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK} ${nonceNumber}`);
       return nonceNumber + RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK;

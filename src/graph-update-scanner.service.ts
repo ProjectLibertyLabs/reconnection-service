@@ -1,18 +1,17 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { BlockHash } from '@polkadot/types/interfaces';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { MILLISECONDS_PER_SECOND, SECONDS_PER_MINUTE } from 'time-constants';
-import { InjectRedis } from '@liaoliaots/nestjs-redis';
-import Redis from 'ioredis';
 import { ConfigService } from './config/config.service';
 import { UpdateTransitiveGraphs, createGraphUpdateJob } from './interfaces/graph-update-job.interface';
 import { BlockchainService } from './blockchain/blockchain.service';
 import { BlockchainScannerService } from './blockchain-scanner.service';
+import { ReconnectionCacheMgrService } from './cache/reconnection-cache-mgr.service';
 
 @Injectable()
-export class GraphUpdateScannerService extends BlockchainScannerService implements OnApplicationBootstrap {
+export class GraphUpdateScannerService extends BlockchainScannerService implements OnApplicationBootstrap, OnApplicationShutdown {
   private readonly QUEUE_HIGH_WATER_MARK: number;
 
   async onApplicationBootstrap() {
@@ -25,8 +24,20 @@ export class GraphUpdateScannerService extends BlockchainScannerService implemen
     this.schedulerRegistry.addTimeout('initialScan', initialTimeout);
   }
 
+  async onApplicationShutdown(signal?: string | undefined) {
+    if (this.schedulerRegistry.doesExist('timeout', 'initialScan')) {
+      this.schedulerRegistry.deleteTimeout('initialScan');
+    }
+
+    if (this.schedulerRegistry.doesExist('interval', 'blockchainScan')) {
+      this.schedulerRegistry.deleteInterval('blockchainScan');
+    }
+
+    super.onApplicationShutdown(signal);
+  }
+
   constructor(
-    @InjectRedis() cacheManager: Redis,
+    cacheManager: ReconnectionCacheMgrService,
     @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
     private readonly configService: ConfigService,
     private schedulerRegistry: SchedulerRegistry,

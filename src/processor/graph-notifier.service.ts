@@ -1,8 +1,6 @@
-import { InjectRedis } from '@liaoliaots/nestjs-redis';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
-import Redis from 'ioredis';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { BlockchainService } from '#app/blockchain/blockchain.service';
 import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
@@ -20,17 +18,21 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
       `${this.cachePrefix}:blockchainScan`,
       setInterval(() => this.scan(), BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND),
     );
+
+    super.onApplicationBootstrap();
   }
 
-  onApplicationShutdown(_signal?: string | undefined) {
+  async onApplicationShutdown(signal?: string | undefined) {
     const interval = this.schedulerRegistry.getInterval(`${this.cachePrefix}:blockchainScan`);
     if (interval) {
       this.schedulerRegistry.deleteInterval(`${this.cachePrefix}:blockchainScan`);
     }
+
+    super.onApplicationShutdown(signal);
   }
 
   constructor(
-    @InjectRedis() cacheManager: Redis,
+    cacheManager: ReconnectionCacheMgrService,
     @InjectQueue('graphUpdateQueue') private reconnectionQueue: Queue,
     private readonly schedulerRegistry: SchedulerRegistry,
     blockchainService: BlockchainService,
@@ -195,13 +197,13 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
     const epochCapacityKey = `epochCapacity:${epoch}`;
 
     try {
-      const savedCapacity = await this.cacheManager.get(epochCapacityKey);
+      const savedCapacity = await this.cacheManager.redis.get(epochCapacityKey);
       const epochCapacity = BigInt(savedCapacity ?? 0);
       const newEpochCapacity = epochCapacity + capacityWithdrawn;
 
       const epochDurationBlocks = await this.blockchainService.getCurrentEpochLength();
       const epochDuration = epochDurationBlocks * BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
-      await this.cacheManager.setex(epochCapacityKey, epochDuration, newEpochCapacity.toString());
+      await this.cacheManager.redis.setex(epochCapacityKey, epochDuration, newEpochCapacity.toString());
     } catch (error) {
       this.logger.error(`Error setting epoch capacity: ${error}`);
     }

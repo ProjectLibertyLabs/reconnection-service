@@ -8,9 +8,8 @@ import { ConfigService } from '#app/config/config.service';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { InjectRedis } from '@liaoliaots/nestjs-redis';
-import Redis from 'ioredis';
 import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
+import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { CapacityLowError } from './errors';
 
 const CAPACITY_EPOCH_TIMEOUT_NAME = 'capacity_check';
@@ -40,7 +39,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
 
   constructor(
     @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
-    @InjectRedis() private cacheManager: Redis,
+    private cacheManager: ReconnectionCacheMgrService,
     private graphSdkService: ReconnectionGraphService,
     private blockchainService: BlockchainService,
     private configService: ConfigService,
@@ -174,7 +173,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
       const { remainingCapacity } = capacity;
       const { currentEpoch } = capacity;
       const epochCapacityKey = `epochCapacity:${currentEpoch}`;
-      const epochUsedCapacity = BigInt((await this.cacheManager.get(epochCapacityKey)) ?? 0); // Fetch capacity used by the service
+      const epochUsedCapacity = BigInt((await this.cacheManager.redis.get(epochCapacityKey)) ?? 0); // Fetch capacity used by the service
       let outOfCapacity = remainingCapacity <= 0n;
 
       if (!outOfCapacity) {

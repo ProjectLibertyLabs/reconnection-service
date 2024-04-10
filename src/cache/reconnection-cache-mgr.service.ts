@@ -18,6 +18,10 @@ export class ReconnectionCacheMgrService {
     this.logger = new Logger(this.constructor.name);
   }
 
+  public get redis(): Redis {
+    return this.cacheMgr;
+  }
+
   public async upsertWatchedTxns(txStatus: ITxStatus | ITxStatus[]): Promise<void> {
     let id: string = '';
     const obj = {};

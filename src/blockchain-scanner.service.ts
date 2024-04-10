@@ -1,30 +1,34 @@
 import { Logger } from '@nestjs/common';
 import { BlockHash } from '@polkadot/types/interfaces';
-import Redis from 'ioredis';
+import { OnQueueEvent, QueueEventsHost, QueueEventsListener } from '@nestjs/bullmq';
 import { BlockchainService } from './blockchain/blockchain.service';
+import { ReconnectionCacheMgrService } from './cache/reconnection-cache-mgr.service';
 
 export const LAST_SEEN_BLOCK_NUMBER_KEY = 'lastSeenBlockNumber';
 
-export abstract class BlockchainScannerService {
-  protected readonly cacheManager: Redis;
-
-  protected readonly blockchainService: BlockchainService;
-
-  protected readonly logger: Logger;
-
+@QueueEventsListener('graphUpdateQueue')
+export abstract class BlockchainScannerService extends QueueEventsHost {
   protected scanInProgress = false;
 
   protected readonly cachePrefix: string | undefined;
 
   private readonly lastSeenBlockNumberKey: string;
 
-  constructor(cacheManager: Redis, blockchainService: BlockchainService, logger: Logger, options?: { cachePrefix?: string }) {
-    this.cacheManager = cacheManager;
-    this.blockchainService = blockchainService;
-    this.logger = logger;
-
+  constructor(
+    protected readonly cacheManager: ReconnectionCacheMgrService,
+    protected readonly blockchainService: BlockchainService,
+    protected readonly logger: Logger,
+    options?: { cachePrefix?: string },
+  ) {
+    super();
     this.cachePrefix = options?.cachePrefix;
     this.lastSeenBlockNumberKey = options?.cachePrefix ? `${options.cachePrefix}:${LAST_SEEN_BLOCK_NUMBER_KEY}` : LAST_SEEN_BLOCK_NUMBER_KEY;
+  }
+
+  @OnQueueEvent('drained')
+  handleEmptyQueue() {
+    this.logger.log('Empty queue; resuming chain scan');
+    setTimeout(() => this.scan(), 0);
   }
 
   public async scan(): Promise<void> {
@@ -40,18 +44,18 @@ export abstract class BlockchainScannerService {
     //   }
     // }
 
+    if (this.scanInProgress) {
+      this.logger.log('Scheduled blockchain scan skipped due to previous scan still in progress');
+      return;
+    }
+
+    // Only scan blocks if initial conditions met
+    if (!(await this.checkInitialScanParameters())) {
+      this.logger.log('Skipping blockchain scan--initial conditions not met');
+      return;
+    }
+
     try {
-      if (this.scanInProgress) {
-        this.logger.log('Scheduled blockchain scan skipped due to previous scan still in progress');
-        return;
-      }
-
-      // Only scan blocks if initial conditions met
-      if (!(await this.checkInitialScanParameters())) {
-        this.logger.log('Skipping blockchain scan--initial conditions not met');
-        return;
-      }
-
       this.scanInProgress = true;
       let currentBlockNumber: number;
       let currentBlockHash: BlockHash;
@@ -92,11 +96,11 @@ export abstract class BlockchainScannerService {
   }
 
   public async getLastSeenBlockNumber(): Promise<number> {
-    return Number((await this.cacheManager.get(this.lastSeenBlockNumberKey)) ?? 0);
+    return Number((await this.cacheManager.redis.get(this.lastSeenBlockNumberKey)) ?? 0);
   }
 
   protected async setLastSeenBlockNumber(b: number): Promise<void> {
-    await this.cacheManager.set(this.lastSeenBlockNumberKey, b);
+    await this.cacheManager.redis.set(this.lastSeenBlockNumberKey, b);
   }
 
   // eslint-disable-next-line class-methods-use-this
