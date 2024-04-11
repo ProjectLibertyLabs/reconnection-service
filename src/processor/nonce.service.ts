@@ -1,10 +1,10 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import fs from 'fs';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
-import { createKeys } from '../blockchain/create-keys';
-import { RedisUtils } from '../utils/redis';
-import { BlockchainService } from '../blockchain/blockchain.service';
-import { ConfigService } from '../config/config.service';
+import { createKeys } from '#app/blockchain/create-keys';
+import { CacheUtils } from '#app/cache/cache-utils';
+import { BlockchainService } from '#app/blockchain/blockchain.service';
+import { ConfigService } from '#app/config/config.service';
 
 @Injectable()
 export class NonceService implements OnApplicationBootstrap {
@@ -19,11 +19,11 @@ export class NonceService implements OnApplicationBootstrap {
   ) {
     this.logger = new Logger(NonceService.name);
     cacheMgr.redis.defineCommand('incrementNonce', {
-      numberOfKeys: RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK,
+      numberOfKeys: CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK,
       lua: fs.readFileSync('lua/incrementNonce.lua', 'utf8'),
     });
     cacheMgr.redis.defineCommand('peekNonce', {
-      numberOfKeys: RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK,
+      numberOfKeys: CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK,
       lua: fs.readFileSync('lua/peekNonce.lua', 'utf-8'),
     });
   }
@@ -40,8 +40,8 @@ export class NonceService implements OnApplicationBootstrap {
     // @ts-ignore
     const nextNonceIndex = await this.cacheMgr.redis.peekNonce(...keys, keys.length);
     if (nextNonceIndex === -1) {
-      this.logger.warn(`nextNonce was full even with ${RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK} ${nonceNumber}`);
-      return nonceNumber + RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK;
+      this.logger.warn(`nextNonce was full even with ${CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK} ${nonceNumber}`);
+      return nonceNumber + CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK;
     }
     const nextNonce = nonceNumber + nextNonceIndex - 1;
     this.logger.debug(`nextNonce ${nextNonce}`);
@@ -52,10 +52,10 @@ export class NonceService implements OnApplicationBootstrap {
     const nonceNumber = (await this.blockchainService.getNonce(this.accountId)).toNumber();
     const keys = this.getNextPossibleKeys(nonceNumber);
     // @ts-ignore
-    const nextNonceIndex = await this.cacheMgr.incrementNonce(...keys, keys.length, RedisUtils.NONCE_KEY_EXPIRE_SECONDS);
+    const nextNonceIndex = await this.cacheMgr.redis.incrementNonce(...keys, keys.length, CacheUtils.NONCE_KEY_EXPIRE_SECONDS);
     if (nextNonceIndex === -1) {
-      this.logger.warn(`nextNonce was full even with ${RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK} ${nonceNumber}`);
-      return nonceNumber + RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK;
+      this.logger.warn(`nextNonce was full even with ${CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK} ${nonceNumber}`);
+      return nonceNumber + CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK;
     }
     const nextNonce = nonceNumber + nextNonceIndex - 1;
     this.logger.debug(`nextNonce ${nextNonce}`);
@@ -64,9 +64,9 @@ export class NonceService implements OnApplicationBootstrap {
 
   // eslint-disable-next-line class-methods-use-this
   getNextPossibleKeys(currentNonce: number): string[] {
-    const keys: string[] = Array(RedisUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK)
+    const keys: string[] = Array(CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK)
       .fill(null)
-      .map((_entry, i) => RedisUtils.getNonceKey(`${currentNonce + i}`));
+      .map((_entry, i) => CacheUtils.getNonceKey(`${currentNonce + i}`));
     return keys;
   }
 }

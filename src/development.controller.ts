@@ -11,13 +11,14 @@ import { plainToClass } from 'class-transformer';
 import { GraphUpdateJobDto } from './interfaces/graph-update-job.dto';
 import { ReconnectionGraphService } from './processor/reconnection-graph.service';
 import { GraphUpdateScannerService } from './graph-update-scanner.service';
+import { ReconnectionServiceConstants } from './constants';
 
 @Controller('reconnection-service/dev')
 export class DevelopmentController {
   private readonly logger: Logger;
 
   constructor(
-    @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
+    @InjectQueue(ReconnectionServiceConstants.GRAPH_UPDATE_QUEUE_NAME) private graphUpdateQueue: Queue,
     private graphService: ReconnectionGraphService,
     private scannerService: GraphUpdateScannerService,
   ) {
@@ -76,7 +77,7 @@ export class DevelopmentController {
     }
     const job = await this.graphUpdateQueue.getJob(jobId);
     if (job) {
-      await job.update(data);
+      await job.updateData(data);
       await job.retry();
     } else {
       throw new HttpException('Job ID not found', HttpStatus.NOT_FOUND);
@@ -93,7 +94,7 @@ export class DevelopmentController {
       const { action, ...debugOptions } = debugData;
       options = { ...options, ...debugOptions };
     }
-    return this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, options);
+    return this.graphUpdateQueue.add(ReconnectionServiceConstants.GRAPH_UPDATE_JOB_TYPE, data, options);
   }
 
   @Post('update/graph')

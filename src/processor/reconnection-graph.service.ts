@@ -14,6 +14,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Option, Vec } from '@polkadot/types';
 import { ITxStatus } from '#app/interfaces/tx-status.interface';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
+import { ReconnectionServiceConstants } from '#app/constants';
 import { SkipTransitiveGraphs, createGraphUpdateJob } from '../interfaces/graph-update-job.interface';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { createKeys } from '../blockchain/create-keys';
@@ -32,7 +33,7 @@ export class ReconnectionGraphService {
   constructor(
     private readonly configService: ConfigService,
     private readonly graphStateManager: GraphStateManager,
-    @InjectQueue('graphUpdateQueue') private readonly graphUpdateQueue: Queue,
+    @InjectQueue(ReconnectionServiceConstants.GRAPH_UPDATE_QUEUE_NAME) private readonly graphUpdateQueue: Queue,
     private readonly blockchainService: BlockchainService,
     private readonly providerWebhookService: ProviderWebhookService,
     private readonly eventEmitter: EventEmitter2,
@@ -46,7 +47,8 @@ export class ReconnectionGraphService {
     return this.blockchainService.api.consts.frequencyTxPayment.maximumCapacityBatchLength.toNumber();
   }
 
-  public async updateUserGraph(jobId: string, dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<any> {
+  public async updateUserGraph(jobId: string, dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<boolean> {
+    let doTrack = false;
     this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
     // Acquire a graph state for the job
     const graphState = this.graphStateManager.createGraphState();
@@ -73,7 +75,7 @@ export class ReconnectionGraphService {
       try {
         if (actions.length === 0) {
           this.logger.debug(`No actions to apply for user ${dsnpUserId.toString()}`);
-          return {};
+          return false;
         }
         graphState.applyActions(actions, { ignoreExistingConnections: true });
       } catch (e: any) {
@@ -110,6 +112,7 @@ export class ReconnectionGraphService {
             if (batch.length === this.capacityBatchLimit) {
               // eslint-disable-next-line no-await-in-loop
               await this.processSingleBatch(jobId, providerKeys, batch);
+              doTrack = true;
               batch = [];
             }
             break;
@@ -120,11 +123,14 @@ export class ReconnectionGraphService {
 
       if (batch.length > 0) {
         await this.processSingleBatch(jobId, providerKeys, batch);
+        doTrack = true;
       }
 
-      return {};
+      return doTrack;
     } catch (err) {
       this.logger.error(`Error updating graph for user ${dsnpUserStr}, provider ${providerStr}: ${(err as Error).stack}`);
+      // In case any transaction were submitted, we don't need to track them because we're already going to fail/retry this job
+      await this.cacheService.removeJob(jobId);
       throw err;
     } finally {
       graphState.freeGraphState();
@@ -355,7 +361,7 @@ export class ReconnectionGraphService {
               if (isDelegatedConnection) {
                 const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
                 this.graphUpdateQueue.remove(jobId);
-                this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
+                this.graphUpdateQueue.add(ReconnectionServiceConstants.GRAPH_UPDATE_JOB_TYPE, data, { jobId });
                 this.logger.debug(`Queued transitive graph update job ${jobId}`);
               } else {
                 this.logger.warn(`No delegation for user ${connection.dsnpId} for schema ${schemaId}`);
@@ -383,7 +389,7 @@ export class ReconnectionGraphService {
               if (isDelegatedConnection) {
                 const { key: jobId, data } = createGraphUpdateJob(connection.dsnpId, providerId, SkipTransitiveGraphs);
                 this.graphUpdateQueue.remove(jobId);
-                this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
+                this.graphUpdateQueue.add(ReconnectionServiceConstants.GRAPH_UPDATE_JOB_TYPE, data, { jobId });
               }
             } else {
               this.logger.warn(`No delegation for user ${connection.dsnpId} for schema ${schemaId}`);

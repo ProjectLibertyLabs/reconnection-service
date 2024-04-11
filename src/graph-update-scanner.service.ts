@@ -9,6 +9,7 @@ import { UpdateTransitiveGraphs, createGraphUpdateJob } from './interfaces/graph
 import { BlockchainService } from './blockchain/blockchain.service';
 import { BlockchainScannerService } from './blockchain-scanner.service';
 import { ReconnectionCacheMgrService } from './cache/reconnection-cache-mgr.service';
+import { ReconnectionServiceConstants } from './constants';
 
 @Injectable()
 export class GraphUpdateScannerService extends BlockchainScannerService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -22,6 +23,7 @@ export class GraphUpdateScannerService extends BlockchainScannerService implemen
     // Kick off initial scan
     const initialTimeout = setTimeout(() => this.scan(), 0);
     this.schedulerRegistry.addTimeout('initialScan', initialTimeout);
+    await super.onApplicationBootstrap();
   }
 
   async onApplicationShutdown(signal?: string | undefined) {
@@ -38,7 +40,7 @@ export class GraphUpdateScannerService extends BlockchainScannerService implemen
 
   constructor(
     cacheManager: ReconnectionCacheMgrService,
-    @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
+    @InjectQueue(ReconnectionServiceConstants.GRAPH_UPDATE_QUEUE_NAME) private graphUpdateQueue: Queue,
     private readonly configService: ConfigService,
     private schedulerRegistry: SchedulerRegistry,
     blockchainService: BlockchainService,
@@ -83,7 +85,7 @@ export class GraphUpdateScannerService extends BlockchainScannerService implemen
       if (job && ((await job.isCompleted()) || (await job.isFailed()))) {
         await job.retry();
       } else {
-        await this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, { jobId });
+        await this.graphUpdateQueue.add(ReconnectionServiceConstants.GRAPH_UPDATE_JOB_TYPE, data, { jobId });
       }
     });
 

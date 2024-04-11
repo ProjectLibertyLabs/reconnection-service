@@ -1,28 +1,35 @@
-import { Logger } from '@nestjs/common';
+import { Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { BlockHash } from '@polkadot/types/interfaces';
 import { OnQueueEvent, QueueEventsHost, QueueEventsListener } from '@nestjs/bullmq';
 import { BlockchainService } from './blockchain/blockchain.service';
 import { ReconnectionCacheMgrService } from './cache/reconnection-cache-mgr.service';
+import { ReconnectionServiceConstants } from './constants';
 
 export const LAST_SEEN_BLOCK_NUMBER_KEY = 'lastSeenBlockNumber';
 
-@QueueEventsListener('graphUpdateQueue')
-export abstract class BlockchainScannerService extends QueueEventsHost {
+@QueueEventsListener(ReconnectionServiceConstants.GRAPH_UPDATE_QUEUE_NAME)
+export abstract class BlockchainScannerService extends QueueEventsHost implements OnApplicationBootstrap {
   protected scanInProgress = false;
 
-  protected readonly cachePrefix: string | undefined;
-
   private readonly lastSeenBlockNumberKey: string;
+
+  // TODO: This can be removed after a release cycle or two
+  async onApplicationBootstrap() {
+    const oldBlockNumber = await this.cacheManager.redis.get(LAST_SEEN_BLOCK_NUMBER_KEY);
+    const newBlockNumberExists = await this.cacheManager.redis.exists(this.lastSeenBlockNumberKey);
+    if (!newBlockNumberExists && !!oldBlockNumber) {
+      this.logger.verbose(`Copying old '${LAST_SEEN_BLOCK_NUMBER_KEY}' to new '${this.lastSeenBlockNumberKey}'`);
+      await this.cacheManager.redis.set(this.lastSeenBlockNumberKey, oldBlockNumber);
+    }
+  }
 
   constructor(
     protected readonly cacheManager: ReconnectionCacheMgrService,
     protected readonly blockchainService: BlockchainService,
     protected readonly logger: Logger,
-    options?: { cachePrefix?: string },
   ) {
     super();
-    this.cachePrefix = options?.cachePrefix;
-    this.lastSeenBlockNumberKey = options?.cachePrefix ? `${options.cachePrefix}:${LAST_SEEN_BLOCK_NUMBER_KEY}` : LAST_SEEN_BLOCK_NUMBER_KEY;
+    this.lastSeenBlockNumberKey = `${this.constructor.name}:${LAST_SEEN_BLOCK_NUMBER_KEY}`;
   }
 
   @OnQueueEvent('drained')
@@ -45,13 +52,13 @@ export abstract class BlockchainScannerService extends QueueEventsHost {
     // }
 
     if (this.scanInProgress) {
-      this.logger.log('Scheduled blockchain scan skipped due to previous scan still in progress');
+      this.logger.verbose('Scheduled blockchain scan skipped due to previous scan still in progress');
       return;
     }
 
     // Only scan blocks if initial conditions met
     if (!(await this.checkInitialScanParameters())) {
-      this.logger.log('Skipping blockchain scan--initial conditions not met');
+      this.logger.verbose('Skipping blockchain scan--initial conditions not met');
       return;
     }
 
@@ -69,7 +76,7 @@ export abstract class BlockchainScannerService extends QueueEventsHost {
         this.scanInProgress = false;
         return;
       }
-      this.logger.log(`Starting scan from block #${currentBlockNumber} (${currentBlockHash})`);
+      this.logger.verbose(`Starting scan from block #${currentBlockNumber}`);
 
       // eslint-disable-next-line no-await-in-loop
       while (!currentBlockHash.isEmpty && !!(await this.checkScanParameters())) {
@@ -85,7 +92,7 @@ export abstract class BlockchainScannerService extends QueueEventsHost {
       }
 
       if (currentBlockHash.isEmpty) {
-        this.logger.log(`Scan reached end-of-chain at block ${currentBlockNumber - 1}`);
+        this.logger.verbose(`Scan reached end-of-chain at block ${currentBlockNumber - 1}`);
       }
     } catch (e) {
       this.logger.error(JSON.stringify(e));

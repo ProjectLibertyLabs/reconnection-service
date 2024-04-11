@@ -1,13 +1,14 @@
 import { Controller, Get, HttpException, HttpStatus, Logger, Param, Post } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { ReconnectionServiceConstants } from './constants';
 
 type JobStatus = 'active' | 'completed' | 'failed' | 'delayed' | 'waiting';
 
 @Controller('reconnection-service')
 export class ReconnectionServiceController {
-  // eslint-disable-next-line no-useless-constructor
-  constructor(@InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue) {}
+  // eslint-disable-next-line no-useless-constructor, no-empty-function
+  constructor(@InjectQueue(ReconnectionServiceConstants.GRAPH_UPDATE_QUEUE_NAME) private graphUpdateQueue: Queue) {}
 
   // eslint-disable-next-line class-methods-use-this
   @Get('health')

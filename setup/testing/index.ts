@@ -190,6 +190,7 @@ async function main() {
   const famouseMsa = await ExtrinsicHelper.apiPromise.query.msa.publicKeyToMsaId(famousUser.keys!.address);
   if (famouseMsa.isSome) {
     famousUser.msaId = famouseMsa.unwrap();
+    console.log(`Found famous user ${famousUser.msaId.toString()}`);
   }
 
   interface PromiseTracker {

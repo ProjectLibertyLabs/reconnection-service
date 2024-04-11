@@ -11,6 +11,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
+import { ReconnectionServiceConstants } from '#app/constants';
 import { QueueConsumerService } from './queue-consumer.service';
 import { GraphUpdateCompletionMonitorService } from './graph-notifier.service';
 import { ReconnectionGraphService } from './reconnection-graph.service';
@@ -46,18 +47,7 @@ import { NonceService } from './nonce.service';
       inject: [ConfigService],
     }),
     BullModule.registerQueue({
-      name: 'graphUpdateQueue',
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-        },
-        removeOnComplete: false,
-        removeOnFail: false,
-      },
-    }),
-    BullModule.registerQueue({
-      name: 'graphTxMonitorQueue',
+      name: ReconnectionServiceConstants.GRAPH_UPDATE_QUEUE_NAME,
       defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -73,11 +63,7 @@ import { NonceService } from './nonce.service';
       adapter: ExpressAdapter,
     }),
     BullBoardModule.forFeature({
-      name: 'graphUpdateQueue',
-      adapter: BullMQAdapter,
-    }),
-    BullBoardModule.forFeature({
-      name: 'graphTxMonitorQueue',
+      name: ReconnectionServiceConstants.GRAPH_UPDATE_QUEUE_NAME,
       adapter: BullMQAdapter,
     }),
     ConfigModule,
