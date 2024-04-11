@@ -285,7 +285,9 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
 
   @OnEvent('capacity.refilled', { async: true, promisify: true })
   private async handleCapacityRefilled() {
-    this.logger.debug('Received capacity.refilled event');
+    if (this.capacityExhausted) {
+      this.logger.debug('Received capacity.refilled event');
+    }
     this.capacityExhausted = false;
     try {
       this.schedulerRegistry.deleteTimeout(CAPACITY_EPOCH_TIMEOUT_NAME);
@@ -309,11 +311,11 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
       let outOfCapacity = remainingCapacity <= 0n;
 
       if (!outOfCapacity) {
-        this.logger.debug(`Capacity remaining: ${remainingCapacity}`);
+        // this.logger.debug(`Capacity remaining: ${remainingCapacity}`);
         if (capacityLimit.type === 'percentage') {
           const capacityLimitPercentage = BigInt(capacityLimit.value);
           const capacityLimitThreshold = (capacity.totalCapacityIssued * capacityLimitPercentage) / 100n;
-          this.logger.debug(`Capacity limit threshold: ${capacityLimitThreshold}`);
+          // this.logger.debug(`Capacity limit threshold: ${capacityLimitThreshold}`);
           if (epochUsedCapacity >= capacityLimitThreshold) {
             outOfCapacity = true;
             this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimitThreshold}`);

@@ -91,9 +91,9 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
       pendingTxns = await this.cacheService.getAllPendingTxns();
       // eslint-disable-next-line no-restricted-syntax
       for (const txStatus of Object.values(pendingTxns)) {
-        if (txStatus.death >= currentBlockNumber) {
+        if (txStatus.death <= currentBlockNumber) {
           txStatus.status = 'expired';
-          this.logger.verbose(`Tx ${txStatus.txHash} expired`);
+          this.logger.verbose(`Tx ${txStatus.txHash} expired (birth: ${txStatus.birth}, death: ${txStatus.death}, currentBlock: ${currentBlockNumber})`);
           // eslint-disable-next-line no-await-in-loop
           await this.cacheService.upsertWatchedTxns(txStatus);
         }
