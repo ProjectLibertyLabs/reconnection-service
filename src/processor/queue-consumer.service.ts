@@ -10,9 +10,8 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
-import { ITxMonitorJob } from '#app/interfaces/monitor.job.interface';
 import { ReconnectionServiceConstants } from '#app/constants';
-import { exist } from 'joi';
+import { ITxMonitorJob } from '#app/interfaces/monitor.job.interface';
 import { CapacityLowError } from './errors';
 
 const CAPACITY_EPOCH_TIMEOUT_NAME = 'capacity_check';

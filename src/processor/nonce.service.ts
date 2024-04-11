@@ -13,16 +13,16 @@ export class NonceService implements OnApplicationBootstrap {
   private accountId: Uint8Array;
 
   constructor(
-    private cacheMgr: ReconnectionCacheMgrService,
+    private cacheService: ReconnectionCacheMgrService,
     private blockchainService: BlockchainService,
     private configService: ConfigService,
   ) {
     this.logger = new Logger(NonceService.name);
-    cacheMgr.redis.defineCommand('incrementNonce', {
+    cacheService.redis.defineCommand('incrementNonce', {
       numberOfKeys: CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK,
       lua: fs.readFileSync('lua/incrementNonce.lua', 'utf8'),
     });
-    cacheMgr.redis.defineCommand('peekNonce', {
+    cacheService.redis.defineCommand('peekNonce', {
       numberOfKeys: CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK,
       lua: fs.readFileSync('lua/peekNonce.lua', 'utf-8'),
     });
@@ -38,7 +38,7 @@ export class NonceService implements OnApplicationBootstrap {
     const nonceNumber = (await this.blockchainService.getNonce(this.accountId)).toNumber();
     const keys = this.getNextPossibleKeys(nonceNumber);
     // @ts-ignore
-    const nextNonceIndex = await this.cacheMgr.redis.peekNonce(...keys, keys.length);
+    const nextNonceIndex = await this.cacheService.redis.peekNonce(...keys, keys.length);
     if (nextNonceIndex === -1) {
       this.logger.warn(`nextNonce was full even with ${CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK} ${nonceNumber}`);
       return nonceNumber + CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK;
@@ -52,7 +52,7 @@ export class NonceService implements OnApplicationBootstrap {
     const nonceNumber = (await this.blockchainService.getNonce(this.accountId)).toNumber();
     const keys = this.getNextPossibleKeys(nonceNumber);
     // @ts-ignore
-    const nextNonceIndex = await this.cacheMgr.redis.incrementNonce(...keys, keys.length, CacheUtils.NONCE_KEY_EXPIRE_SECONDS);
+    const nextNonceIndex = await this.cacheService.redis.incrementNonce(...keys, keys.length, CacheUtils.NONCE_KEY_EXPIRE_SECONDS);
     if (nextNonceIndex === -1) {
       this.logger.warn(`nextNonce was full even with ${CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK} ${nonceNumber}`);
       return nonceNumber + CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK;

@@ -1,8 +1,8 @@
-import { ITxStatus } from '#app/interfaces/tx-status.interface';
 import { InjectRedis } from '@liaoliaots/nestjs-redis';
 import { Injectable } from '@nestjs/common';
 import { HexString } from '@polkadot/util/types';
 import { Redis } from 'ioredis';
+import { ITxStatus } from '#app/interfaces/tx-status.interface';
 
 export type TxStatusObj = Record<HexString, ITxStatus>;
 
