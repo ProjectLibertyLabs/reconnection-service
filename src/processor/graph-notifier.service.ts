@@ -1,14 +1,13 @@
-import { InjectRedis } from '@liaoliaots/nestjs-redis';
 import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Job, Queue } from 'bullmq';
-import Redis from 'ioredis';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { RegistryError } from '@polkadot/types/types';
 import { BlockchainService } from '#app/blockchain/blockchain.service';
 import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
 import { ITxMonitorJob } from '#app/interfaces/monitor.job.interface';
 import { IGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
+import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 
 @Injectable()
 @Processor('graphTxMonitorQueue')
@@ -16,7 +15,7 @@ export class GraphNotifierService extends WorkerHost {
   private logger: Logger;
 
   constructor(
-    @InjectRedis() private cacheManager: Redis,
+    private cacheManager: ReconnectionCacheMgrService,
     @InjectQueue('graphUpdateQueue') private reconnectionQueue: Queue,
     private blockchainService: BlockchainService,
   ) {
@@ -86,13 +85,13 @@ export class GraphNotifierService extends WorkerHost {
     const epochCapacityKey = `epochCapacity:${epoch}`;
 
     try {
-      const savedCapacity = await this.cacheManager.get(epochCapacityKey);
+      const savedCapacity = await this.cacheManager.redis.get(epochCapacityKey);
       const epochCapacity = BigInt(savedCapacity ?? 0);
       const newEpochCapacity = epochCapacity + capacityWithdrawn;
 
       const epochDurationBlocks = await this.blockchainService.getCurrentEpochLength();
       const epochDuration = epochDurationBlocks * BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND;
-      await this.cacheManager.setex(epochCapacityKey, epochDuration, newEpochCapacity.toString());
+      await this.cacheManager.redis.setex(epochCapacityKey, epochDuration, newEpochCapacity.toString());
     } catch (error) {
       this.logger.error(`Error setting epoch capacity: ${error}`);
     }

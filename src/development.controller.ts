@@ -4,25 +4,23 @@ To use it, simply rename and remove the '.dev' extension
 */
 
 // eslint-disable-next-line max-classes-per-file
-import { Controller, Logger, Post, Body, Param, Query, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Logger, Post, Body, Param, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { plainToClass } from 'class-transformer';
-import { InjectRedis } from '@liaoliaots/nestjs-redis';
-import Redis from 'ioredis';
 import { GraphUpdateJobDto } from './interfaces/graph-update-job.dto';
 import { ReconnectionGraphService } from './processor/reconnection-graph.service';
-import { BlockchainScannerService, LAST_SEEN_BLOCK_NUMBER_KEY } from './blockchain-scanner.service';
+import { GraphUpdateScannerService } from './graph-update-scanner.service';
+import { ReconnectionServiceConstants } from './constants';
 
 @Controller('reconnection-service/dev')
 export class DevelopmentController {
   private readonly logger: Logger;
 
   constructor(
-    @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
-    @InjectRedis() private cacheManager: Redis,
+    @InjectQueue(ReconnectionServiceConstants.GRAPH_UPDATE_QUEUE_NAME) private graphUpdateQueue: Queue,
     private graphService: ReconnectionGraphService,
-    private scannerService: BlockchainScannerService,
+    private scannerService: GraphUpdateScannerService,
   ) {
     this.logger = new Logger(this.constructor.name);
 
@@ -79,7 +77,7 @@ export class DevelopmentController {
     }
     const job = await this.graphUpdateQueue.getJob(jobId);
     if (job) {
-      await job.update(data);
+      await job.updateData(data);
       await job.retry();
     } else {
       throw new HttpException('Job ID not found', HttpStatus.NOT_FOUND);
@@ -96,7 +94,7 @@ export class DevelopmentController {
       const { action, ...debugOptions } = debugData;
       options = { ...options, ...debugOptions };
     }
-    return this.graphUpdateQueue.add(`graphUpdate:${data.dsnpId}`, data, options);
+    return this.graphUpdateQueue.add(ReconnectionServiceConstants.GRAPH_UPDATE_JOB_TYPE, data, options);
   }
 
   @Post('update/graph')
@@ -105,9 +103,9 @@ export class DevelopmentController {
   }
 
   @Post('scan/:blockNumber')
-  async scanChainFromBlock(@Param('blockNumber') blockNumber: string) {
-    const block = BigInt(blockNumber) - 1n;
-    await this.cacheManager.set(LAST_SEEN_BLOCK_NUMBER_KEY, block.toString());
+  async scanChainFromBlock(@Param('blockNumber') blockNumber: number) {
+    const block = blockNumber - 1;
+    await (this.scannerService as unknown as any).setLastSeenBlockNumber(block);
     this.scannerService.scan();
   }
 
