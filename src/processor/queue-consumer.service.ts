@@ -12,6 +12,7 @@ import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { ITxMonitorJob } from '#app/interfaces/monitor.job.interface';
 import { ReconnectionServiceConstants } from '#app/constants';
+import { exist } from 'joi';
 import { CapacityLowError } from './errors';
 
 const CAPACITY_EPOCH_TIMEOUT_NAME = 'capacity_check';
@@ -54,7 +55,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
   }
 
   async process(job: Job<any, any, string>): Promise<void> {
-    if (job.name === ReconnectionServiceConstants.GRAPH_UPDATE_QUEUE_NAME) {
+    if (job.name === ReconnectionServiceConstants.GRAPH_UPDATE_JOB_TYPE) {
       return this.processGraphUpdateJob(job);
     }
     if (job.name === 'monitorJobStatus') {
@@ -187,8 +188,14 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     }
 
     try {
-      const doTrack = await this.graphSdkService.updateUserGraph(job.id ?? '', job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
-      this.logger.verbose(`Successfully ${doTrack ? 'submitted' : 'processed'} graph update for ${job.id}`);
+      let doTrack = false;
+      if (await this.cacheManager.doesJobKeyExist(job.id!)) {
+        doTrack = true;
+        this.logger.debug(`Already tracking transactions for ${job.id}; adding a child job`);
+      } else {
+        doTrack = await this.graphSdkService.updateUserGraph(job.id ?? '', job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
+        this.logger.verbose(`Successfully ${doTrack ? 'submitted' : 'processed'} graph update for ${job.id}`);
+      }
       if (doTrack) {
         this.graphUpdateQueue.add(
           'monitorJobStatus',

@@ -36,7 +36,7 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
     super(cacheManager, blockchainService, new Logger(GraphUpdateCompletionMonitorService.name));
   }
 
-  async processCurrentBlock(currentBlockHash: BlockHash, _currentBlockNumber: number): Promise<void> {
+  async processCurrentBlock(currentBlockHash: BlockHash, currentBlockNumber: number): Promise<void> {
     // Get set of tx hashes to monitor from cache
     let pendingTxns = await this.cacheService.getAllPendingTxns();
 
@@ -87,12 +87,11 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
 
       await this.setEpochCapacity(epoch, totalCapacityWithdrawn);
 
-      // Now check all pending transactions for expiration
-      const lastBlock = await this.blockchainService.getLatestFinalizedBlockNumber();
+      // Now check all pending transactions for expiration as of this block
       pendingTxns = await this.cacheService.getAllPendingTxns();
       // eslint-disable-next-line no-restricted-syntax
       for (const txStatus of Object.values(pendingTxns)) {
-        if (BigInt(txStatus.death) >= lastBlock) {
+        if (txStatus.death >= currentBlockNumber) {
           txStatus.status = 'expired';
           this.logger.verbose(`Tx ${txStatus.txHash} expired`);
           // eslint-disable-next-line no-await-in-loop

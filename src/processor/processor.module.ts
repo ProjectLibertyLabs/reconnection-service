@@ -13,7 +13,7 @@ import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { ReconnectionServiceConstants } from '#app/constants';
 import { QueueConsumerService } from './queue-consumer.service';
-import { GraphUpdateCompletionMonitorService } from './graph-notifier.service';
+import { GraphUpdateCompletionMonitorService } from './graph-update-completion-monitor.service';
 import { ReconnectionGraphService } from './reconnection-graph.service';
 import { GraphManagerModule } from '../graph/graph-state.module';
 import { GraphStateManager } from '../graph/graph-state-manager';

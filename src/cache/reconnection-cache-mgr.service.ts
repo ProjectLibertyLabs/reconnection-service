@@ -7,7 +7,8 @@ import { Redis } from 'ioredis';
 export type TxStatusObj = Record<HexString, ITxStatus>;
 
 function makeJobKey(jobId: string): string {
-  return jobId.startsWith('pending:') ? jobId : `pending:${jobId}`;
+  const id = jobId.replace(/:(false|true)$/, '');
+  return id.startsWith('pending:') ? id : `pending:${id}`;
 }
 
 @Injectable()
@@ -17,6 +18,11 @@ export class ReconnectionCacheMgrService {
 
   public get redis(): Redis {
     return this.cacheMgr;
+  }
+
+  public async doesJobKeyExist(jobId: string): Promise<boolean> {
+    const value = await this.cacheMgr.exists(makeJobKey(jobId));
+    return !!value;
   }
 
   public async upsertWatchedTxns(txStatus: ITxStatus | ITxStatus[]): Promise<void> {
