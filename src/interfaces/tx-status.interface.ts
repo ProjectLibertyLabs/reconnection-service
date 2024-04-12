@@ -8,7 +8,3 @@ export interface ITxStatus {
   status: 'success' | 'failed' | 'expired' | 'pending';
   error?: string;
 }
-
-export type TxHashMap = Record<HexString, ITxStatus>;
-
-export type JobTxList = Record<string, HexString[]>;

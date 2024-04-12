@@ -1,4 +1,4 @@
-import { IsBoolean, IsNumberString, IsOptional } from 'class-validator';
+import { IsBoolean, IsEnum, IsNumber, IsNumberString, IsOptional } from 'class-validator';
 import { GraphUpdateJobState, IGraphUpdateJob, createGraphUpdateJob } from './graph-update-job.interface';
 
 export class GraphUpdateJobDto implements IGraphUpdateJob {
@@ -13,6 +13,7 @@ export class GraphUpdateJobDto implements IGraphUpdateJob {
   @IsBoolean()
   public processTransitiveUpdates: boolean;
 
+  @IsEnum(GraphUpdateJobState)
   public state: GraphUpdateJobState;
 
   @IsOptional()
