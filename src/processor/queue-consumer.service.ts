@@ -311,18 +311,21 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
       let outOfCapacity = remainingCapacity <= 0n;
 
       if (!outOfCapacity) {
-        // this.logger.debug(`Capacity remaining: ${remainingCapacity}`);
+        let capacityLimitThreshold: bigint = BigInt(capacityLimit.value);
         if (capacityLimit.type === 'percentage') {
           const capacityLimitPercentage = BigInt(capacityLimit.value);
-          const capacityLimitThreshold = (capacity.totalCapacityIssued * capacityLimitPercentage) / 100n;
-          // this.logger.debug(`Capacity limit threshold: ${capacityLimitThreshold}`);
+          capacityLimitThreshold = (capacity.totalCapacityIssued * capacityLimitPercentage) / 100n;
           if (epochUsedCapacity >= capacityLimitThreshold) {
             outOfCapacity = true;
-            this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimitThreshold}`);
           }
         } else if (epochUsedCapacity >= capacityLimit.value) {
           outOfCapacity = true;
-          this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimit.value}`);
+        }
+
+        if (outOfCapacity) {
+          this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimitThreshold}`);
+        } else {
+          this.logger.verbose(`Capacity usage: ${epochUsedCapacity} of ${capacityLimitThreshold} (${remainingCapacity} remaining)`);
         }
       }
 

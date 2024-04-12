@@ -78,17 +78,15 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
         .filter(({ event }) => at.events.capacity.CapacityWithdrawn.is(event))
         .reduce((sum, { event }) => (event as unknown as any).data.amount.toBigInt() + sum, 0n);
 
-      const updateTxns: ITxStatus[] = [];
-
       // eslint-disable-next-line no-restricted-syntax
       for (const [txHash, txIndex] of extrinsicIndices) {
         const extrinsicEvents = events.filter(({ phase }) => phase.isApplyExtrinsic && phase.asApplyExtrinsic.eq(txIndex));
         const hasSuccess = extrinsicEvents.some(({ event }) => at.events.utility.BatchCompleted.is(event));
         const failureEvent = extrinsicEvents.find(({ event }) => at.events.system.ExtrinsicFailed.is(event))?.event;
 
-        updateTxns.push(this.getTxStatus(pendingTxns[txHash], hasSuccess, failureEvent));
+        // eslint-disable-next-line no-await-in-loop
+        await this.cacheService.upsertWatchedTxns(this.getTxStatus(pendingTxns[txHash], hasSuccess, failureEvent));
       }
-      await this.cacheService.upsertWatchedTxns(updateTxns);
 
       await this.setEpochCapacity(epoch, totalCapacityWithdrawn);
 
