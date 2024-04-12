@@ -8,6 +8,8 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { ReconnectionServiceConstants } from '#app/constants';
+import { ITxStatus } from '#app/interfaces/tx-status.interface';
+import { Graph } from '@dsnp/graph-sdk';
 
 const CAPACITY_EPOCH_TIMEOUT_NAME = 'capacity_check';
 
@@ -49,58 +51,64 @@ export class TxMonitorQueueConsumerService extends WorkerHost implements OnAppli
       throw new Error(`Unable to find source job ${job.id}`);
     }
     const allJobTxns = Object.values(jobTxns);
-    const pending = allJobTxns.filter((tx) => tx.status === 'pending');
-    const success = allJobTxns.filter((tx) => tx.status === 'success');
-    const failed = allJobTxns.filter((tx) => tx.status === 'failed');
-    const expired = allJobTxns.filter((tx) => tx.status === 'expired');
+    const hasTxns = allJobTxns.length > 0;
+    const hasPending = allJobTxns.some((tx) => tx.status === 'pending');
+    const allSucceeded = allJobTxns.filter((tx) => tx.status === 'success').length === allJobTxns.length;
+    const expiredOrFailed = allJobTxns.filter((tx) => tx.status === 'failed' || tx.status === 'expired');
 
-    if (allJobTxns.length === 0 || pending.length === 0) {
-      await this.cacheManager.removeJob(sourceJob.id!);
-    }
-
-    if (allJobTxns.length === 0) {
-      this.logger.verbose(`No transactions to await for job ${sourceJob.id}; marking completed`);
-      await sourceJob.updateData({ ...sourceJob.data, state: GraphUpdateJobState.MonitorSuccess });
-    } else if (pending.length === 0 && failed.length === 0 && expired.length === 0 && success.length > 0) {
-      this.logger.verbose(`All transactions completed for job ${sourceJob.id}`);
-      await sourceJob.updateData({ ...sourceJob.data, state: GraphUpdateJobState.MonitorSuccess });
-    } else if (pending.length > 0) {
+    if (hasPending) {
       this.logger.verbose(`Job ${sourceJob.id} still has pending transactions`);
       await job.moveToDelayed(Date.now() + BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND, job.token);
       throw new DelayedError();
-    } else if (failed.length > 0) {
-      // Check types of failures to determine whether we pause queue or retry
-      let pause = false;
-      let retry = false;
-      let failure: string | undefined;
-      failed.forEach(({ error }) => {
+    }
+
+    if (!hasTxns || !hasPending) {
+      await this.cacheManager.removeJob(sourceJob.id!);
+    }
+
+    let { state } = sourceJob.data;
+    if (!hasTxns || allSucceeded) {
+      this.logger.verbose(`${allSucceeded ? 'All transactions completed' : 'No transactions to await'} for job ${sourceJob.id}; marking completed`);
+      state = GraphUpdateJobState.MonitorSuccess;
+    } else {
+      state = await this.handleExpiredOrFailed(expiredOrFailed, sourceJob);
+    }
+
+    await sourceJob.updateData({ ...sourceJob.data, state });
+  }
+
+  private async handleExpiredOrFailed(txns: ITxStatus[], sourceJob: Job<IGraphUpdateJob, any, string>): Promise<GraphUpdateJobState> {
+    // Check types of failures to determine whether we pause queue or retry
+    let pause = false;
+    let noRetry = false;
+    let failure: string | undefined;
+    // eslint-disable-next-line no-restricted-syntax
+    txns
+      .filter((txn) => txn.status === 'failed')
+      .forEach(({ error }) => {
         const errorReport = this.handleMessagesFailure(error!);
         pause = pause || errorReport.pause;
-        retry = retry || errorReport.retry;
+        noRetry = noRetry || !errorReport.retry;
         if (!errorReport.pause && !errorReport.retry) {
           failure = error;
         }
       });
 
-      if (pause) {
-        // eslint-disable-next-line no-await-in-loop
-        await this.graphUpdateQueue.pause();
-      }
-
-      if (retry) {
-        this.logger.error(`Job ${sourceJob.id} had transactions that failed; retrying`);
-        await sourceJob.updateData({ ...sourceJob.data, state: GraphUpdateJobState.ChainFailureRetry });
-      } else if (failure) {
-        this.logger.error(`Job ${sourceJob.id} failed with error ${failure}`);
-        await sourceJob.updateData({ ...sourceJob.data, state: GraphUpdateJobState.ChainFailureNoRetry });
-      }
-    } else if (expired.length > 0) {
-      this.logger.error(`Job ${sourceJob.id} had transactions that expired; retrying`);
-      await sourceJob.updateData({ ...sourceJob.data, state: GraphUpdateJobState.ChainFailureRetry });
-    } else {
-      await job.moveToDelayed(Date.now() + BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND, job.token);
-      throw new DelayedError();
+    if (pause) {
+      // eslint-disable-next-line no-await-in-loop
+      await this.graphUpdateQueue.pause();
     }
+
+    let { state } = sourceJob.data;
+    if (!noRetry) {
+      this.logger.error(`Job ${sourceJob.id} had transactions that failed or expired; retrying`);
+      state = GraphUpdateJobState.ChainFailureRetry;
+    } else if (failure) {
+      this.logger.error(`Job ${sourceJob.id} failed with error ${failure}`);
+      state = GraphUpdateJobState.ChainFailureNoRetry;
+    }
+
+    return state;
   }
 
   private handleMessagesFailure(error: string): { pause: boolean; retry: boolean } {

@@ -34,8 +34,9 @@ export abstract class BlockchainScannerService extends QueueEventsHost implement
 
   @OnQueueEvent('drained')
   handleEmptyQueue() {
-    this.logger.log('Empty queue; resuming chain scan');
-    setTimeout(() => this.scan(), 0);
+    if (!this.scanInProgress) {
+      setTimeout(() => this.scan(), 0);
+    }
   }
 
   public async scan(): Promise<void> {
@@ -72,7 +73,6 @@ export abstract class BlockchainScannerService extends QueueEventsHost implement
       currentBlockHash = await this.blockchainService.getBlockHash(currentBlockNumber);
 
       if (!currentBlockHash.some((byte) => byte !== 0)) {
-        this.logger.log('No new blocks to read; no scan performed.');
         this.scanInProgress = false;
         return;
       }
