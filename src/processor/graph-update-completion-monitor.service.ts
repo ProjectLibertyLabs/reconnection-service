@@ -51,12 +51,11 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
     if (extrinsicIndices.length > 0) {
       const at = await this.blockchainService.apiPromise.at(currentBlockHash);
       const epoch = (await at.query.capacity.currentEpoch()).toNumber();
-      let totalCapacityWithdrawn: bigint = 0n;
       const events = (await at.query.system.events()).filter(({ phase }) => phase.isApplyExtrinsic && extrinsicIndices.some((index) => phase.asApplyExtrinsic.eq(index)));
-      const capacityAmounts: bigint[] = events
+      
+      const totalCapacityWithdrawn: bigint = events
         .filter(({ event }) => at.events.capacity.CapacityWithdrawn.is(event))
-        .map(({ event }) => (event as unknown as any).data.amount.toBigInt());
-      totalCapacityWithdrawn = capacityAmounts.reduce((prev, curr) => prev + curr, totalCapacityWithdrawn);
+        .reduce((sum, { event }) => (event as unknown as any).data.amount.toBigInt() + sum, 0n);
 
       // eslint-disable-next-line no-restricted-syntax
       for (const [txHash, txIndex] of extrinsicIndices) {
@@ -64,7 +63,6 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
         const hasSuccess = extrinsicEvents.some(({ event }) => at.events.utility.BatchCompleted.is(event));
         const failureEvent = extrinsicEvents.find(({ event }) => at.events.system.ExtrinsicFailed.is(event));
 
-        // eslint-disable-next-line no-await-in-loop
         const txStatus = pendingTxns[txHash];
 
         if (failureEvent && at.events.system.ExtrinsicFailed.is(failureEvent.event)) {
