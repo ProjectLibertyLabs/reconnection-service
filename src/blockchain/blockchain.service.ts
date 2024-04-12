@@ -11,6 +11,9 @@ import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
 import { u32, Option } from '@polkadot/types';
 import { PalletCapacityCapacityDetails, PalletCapacityEpochInfo } from '@polkadot/types/lookup';
 import { HexString } from '@polkadot/util/types';
+import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ReconnectionServiceConstants } from '#app/constants';
 import { Extrinsic } from './extrinsic';
 
 @Injectable()
@@ -19,9 +22,9 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
 
   public apiPromise: ApiPromise;
 
-  private configService: ConfigService;
+  private readonly logger: Logger;
 
-  private logger: Logger;
+  private lastCapacityUsed: bigint;
 
   public async onApplicationBootstrap() {
     const providerUrl = this.configService.frequencyUrl!;
@@ -40,7 +43,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     this.logger.log('Blockchain API ready.');
   }
 
-  public async onApplicationShutdown(signal?: string | undefined) {
+  public async onApplicationShutdown(_signal?: string | undefined) {
     const promises: Promise<any>[] = [];
     if (this.api) {
       promises.push(this.api.disconnect());
@@ -52,7 +55,11 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     await Promise.all(promises);
   }
 
-  constructor(configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly cacheManager: ReconnectionCacheMgrService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {
     this.configService = configService;
     this.logger = new Logger(this.constructor.name);
   }
@@ -156,5 +163,46 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
 
   public async getLatestFinalizedBlockHash(): Promise<BlockHash> {
     return (await this.apiPromise.rpc.chain.getFinalizedHead()) as BlockHash;
+  }
+
+  public async checkCapacity(): Promise<void> {
+    try {
+      const { lastCapacityUsed } = this;
+      const capacityLimit = this.configService.getCapacityLimit();
+      const capacity = await this.capacityInfo(this.configService.getProviderId());
+      const { remainingCapacity } = capacity;
+      const { currentEpoch } = capacity;
+      const epochCapacityKey = `${ReconnectionServiceConstants.EPOCH_CAPACITY_PREFIX}${currentEpoch}`;
+      const epochUsedCapacity = BigInt((await this.cacheManager.redis.get(epochCapacityKey)) ?? 0); // Fetch capacity used by the service
+      this.lastCapacityUsed = epochUsedCapacity;
+      let outOfCapacity = remainingCapacity <= 0n;
+
+      if (!outOfCapacity) {
+        let capacityLimitThreshold: bigint = BigInt(capacityLimit.value);
+        if (capacityLimit.type === 'percentage') {
+          const capacityLimitPercentage = BigInt(capacityLimit.value);
+          capacityLimitThreshold = (capacity.totalCapacityIssued * capacityLimitPercentage) / 100n;
+          if (epochUsedCapacity >= capacityLimitThreshold) {
+            outOfCapacity = true;
+          }
+        } else if (epochUsedCapacity >= capacityLimit.value) {
+          outOfCapacity = true;
+        }
+
+        if (outOfCapacity) {
+          this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimitThreshold}`);
+        } else if (epochUsedCapacity !== lastCapacityUsed) {
+          this.logger.verbose(`Capacity usage: ${epochUsedCapacity} of ${capacityLimitThreshold} (${remainingCapacity} remaining)`);
+        }
+      }
+
+      if (outOfCapacity) {
+        await this.eventEmitter.emitAsync('capacity.exhausted');
+      } else {
+        await this.eventEmitter.emitAsync('capacity.refilled');
+      }
+    } catch (err: any) {
+      this.logger.error('Caught error in checkCapacity', err?.stack);
+    }
   }
 }

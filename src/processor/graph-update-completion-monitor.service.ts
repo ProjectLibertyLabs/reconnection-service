@@ -8,6 +8,7 @@ import { BlockHash, Event } from '@polkadot/types/interfaces';
 import { HexString } from '@polkadot/util/types';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { ITxStatus } from '#app/interfaces/tx-status.interface';
+import { ReconnectionServiceConstants } from '#app/constants';
 
 @Injectable()
 export class GraphUpdateCompletionMonitorService extends BlockchainScannerService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -102,10 +103,11 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
         await this.cacheService.upsertWatchedTxns(txStatus);
       }
     }
+    await this.blockchainService.checkCapacity();
   }
 
   private async setEpochCapacity(epoch: number, capacityWithdrawn: bigint): Promise<void> {
-    const epochCapacityKey = `epochCapacity:${epoch}`;
+    const epochCapacityKey = `${ReconnectionServiceConstants.EPOCH_CAPACITY_PREFIX}${epoch}`;
 
     try {
       const savedCapacity = await this.cacheManager.redis.get(epochCapacityKey);
