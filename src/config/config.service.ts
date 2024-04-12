@@ -26,7 +26,6 @@ export interface ConfigEnvironmentVariables {
   PROVIDER_ACCOUNT_SEED_PHRASE: string;
   CAPACITY_LIMIT: ICapacityLimit;
   FREQUENCY_TX_TIMEOUT_SECONDS: number;
-  DEAD_LETTER_JOB_PREFIX: string;
   CONNECTIONS_PER_PROVIDER_RESPONSE_PAGE: number;
 }
 
@@ -109,10 +108,6 @@ export class ConfigService {
 
   public getFrequencyTxTimeoutSeconds(): number {
     return this.nestConfigService.get<number>('FREQUENCY_TX_TIMEOUT_SECONDS')!;
-  }
-
-  public getDeadLetterPrefix(): string {
-    return this.nestConfigService.get<string>('DEAD_LETTER_JOB_PREFIX')!;
   }
 
   public getPageSize(): number {

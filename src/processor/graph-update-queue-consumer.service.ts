@@ -146,8 +146,8 @@ export class GraphUpdateQueueConsumerService extends WorkerHost implements OnApp
       if (e instanceof WaitingChildrenError) {
         throw e;
       }
-      this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`, e);
-      const isDeadLetter = job.id?.search(this.configService.getDeadLetterPrefix()) === 0;
+      this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);
+      const isDeadLetter = job.id?.search(ReconnectionServiceConstants.DEAD_LETTER_QUEUE_PREFIX) === 0;
       if (!isDeadLetter && job.attemptsMade === 1 && job.id) {
         // if capacity is low, saying for some failing transactions
         // add delay to job and continue
@@ -158,7 +158,7 @@ export class GraphUpdateQueueConsumerService extends WorkerHost implements OnApp
         const delay = e instanceof CapacityLowError ? blocksRemaining * blockDelay : blockDelay;
         this.logger.debug(`Adding delay to job ${job.id} for ${delay}ms`);
         const { key: delayJobId, data: delayJobData } = createGraphUpdateJob(job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
-        const deadLetterDelayedJobId = `${this.configService.getDeadLetterPrefix()}${delayJobId}`;
+        const deadLetterDelayedJobId = `${ReconnectionServiceConstants.DEAD_LETTER_QUEUE_PREFIX}${delayJobId}`;
         await this.graphUpdateQueue.remove(deadLetterDelayedJobId);
         await this.graphUpdateQueue.remove(job.id);
         await this.graphUpdateQueue.add(ReconnectionServiceConstants.GRAPH_UPDATE_JOB_TYPE, delayJobData, { jobId: deadLetterDelayedJobId, delay });

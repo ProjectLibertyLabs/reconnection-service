@@ -36,6 +36,7 @@ const setupConfigService = async (envObj: any): Promise<ConfigService> => {
 
 describe('ReconnectionConfigService', () => {
   const ALL_ENV: { [key: string]: string | undefined } = {
+    API_PORT: undefined,
     REDIS_URL: undefined,
     FREQUENCY_URL: undefined,
     PROVIDER_ID: undefined,
@@ -67,6 +68,12 @@ describe('ReconnectionConfigService', () => {
     it('missing redis url should fail', async () => {
       const { REDIS_URL: dummy, ...env } = ALL_ENV;
       await expect(setupConfigService({ ...env })).rejects.toBeDefined();
+    });
+
+    it('invalid api port should fail', async () => {
+      const { API_PORT: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ API_PORT: 1000, ...env })).rejects.toBeDefined();
+      await expect(setupConfigService({ API_PORT: 65537, ...env })).rejects.toBeDefined();
     });
 
     it('invalid redis url should fail', async () => {
@@ -217,6 +224,10 @@ describe('ReconnectionConfigService', () => {
       expect(reconnectionConfigService).toBeDefined();
     });
 
+    it('should get api port', () => {
+      expect(reconnectionConfigService.apiPort?.toString()).toStrictEqual(ALL_ENV.API_PORT?.toString());
+    });
+
     it('should get redis url', () => {
       expect(reconnectionConfigService.redisUrl?.toString()).toStrictEqual(ALL_ENV.REDIS_URL?.toString());
     });
@@ -283,10 +294,6 @@ describe('ReconnectionConfigService', () => {
 
     it('should get frequency tx timeout seconds', () => {
       expect(reconnectionConfigService.getFrequencyTxTimeoutSeconds()).toStrictEqual(parseInt(ALL_ENV.FREQUENCY_TX_TIMEOUT_SECONDS as string, 10));
-    });
-
-    it('should get dead letter job prefix', () => {
-      expect(reconnectionConfigService.getDeadLetterPrefix()).toStrictEqual(ALL_ENV.DEAD_LETTER_JOB_PREFIX);
     });
 
     it('should get connections per page', () => {
