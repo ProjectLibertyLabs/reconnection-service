@@ -8,6 +8,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
 
 export interface ConfigEnvironmentVariables {
+  API_PORT: number;
   REDIS_URL: URL;
   FREQUENCY_URL: URL;
   PROVIDER_ID: string;
@@ -36,6 +37,10 @@ export class ConfigService {
 
   constructor(private nestConfigService: NestConfigService<ConfigEnvironmentVariables>) {
     this.capacityLimit = JSON.parse(nestConfigService.get('CAPACITY_LIMIT')!);
+  }
+
+  public get apiPort(): number {
+    return this.nestConfigService.get<number>('API_PORT')!;
   }
 
   public get redisUrl(): URL {

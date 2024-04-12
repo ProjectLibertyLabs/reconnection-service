@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ReconnectionServiceModule } from './reconnection-service.module';
+import { ConfigService } from './config/config.service';
 
 const logger = new Logger('main');
 
@@ -30,7 +31,9 @@ async function bootstrap() {
   try {
     app.enableShutdownHooks();
     app.useGlobalPipes(new ValidationPipe());
-    await app.listen(3000);
+    const configService = app.get<ConfigService>(ConfigService);
+    logger.log(`Application listening on port ${configService.apiPort}`);
+    await app.listen(configService.apiPort);
   } catch (e) {
     await app.close();
     logger.log('****** MAIN CATCH ********');

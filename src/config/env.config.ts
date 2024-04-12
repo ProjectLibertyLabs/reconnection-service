@@ -8,6 +8,7 @@ const devUriRegEx = /^\/\/(Alice|Bob|Charlie|Dave|Eve|Ferdie)(\/[\/]?\d+)?$/;
 export const configModuleOptions: ConfigModuleOptions = {
   isGlobal: true,
   validationSchema: Joi.object({
+    API_PORT: Joi.number().min(1025).max(65535).default(3000),
     REDIS_URL: Joi.string().uri().required(),
     FREQUENCY_URL: Joi.string().uri().required(),
     PROVIDER_ID: Joi.required().custom((value: string, helpers) => {
