@@ -123,6 +123,20 @@ dsnp2 -->|no| dsnp6(No action required)
 dsnp4 -->|no| dsnp7(Show non-provider\nuser as an external\nDSNP user)
 ```
 
+## Running the application
+
+There are three ways to run the application:
+
+1. Manually, starting the application natively in your own Node.js environment
+2. Using the provided Docker image [amplicalabs/reconnection-service:apponly-latest](https://hub.docker.com/r/amplicalabs/reconnection-service/tags) to run the app and configure to access your own external Redis instance
+3. Using the provided Docker image [amplicalabs/reconnection-service:standalone](https://hub.docker.com/r/amplicalabs/reconnection-service/tags) to run the app bundled with its own Redis server inside the same container (useful for dev/testing)
+
+## Configuring the application
+
+The application receives its configuration from the environment. Each method of launching the app has its own source for the environment. If you run a container image using Kubernetes, it is likely your environment injection will be configured in a Helm chart. For local Docker-based development, you may specifiy the environment or point to an environment file (see Docker documentation for the preferred way to configure this). If running natively using the script included in `package.json`, the app will use either a local `.env` or `.env.dev` file (depending on the script used to launch the app).
+
+Environment files are documented [here](./ENVIRONMENT.md), and a sample environment file is provided [here](./env.template).
+
 ## Docker compose development environment
 
 ### Prerequisites
@@ -130,26 +144,26 @@ dsnp4 -->|no| dsnp7(Show non-provider\nuser as an external\nDSNP user)
 1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop) for your platform
 2. Clone this repository
 
-    ```bash
-    git clone https://github.com/LibertyDSNP/reconnection-service.git
-    ```
+   ```bash
+   git clone https://github.com/LibertyDSNP/reconnection-service.git
+   ```
 
 3. Check for values in `.env.docker.dev` file and update as needed
 
 ### Running the development environment
 
 Note: Check docker compose file for various services it will start.
-Note: If `graphQueue` is paused, then it means we are out of capacity and need to stake more capacity, in such cases the pause it put for one epoch and then it will resume automatically.
+Note: If `graphQueue` is paused, then it means we are out of capacity and need to stake more capacity; in such cases the queue is paused for one epoch and then it will resume automatically.
 
 1. Start the development environment
 
-    ```bash
-    docker-compose -f docker-compose.dev.yml up
-    ```
+   ```bash
+   docker-compose -f docker-compose.dev.yml up
+   ```
 
 2. Run the [graph-migration-setup](https://github.com/LibertyDSNP/frequency-scenario-template/tree/main/graph-migration-setup) scenario to create the necessary accounts and delegations
 
-3. Go to [Polkadotjs](https://polkadot.js.org) and connect to the local development node.
+3. Go to [Polkadot.js](https://polkadot.js.org) and connect to the local development node.
 4. Fund MSA 1 (Provider) and stake some capacity, in graph migration setup scenario MSA 1 is the provider.
 5. Reconnection service will scan the chain and find delegation for PROVIDER_ID set in `.env.docker.dev` file and will start processing the graph migration.
-6. Make sure websocket data is sending correct response when reconnection service is requesting  graph data from provider.
+6. Make sure websocket data is sending correct response when reconnection service is requesting graph data from provider.
