@@ -8,6 +8,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
 
 export interface ConfigEnvironmentVariables {
+  API_PORT: number;
   REDIS_URL: URL;
   FREQUENCY_URL: URL;
   PROVIDER_ID: string;
@@ -25,7 +26,6 @@ export interface ConfigEnvironmentVariables {
   PROVIDER_ACCOUNT_SEED_PHRASE: string;
   CAPACITY_LIMIT: ICapacityLimit;
   FREQUENCY_TX_TIMEOUT_SECONDS: number;
-  DEAD_LETTER_JOB_PREFIX: string;
   CONNECTIONS_PER_PROVIDER_RESPONSE_PAGE: number;
 }
 
@@ -36,6 +36,10 @@ export class ConfigService {
 
   constructor(private nestConfigService: NestConfigService<ConfigEnvironmentVariables>) {
     this.capacityLimit = JSON.parse(nestConfigService.get('CAPACITY_LIMIT')!);
+  }
+
+  public get apiPort(): number {
+    return this.nestConfigService.get<number>('API_PORT')!;
   }
 
   public get redisUrl(): URL {
@@ -104,10 +108,6 @@ export class ConfigService {
 
   public getFrequencyTxTimeoutSeconds(): number {
     return this.nestConfigService.get<number>('FREQUENCY_TX_TIMEOUT_SECONDS')!;
-  }
-
-  public getDeadLetterPrefix(): string {
-    return this.nestConfigService.get<string>('DEAD_LETTER_JOB_PREFIX')!;
   }
 
   public getPageSize(): number {
