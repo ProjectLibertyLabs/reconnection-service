@@ -1,22 +1,23 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
-import { Job, Queue } from 'bullmq';
-import { IGraphUpdateJob, createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
+import { Job, Queue, UnrecoverableError, WaitingChildrenError } from 'bullmq';
+import { GraphUpdateJobState, IGraphUpdateJob, createGraphUpdateJob } from '#app/interfaces/graph-update-job.interface';
 import { ReconnectionGraphService } from '#app/processor/reconnection-graph.service';
 import { BlockchainService } from '#app/blockchain/blockchain.service';
 import { ConfigService } from '#app/config/config.service';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { SchedulerRegistry } from '@nestjs/schedule';
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { OnEvent } from '@nestjs/event-emitter';
 import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
+import { ReconnectionServiceConstants } from '#app/constants';
 import { CapacityLowError } from './errors';
 
 const CAPACITY_EPOCH_TIMEOUT_NAME = 'capacity_check';
 
 @Injectable()
-@Processor('graphUpdateQueue')
-export class QueueConsumerService extends WorkerHost implements OnApplicationBootstrap, OnModuleDestroy {
+@Processor(ReconnectionServiceConstants.GRAPH_UPDATE_QUEUE_NAME)
+export class GraphUpdateQueueConsumerService extends WorkerHost implements OnApplicationBootstrap, OnModuleDestroy {
   private logger: Logger;
 
   private capacityExhausted = false;
@@ -25,7 +26,6 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
 
   public async onApplicationBootstrap() {
     await Promise.all([this.blockchainService.api.isReady, this.blockchainService.apiPromise.isReady]);
-    await this.checkCapacity();
     this.graphUpdateQueue.resume();
   }
 
@@ -38,20 +38,48 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
   }
 
   constructor(
-    @InjectQueue('graphUpdateQueue') private graphUpdateQueue: Queue,
-    private cacheManager: ReconnectionCacheMgrService,
-    private graphSdkService: ReconnectionGraphService,
-    private blockchainService: BlockchainService,
-    private configService: ConfigService,
-    private schedulerRegistry: SchedulerRegistry,
-    private eventEmitter: EventEmitter2,
+    @InjectQueue(ReconnectionServiceConstants.GRAPH_UPDATE_QUEUE_NAME) private readonly graphUpdateQueue: Queue,
+    @InjectQueue(ReconnectionServiceConstants.TX_MONITOR_QUEUE_NAME) private readonly txMonitorQueue: Queue,
+    private readonly cacheManager: ReconnectionCacheMgrService,
+    private readonly graphSdkService: ReconnectionGraphService,
+    private readonly blockchainService: BlockchainService,
+    private readonly configService: ConfigService,
+    private readonly schedulerRegistry: SchedulerRegistry,
   ) {
     super();
     this.logger = new Logger(this.constructor.name);
     graphUpdateQueue.pause(); // pause queue until we're ready to start processing
   }
 
-  async process(job: Job<IGraphUpdateJob, any, string>) {
+  async process(job: Job<any, any, string>): Promise<void> {
+    switch (job.data.state) {
+      case GraphUpdateJobState.Unprocessed:
+        return this.updateGraph(job);
+
+      case GraphUpdateJobState.Submitted:
+        this.logger.error(`Processing job ${job.id} in state 'Submitted'; should not happen`);
+        throw new UnrecoverableError('Processing job in Submitted state');
+        // eslint-disable-next-line no-unreachable
+        break;
+
+      case GraphUpdateJobState.ChainFailureNoRetry:
+        await job.moveToFailed(new Error('Fatal job error condition after chain submission'), job.token!);
+        break;
+
+      case GraphUpdateJobState.ChainFailureRetry:
+        await job.updateData({ ...job.data, state: GraphUpdateJobState.Unprocessed });
+        throw new Error('Error detected on-chain; will retry if allowed');
+        // eslint-disable-next-line no-unreachable
+        break;
+
+      case GraphUpdateJobState.MonitorSuccess:
+      default:
+    }
+
+    return Promise.resolve();
+  }
+
+  private async updateGraph(job: Job<IGraphUpdateJob, any, string>) {
     this.logger.debug(`Processing job ${job.id}, attempts: ${job.attemptsMade}`);
 
     // Handle dev/debug jobs
@@ -85,10 +113,40 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     }
 
     try {
-      await this.graphSdkService.updateUserGraph(job.id ?? '', job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
-      this.logger.verbose(`Successfully completed job ${job.id}`);
+      let doTrack = false;
+      if (await this.cacheManager.doesJobKeyExist(job.id!)) {
+        doTrack = true;
+        this.logger.debug(`Already tracking transactions for ${job.id}; adding a child job`);
+      } else {
+        doTrack = await this.graphSdkService.updateUserGraph(job.id ?? '', job.data.dsnpId, job.data.providerId, job.data.processTransitiveUpdates);
+        this.logger.verbose(`Successfully ${doTrack ? 'submitted' : 'processed'} graph update for ${job.id}`);
+      }
+      if (doTrack) {
+        this.txMonitorQueue.add(
+          ReconnectionServiceConstants.TX_MONITOR_JOB_NAME,
+          { id: job.id },
+          {
+            lifo: true,
+            failParentOnFailure: true,
+            parent: {
+              id: job.id!,
+              queue: job.queueQualifiedName,
+            },
+          },
+        );
+
+        const shouldWait = await job.moveToWaitingChildren(job.token!);
+        if (!shouldWait) {
+          throw new Error('Failed to await monitor job');
+        }
+        await job.updateData({ ...job.data, state: GraphUpdateJobState.Submitted });
+        throw new WaitingChildrenError();
+      }
     } catch (e) {
-      this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`);
+      if (e instanceof WaitingChildrenError) {
+        throw e;
+      }
+      this.logger.error(`Job ${job.id} failed (attempts=${job.attemptsMade})`, e);
       const isDeadLetter = job.id?.search(this.configService.getDeadLetterPrefix()) === 0;
       if (!isDeadLetter && job.attemptsMade === 1 && job.id) {
         // if capacity is low, saying for some failing transactions
@@ -103,11 +161,9 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
         const deadLetterDelayedJobId = `${this.configService.getDeadLetterPrefix()}${delayJobId}`;
         await this.graphUpdateQueue.remove(deadLetterDelayedJobId);
         await this.graphUpdateQueue.remove(job.id);
-        await this.graphUpdateQueue.add(`graphUpdate:${delayJobData.dsnpId}`, delayJobData, { jobId: deadLetterDelayedJobId, delay });
+        await this.graphUpdateQueue.add(ReconnectionServiceConstants.GRAPH_UPDATE_JOB_TYPE, delayJobData, { jobId: deadLetterDelayedJobId, delay });
       }
       throw e;
-    } finally {
-      await this.checkCapacity();
     }
   }
 
@@ -144,7 +200,7 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
     try {
       this.schedulerRegistry.addTimeout(
         CAPACITY_EPOCH_TIMEOUT_NAME,
-        setTimeout(() => this.checkCapacity(), blocksRemaining * BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND),
+        setTimeout(() => this.blockchainService.checkCapacity(), blocksRemaining * BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND),
       );
     } catch (err) {
       // ignore duplicate timeout
@@ -153,7 +209,9 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
 
   @OnEvent('capacity.refilled', { async: true, promisify: true })
   private async handleCapacityRefilled() {
-    this.logger.debug('Received capacity.refilled event');
+    if (this.capacityExhausted) {
+      this.logger.debug('Received capacity.refilled event');
+    }
     this.capacityExhausted = false;
     try {
       this.schedulerRegistry.deleteTimeout(CAPACITY_EPOCH_TIMEOUT_NAME);
@@ -161,44 +219,8 @@ export class QueueConsumerService extends WorkerHost implements OnApplicationBoo
       // ignore
     }
 
-    if (this.webhookOk) {
+    if (this.webhookOk && (await this.graphUpdateQueue.isPaused())) {
       await this.graphUpdateQueue.resume();
-    }
-  }
-
-  private async checkCapacity(): Promise<void> {
-    try {
-      const capacityLimit = this.configService.getCapacityLimit();
-      const capacity = await this.blockchainService.capacityInfo(this.configService.getProviderId());
-      const { remainingCapacity } = capacity;
-      const { currentEpoch } = capacity;
-      const epochCapacityKey = `epochCapacity:${currentEpoch}`;
-      const epochUsedCapacity = BigInt((await this.cacheManager.redis.get(epochCapacityKey)) ?? 0); // Fetch capacity used by the service
-      let outOfCapacity = remainingCapacity <= 0n;
-
-      if (!outOfCapacity) {
-        this.logger.debug(`Capacity remaining: ${remainingCapacity}`);
-        if (capacityLimit.type === 'percentage') {
-          const capacityLimitPercentage = BigInt(capacityLimit.value);
-          const capacityLimitThreshold = (capacity.totalCapacityIssued * capacityLimitPercentage) / 100n;
-          this.logger.debug(`Capacity limit threshold: ${capacityLimitThreshold}`);
-          if (epochUsedCapacity >= capacityLimitThreshold) {
-            outOfCapacity = true;
-            this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimitThreshold}`);
-          }
-        } else if (epochUsedCapacity >= capacityLimit.value) {
-          outOfCapacity = true;
-          this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimit.value}`);
-        }
-      }
-
-      if (outOfCapacity) {
-        await this.eventEmitter.emitAsync('capacity.exhausted');
-      } else {
-        await this.eventEmitter.emitAsync('capacity.refilled');
-      }
-    } catch (err) {
-      this.logger.error('Caught error in checkCapacity', err);
     }
   }
 }

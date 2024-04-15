@@ -5,14 +5,16 @@ import { ApiPromise, ApiRx, HttpProvider, WsProvider } from '@polkadot/api';
 import { firstValueFrom } from 'rxjs';
 import { options } from '@frequency-chain/api-augment';
 import { KeyringPair } from '@polkadot/keyring/types';
-import { BlockHash, BlockNumber, DispatchError, Hash, Index, SignedBlock } from '@polkadot/types/interfaces';
+import { BlockHash, BlockNumber, Index, SignedBlock } from '@polkadot/types/interfaces';
 import { SubmittableExtrinsic } from '@polkadot/api/types';
-import { AnyNumber, Codec, ISubmittableResult, RegistryError } from '@polkadot/types/types';
-import { u32, Option, u128 } from '@polkadot/types';
+import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
+import { u32, Option } from '@polkadot/types';
 import { PalletCapacityCapacityDetails, PalletCapacityEpochInfo } from '@polkadot/types/lookup';
-import { IsEvent } from '@polkadot/types/metadata/decorate/types';
+import { HexString } from '@polkadot/util/types';
+import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ReconnectionServiceConstants } from '#app/constants';
 import { Extrinsic } from './extrinsic';
-import { IGraphNotifierResult } from '../interfaces/graph-notifier-result.interface';
 
 @Injectable()
 export class BlockchainService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -20,9 +22,9 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
 
   public apiPromise: ApiPromise;
 
-  private configService: ConfigService;
+  private readonly logger: Logger;
 
-  private logger: Logger;
+  private lastCapacityUsed: bigint;
 
   public async onApplicationBootstrap() {
     const providerUrl = this.configService.frequencyUrl!;
@@ -41,7 +43,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     this.logger.log('Blockchain API ready.');
   }
 
-  public async onApplicationShutdown(signal?: string | undefined) {
+  public async onApplicationShutdown(_signal?: string | undefined) {
     const promises: Promise<any>[] = [];
     if (this.api) {
       promises.push(this.api.disconnect());
@@ -53,7 +55,11 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     await Promise.all(promises);
   }
 
-  constructor(configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly cacheManager: ReconnectionCacheMgrService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {
     this.configService = configService;
     this.logger = new Logger(this.constructor.name);
   }
@@ -111,21 +117,26 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     totalCapacityIssued: bigint;
     currentEpoch: bigint;
   }> {
-    const providerU64 = this.api.createType('u64', providerId);
-    const { epochStart }: PalletCapacityEpochInfo = await this.query('capacity', 'currentEpochInfo');
-    const epochBlockLength: u32 = await this.query('capacity', 'epochLength');
-    const capacityDetailsOption: Option<PalletCapacityCapacityDetails> = await this.query('capacity', 'capacityLedger', providerU64);
-    const { remainingCapacity, totalCapacityIssued } = capacityDetailsOption.unwrapOr({ remainingCapacity: 0, totalCapacityIssued: 0 });
-    const currentBlock: u32 = await this.query('system', 'number');
-    const currentEpoch = await this.getCurrentCapacityEpoch();
-    return {
-      currentEpoch,
-      providerId,
-      currentBlockNumber: currentBlock.toNumber(),
-      nextEpochStart: epochStart.add(epochBlockLength).toNumber(),
-      remainingCapacity: typeof remainingCapacity === 'number' ? BigInt(remainingCapacity) : remainingCapacity.toBigInt(),
-      totalCapacityIssued: typeof totalCapacityIssued === 'number' ? BigInt(totalCapacityIssued) : totalCapacityIssued.toBigInt(),
-    };
+    try {
+      const providerU64 = this.apiPromise.createType('u64', providerId);
+      const { epochStart }: PalletCapacityEpochInfo = await this.query('capacity', 'currentEpochInfo');
+      const epochBlockLength: u32 = await this.query('capacity', 'epochLength');
+      const capacityDetailsOption: Option<PalletCapacityCapacityDetails> = await this.query('capacity', 'capacityLedger', providerU64);
+      const { remainingCapacity, totalCapacityIssued } = capacityDetailsOption.unwrapOr({ remainingCapacity: 0, totalCapacityIssued: 0 });
+      const currentBlock: u32 = await this.query('system', 'number');
+      const currentEpoch = await this.getCurrentCapacityEpoch();
+      return {
+        currentEpoch,
+        providerId,
+        currentBlockNumber: currentBlock.toNumber(),
+        nextEpochStart: epochStart.add(epochBlockLength).toNumber(),
+        remainingCapacity: typeof remainingCapacity === 'number' ? BigInt(remainingCapacity) : remainingCapacity.toBigInt(),
+        totalCapacityIssued: typeof totalCapacityIssued === 'number' ? BigInt(totalCapacityIssued) : totalCapacityIssued.toBigInt(),
+      };
+    } catch (err: any) {
+      this.logger.error('Error in capacityInfo: ', err?.stack);
+      throw err;
+    }
   }
 
   public async getCurrentCapacityEpoch(): Promise<bigint> {
@@ -142,79 +153,56 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     return this.rpc('system', 'accountNextIndex', account);
   }
 
-  public async getBlock(block: BlockHash): Promise<SignedBlock> {
+  public async getBlock(block: BlockHash | HexString): Promise<SignedBlock> {
     return (await this.apiPromise.rpc.chain.getBlock(block)) as SignedBlock;
   }
 
-  public async getLatestFinalizedBlockNumber(): Promise<bigint> {
-    return (await this.apiPromise.rpc.chain.getBlock()).block.header.number.toBigInt();
+  public async getLatestFinalizedBlockNumber(): Promise<number> {
+    return (await this.apiPromise.rpc.chain.getBlock()).block.header.number.toNumber();
   }
 
   public async getLatestFinalizedBlockHash(): Promise<BlockHash> {
     return (await this.apiPromise.rpc.chain.getFinalizedHead()) as BlockHash;
   }
 
-  public async crawlBlockListForTx<C extends Codec[] = Codec[], N = unknown>(txHash: Hash, blockList: bigint[], successEvents: [IsEvent<C, N>]): Promise<IGraphNotifierResult> {
-    const txReceiptPromises: Promise<IGraphNotifierResult>[] = blockList.map(async (blockNumber) => {
-      const result: IGraphNotifierResult = { found: false, success: false };
-      const blockHash = await this.getBlockHash(blockNumber);
-      const block = await this.getBlock(blockHash);
-      const extrinsicIndex = block.block.extrinsics.findIndex((extrinsic) => extrinsic.hash.toString() === txHash.toString());
+  public async checkCapacity(): Promise<void> {
+    try {
+      const { lastCapacityUsed } = this;
+      const capacityLimit = this.configService.getCapacityLimit();
+      const capacity = await this.capacityInfo(this.configService.getProviderId());
+      const { remainingCapacity } = capacity;
+      const { currentEpoch } = capacity;
+      const epochCapacityKey = `${ReconnectionServiceConstants.EPOCH_CAPACITY_PREFIX}${currentEpoch}`;
+      const epochUsedCapacity = BigInt((await this.cacheManager.redis.get(epochCapacityKey)) ?? 0); // Fetch capacity used by the service
+      this.lastCapacityUsed = epochUsedCapacity;
+      let outOfCapacity = remainingCapacity <= 0n;
 
-      if (extrinsicIndex === -1) {
-        return result;
+      if (!outOfCapacity) {
+        let capacityLimitThreshold: bigint = BigInt(capacityLimit.value);
+        if (capacityLimit.type === 'percentage') {
+          const capacityLimitPercentage = BigInt(capacityLimit.value);
+          capacityLimitThreshold = (capacity.totalCapacityIssued * capacityLimitPercentage) / 100n;
+          if (epochUsedCapacity >= capacityLimitThreshold) {
+            outOfCapacity = true;
+          }
+        } else if (epochUsedCapacity >= capacityLimit.value) {
+          outOfCapacity = true;
+        }
+
+        if (outOfCapacity) {
+          this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimitThreshold}`);
+        } else if (epochUsedCapacity !== lastCapacityUsed) {
+          this.logger.verbose(`Capacity usage: ${epochUsedCapacity} of ${capacityLimitThreshold} (${remainingCapacity} remaining)`);
+        }
       }
 
-      this.logger.verbose(`Found tx ${txHash} in block ${blockNumber}`);
-      const at = await this.apiPromise.at(blockHash.toHex());
-      const eventsPromise = at.query.system.events();
-
-      const isTxSuccess = false;
-      let txError: RegistryError | undefined;
-
-      result.blockHash = blockHash;
-      result.found = true;
-      result.capacityWithdrawn = 0n;
-      try {
-        // Filter to make sure we only process events for this transaction
-        const events = (await eventsPromise).filter(({ phase }) => phase.isApplyExtrinsic && phase.asApplyExtrinsic.eq(extrinsicIndex));
-        result.capacityEpoch = (await at.query.capacity.currentEpoch()).toNumber();
-
-        events.forEach((record) => {
-          const {
-            event: { data, method, section: eventName },
-          } = record;
-          this.logger.debug(`Received event: ${eventName} ${method} ${data}`);
-
-          // find capacity withdrawn event
-          if (this.api.events.capacity.CapacityWithdrawn.is(record.event)) {
-            const { amount } = record.event.data;
-            result.capacityWithdrawn! += amount.toBigInt();
-          }
-
-          // check custom success events
-          if (successEvents.some((successEvent) => successEvent.is(record.event))) {
-            this.logger.debug(`Found success event ${eventName} ${method}`);
-            result.success = true;
-          }
-
-          // check for system extrinsic failure
-          if (this.api.events.system.ExtrinsicFailed.is(record.event)) {
-            const { asModule: moduleThatErrored, registry } = record.event.data.dispatchError;
-            const moduleError = registry.findMetaError(moduleThatErrored);
-            result.error = moduleError;
-            this.logger.error(`Extrinsic failed with error: ${JSON.stringify(moduleError)}`);
-          }
-        });
-      } catch (error) {
-        this.logger.error(error);
+      if (outOfCapacity) {
+        await this.eventEmitter.emitAsync('capacity.exhausted');
+      } else {
+        await this.eventEmitter.emitAsync('capacity.refilled');
       }
-      this.logger.debug(`Total capacity withdrawn for this extrinsic: ${result.capacityWithdrawn.toString()}`);
-      return result;
-    });
-    const results = await Promise.all(txReceiptPromises);
-    const result = results.find((receipt) => receipt.found);
-    this.logger.debug(`Found tx receipt: ${JSON.stringify(result)}`);
-    return result ?? { found: false, success: false };
+    } catch (err: any) {
+      this.logger.error('Caught error in checkCapacity', err?.stack);
+    }
   }
 }

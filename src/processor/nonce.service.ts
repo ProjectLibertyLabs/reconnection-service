@@ -1,10 +1,10 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import fs from 'fs';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
-import { createKeys } from '../blockchain/create-keys';
-import { CacheUtils } from '../cache/cache-utils';
-import { BlockchainService } from '../blockchain/blockchain.service';
-import { ConfigService } from '../config/config.service';
+import { createKeys } from '#app/blockchain/create-keys';
+import { CacheUtils } from '#app/cache/cache-utils';
+import { BlockchainService } from '#app/blockchain/blockchain.service';
+import { ConfigService } from '#app/config/config.service';
 
 @Injectable()
 export class NonceService implements OnApplicationBootstrap {
