@@ -9,7 +9,6 @@ import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { ReconnectionServiceConstants } from '#app/constants';
 import { ITxStatus } from '#app/interfaces/tx-status.interface';
-import { Graph } from '@dsnp/graph-sdk';
 
 const CAPACITY_EPOCH_TIMEOUT_NAME = 'capacity_check';
 

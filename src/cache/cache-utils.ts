@@ -1,3 +1,6 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { RedisClient } from 'bullmq';
+
 export namespace CacheUtils {
   export const NUMBER_OF_NONCE_KEYS_TO_CHECK = 50;
   /**
@@ -9,5 +12,17 @@ export namespace CacheUtils {
 
   export function getNonceKey(suffix: string) {
     return `${CHAIN_NONCE_KEY}:${suffix}`;
+  }
+
+  export function redisEventsToEventEmitter(client: RedisClient, eventEmitter: EventEmitter2) {
+    client.on('error', (err) => {
+      eventEmitter.emit('redis.error', err);
+    });
+    client.on('ready', () => {
+      eventEmitter.emit('redis.ready');
+    });
+    client.on('close', () => {
+      eventEmitter.emit('redis.close');
+    });
   }
 }
