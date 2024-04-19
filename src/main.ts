@@ -29,10 +29,13 @@ async function bootstrap() {
   });
 
   // eslint-disable-next-line no-undef
-  let redisConnectTimeout: NodeJS.Timeout | null;
+  let redisConnectTimeout: NodeJS.Timeout | null = setTimeout(() => {
+    logger.error('Redis connection timeout!');
+    process.exit(1);
+  }, 30_000);
   eventEmitter.on('redis.ready', () => {
     if (redisConnectTimeout !== null) {
-      logger.warn('Redis Reconnection Detected.');
+      logger.log('Redis Connected!');
       clearTimeout(redisConnectTimeout);
       redisConnectTimeout = null;
     }
