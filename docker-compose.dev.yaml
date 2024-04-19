@@ -28,6 +28,7 @@ services:
       - redis_data:/data
 
   frequency:
+    platform: linux/amd64
     image: dsnp/instant-seal-node-with-deployed-schemas:latest
     environment:
       - SEALING_MODE=interval
@@ -43,6 +44,7 @@ services:
       - chainstorage:/data
 
   frequency-instant:
+    platform: linux/amd64
     image: dsnp/instant-seal-node-with-deployed-schemas:latest
     environment:
       - SEALING_MODE=instant
@@ -71,7 +73,7 @@ services:
   reconnection-service:
     depends_on:
       - redis
-      - frequency
+      - frequency-instant
       - webhook
     build:
       context: .
@@ -81,7 +83,7 @@ services:
     env_file:
       - .env.docker.dev
     volumes:
-    - ./:/app
+      - ./:/app
     networks:
       - reconnection-service-network-dev
 

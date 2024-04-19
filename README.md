@@ -145,7 +145,7 @@ Environment files are documented [here](./ENVIRONMENT.md), and a sample environm
 2. Clone this repository
 
    ```bash
-   git clone https://github.com/LibertyDSNP/reconnection-service.git
+   git clone https://github.com/AmplicaLabs/reconnection-service.git
    ```
 
 3. Check for values in `.env.docker.dev` file and update as needed
@@ -158,10 +158,10 @@ Note: If `graphQueue` is paused, then it means we are out of capacity and need t
 1. Start the development environment
 
    ```bash
-   docker-compose -f docker-compose.dev.yml up
+   docker compose -f docker-compose.dev.yaml up
    ```
 
-2. Run the [graph-migration-setup](https://github.com/LibertyDSNP/frequency-scenario-template/tree/main/graph-migration-setup) scenario to create the necessary accounts and delegations
+2. Run the [graph-migration-setup](https://github.com/AmplicaLabs/frequency-scenario-template/tree/main/graph-migration-setup) scenario to create the necessary accounts and delegations
 
 3. Go to [Polkadot.js](https://polkadot.js.org) and connect to the local development node.
 4. Fund MSA 1 (Provider) and stake some capacity, in graph migration setup scenario MSA 1 is the provider.

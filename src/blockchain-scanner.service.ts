@@ -13,7 +13,6 @@ export abstract class BlockchainScannerService extends QueueEventsHost implement
 
   private readonly lastSeenBlockNumberKey: string;
 
-  // TODO: This can be removed after a release cycle or two
   async onApplicationBootstrap() {
     const oldBlockNumber = await this.cacheManager.redis.get(LAST_SEEN_BLOCK_NUMBER_KEY);
     const newBlockNumberExists = await this.cacheManager.redis.exists(this.lastSeenBlockNumberKey);
