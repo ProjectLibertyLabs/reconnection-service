@@ -4,7 +4,6 @@ import { BlockchainService } from '#app/blockchain/blockchain.service';
 import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
 import { BlockchainScannerService } from '#app/blockchain-scanner.service';
 import { SchedulerRegistry } from '@nestjs/schedule';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BlockHash, Event } from '@polkadot/types/interfaces';
 import { HexString } from '@polkadot/util/types';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
@@ -41,9 +40,8 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
     private readonly schedulerRegistry: SchedulerRegistry,
     blockchainService: BlockchainService,
     private readonly cacheService: ReconnectionCacheMgrService,
-    eventEmitter: EventEmitter2,
   ) {
-    super(cacheManager, blockchainService, new Logger(GraphUpdateCompletionMonitorService.name), eventEmitter);
+    super(cacheManager, blockchainService, new Logger(GraphUpdateCompletionMonitorService.name));
   }
 
   private getTxStatus(txStatus: ITxStatus, hasSuccess: boolean, failureEvent: Event | undefined): ITxStatus {
