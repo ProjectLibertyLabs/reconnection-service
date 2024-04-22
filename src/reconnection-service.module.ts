@@ -13,6 +13,7 @@ import { ReconnectionCacheModule } from './cache/reconnection-cache.module';
 
 @Module({
   imports: [
+    ReconnectionCacheModule,
     BullModule,
     ConfigModule,
     EventEmitterModule.forRoot({
@@ -36,7 +37,6 @@ import { ReconnectionCacheModule } from './cache/reconnection-cache.module';
     ScheduleModule.forRoot(),
     ProcessorModule,
     BlockchainModule,
-    ReconnectionCacheModule,
   ],
   providers: [ConfigService, GraphUpdateScannerService],
   controllers: process.env?.ENABLE_DEV_CONTROLLER === 'true' ? [DevelopmentController, ReconnectionServiceController] : [ReconnectionServiceController],
