@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-      - chore/update-publishing-pages
 
 permissions:
   contents: read
