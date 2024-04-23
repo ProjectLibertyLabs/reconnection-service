@@ -5,3 +5,4 @@ dist
 coverage
 .ci-token
 webhook-specification/mock-webhook-server/responses
+docs/*.html
