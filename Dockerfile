@@ -1,10 +1,10 @@
-FROM --platform=linux/amd64 node:18 as build
+FROM --platform=linux/amd64 node:20 as build
 
 # TODO: The deployment docker image should install the reconnection
 #       service from NPM rather than building from source
 WORKDIR /app
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 # Build / Copy the rest of the application files to the container and build
 COPY . .
