@@ -1,21 +1,6 @@
 version: '3'
 
 services:
-  reconnection-service-standalone:
-    # container_name: reconnection-service-standalone
-    image: amplicalabs/reconnection-service:standalone-latest
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - 3000:3000
-    env_file:
-      - .env.docker.dev
-    networks:
-      - reconnection-service-network-dev
-    # volumes:
-    # - redis_data:/var/lib/redis
-
   redis:
     image: redis:latest
     hostname: redis
@@ -28,32 +13,22 @@ services:
       - redis_data:/data
 
   frequency:
-    platform: linux/amd64
     image: dsnp/instant-seal-node-with-deployed-schemas:latest
+    # We need to specify the platform because it's the only image
+    # built by Frequency at the moment, and auto-pull won't work otherwise
+    platform: linux/amd64
+    # Uncomment SEALING_MODE and SEALING_INTERVAL if you want to use interval sealing.
+    # Other options you may want to add depending on your test scenario.
     environment:
       - SEALING_MODE=interval
       - SEALING_INTERVAL=3
-      - CREATE_EMPTY_BLOCKS=true
-    hostname: frequency
+    #   - CREATE_EMPTY_BLOCKS=true
+    # Uncomment below if you want to let the chain run and keep all of the historical blocks
+    command: --state-pruning=archive
     ports:
       - 9944:9944
     networks:
       - reconnection-service-network-dev
-    container_name: frequency-interval
-    volumes:
-      - chainstorage:/data
-
-  frequency-instant:
-    platform: linux/amd64
-    image: dsnp/instant-seal-node-with-deployed-schemas:latest
-    environment:
-      - SEALING_MODE=instant
-    hostname: frequency
-    ports:
-      - 9944:9944
-    networks:
-      - reconnection-service-network-dev
-    container_name: frequency-instant
     volumes:
       - chainstorage:/data
 
@@ -61,7 +36,7 @@ services:
     container_name: webhook
     hostname: webhook
     build:
-      context: .
+      context: webhook-specification/mock-webhook-server
       dockerfile: webhook-specification/mock-webhook-server/Dockerfile
     ports:
       - 3001:3001
@@ -73,7 +48,7 @@ services:
   reconnection-service:
     depends_on:
       - redis
-      - frequency-instant
+      - frequency
       - webhook
     build:
       context: .

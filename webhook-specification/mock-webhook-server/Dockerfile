@@ -1,4 +1,4 @@
-FROM node:18 as build
+FROM node:20 as build
 
 # TODO: The deployment docker image should install the reconnection
 #       service from NPM rather than building from source
