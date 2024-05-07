@@ -1,9 +1,9 @@
 /* eslint-disable no-underscore-dangle */
 import { ConfigService } from '#app/config/config.service';
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import { options } from '@frequency-chain/api-augment';
 import { ApiPromise, ApiRx, HttpProvider, WsProvider } from '@polkadot/api';
 import { firstValueFrom } from 'rxjs';
-import { options } from '@frequency-chain/api-augment';
 import { KeyringPair } from '@polkadot/keyring/types';
 import { BlockHash, BlockNumber, Index, SignedBlock } from '@polkadot/types/interfaces';
 import { SubmittableExtrinsic } from '@polkadot/api/types';
@@ -27,8 +27,8 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
   private lastCapacityUsed: bigint;
 
   public async onApplicationBootstrap() {
-    const providerUrl = this.configService.frequencyUrl!;
-    let provider: any;
+    const providerUrl = this.configService.frequencyUrl;
+    let provider: WsProvider | HttpProvider;
     if (/^ws/.test(providerUrl.toString())) {
       provider = new WsProvider(providerUrl.toString());
     } else if (/^http/.test(providerUrl.toString())) {
@@ -44,7 +44,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
   }
 
   public async onApplicationShutdown(_signal?: string | undefined) {
-    const promises: Promise<any>[] = [];
+    const promises: Promise<void>[] = [];
     if (this.api) {
       promises.push(this.api.disconnect());
     }
