@@ -10,7 +10,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
-import { ReconnectionServiceConstants } from '#app/constants';
+import * as ReconnectionServiceConstants from '#app/constants';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { GraphUpdateQueueConsumerService } from './graph-update-queue-consumer.service';
 import { GraphUpdateCompletionMonitorService } from './graph-update-completion-monitor.service';

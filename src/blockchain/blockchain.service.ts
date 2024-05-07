@@ -13,7 +13,7 @@ import { PalletCapacityCapacityDetails, PalletCapacityEpochInfo } from '@polkado
 import { HexString } from '@polkadot/util/types';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ReconnectionServiceConstants } from '#app/constants';
+import * as ReconnectionServiceConstants from '#app/constants';
 import { Extrinsic } from './extrinsic';
 
 @Injectable()

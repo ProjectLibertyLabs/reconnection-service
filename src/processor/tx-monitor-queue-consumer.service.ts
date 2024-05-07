@@ -5,9 +5,9 @@ import { GraphUpdateJobState, IGraphUpdateJob } from '#app/interfaces/graph-upda
 import { BlockchainService } from '#app/blockchain/blockchain.service';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { SchedulerRegistry } from '@nestjs/schedule';
-import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
+import * as BlockchainConstants from '#app/blockchain/blockchain-constants';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
-import { ReconnectionServiceConstants } from '#app/constants';
+import * as ReconnectionServiceConstants from '#app/constants';
 import { ITxStatus } from '#app/interfaces/tx-status.interface';
 
 const CAPACITY_EPOCH_TIMEOUT_NAME = 'capacity_check';
