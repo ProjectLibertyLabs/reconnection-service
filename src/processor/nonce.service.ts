@@ -2,7 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import fs from 'fs';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { createKeys } from '#app/blockchain/create-keys';
-import { CacheUtils } from '#app/cache/cache-utils';
+import * as CacheUtils from '#app/cache/cache-utils';
 import { BlockchainService } from '#app/blockchain/blockchain.service';
 import { ConfigService } from '#app/config/config.service';
 
@@ -37,7 +37,7 @@ export class NonceService implements OnApplicationBootstrap {
   async peekNextNonce(): Promise<number> {
     const nonceNumber = (await this.blockchainService.getNonce(this.accountId)).toNumber();
     const keys = this.getNextPossibleKeys(nonceNumber);
-    // @ts-ignore
+    // @ts-expect-error peekNonce is a custom command
     const nextNonceIndex = await this.cacheService.redis.peekNonce(...keys, keys.length);
     if (nextNonceIndex === -1) {
       this.logger.warn(`nextNonce was full even with ${CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK} ${nonceNumber}`);
@@ -51,7 +51,7 @@ export class NonceService implements OnApplicationBootstrap {
   async getNextNonce(): Promise<number> {
     const nonceNumber = (await this.blockchainService.getNonce(this.accountId)).toNumber();
     const keys = this.getNextPossibleKeys(nonceNumber);
-    // @ts-ignore
+    // @ts-expect-error incrementNonce is a custom command
     const nextNonceIndex = await this.cacheService.redis.incrementNonce(...keys, keys.length, CacheUtils.NONCE_KEY_EXPIRE_SECONDS);
     if (nextNonceIndex === -1) {
       this.logger.warn(`nextNonce was full even with ${CacheUtils.NUMBER_OF_NONCE_KEYS_TO_CHECK} ${nonceNumber}`);

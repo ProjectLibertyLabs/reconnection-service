@@ -9,7 +9,7 @@ import { UpdateTransitiveGraphs, createGraphUpdateJob } from './interfaces/graph
 import { BlockchainService } from './blockchain/blockchain.service';
 import { BlockchainScannerService } from './blockchain-scanner.service';
 import { ReconnectionCacheMgrService } from './cache/reconnection-cache-mgr.service';
-import { ReconnectionServiceConstants } from './constants';
+import * as ReconnectionServiceConstants from './constants';
 
 @Injectable()
 export class GraphUpdateScannerService extends BlockchainScannerService implements OnApplicationBootstrap, OnApplicationShutdown {

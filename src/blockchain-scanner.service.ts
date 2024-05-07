@@ -1,9 +1,10 @@
+import '@frequency-chain/api-augment';
 import { Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { BlockHash } from '@polkadot/types/interfaces';
 import { OnQueueEvent, QueueEventsHost, QueueEventsListener } from '@nestjs/bullmq';
 import { BlockchainService } from './blockchain/blockchain.service';
 import { ReconnectionCacheMgrService } from './cache/reconnection-cache-mgr.service';
-import { ReconnectionServiceConstants } from './constants';
+import * as ReconnectionServiceConstants from './constants';
 
 export const LAST_SEEN_BLOCK_NUMBER_KEY = 'lastSeenBlockNumber';
 

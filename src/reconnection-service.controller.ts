@@ -1,7 +1,7 @@
 import { Controller, Get, HttpException, HttpStatus, Logger, Param, Post } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { ReconnectionServiceConstants } from './constants';
+import * as ReconnectionServiceConstants from './constants';
 
 type JobStatus = 'active' | 'completed' | 'failed' | 'delayed' | 'waiting';
 

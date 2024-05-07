@@ -1,9 +1,9 @@
 /* eslint-disable no-underscore-dangle */
 import { ConfigService } from '#app/config/config.service';
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import { options } from '@frequency-chain/api-augment';
 import { ApiPromise, ApiRx, HttpProvider, WsProvider } from '@polkadot/api';
 import { firstValueFrom } from 'rxjs';
-import { options } from '@frequency-chain/api-augment';
 import { KeyringPair } from '@polkadot/keyring/types';
 import { BlockHash, BlockNumber, Index, SignedBlock } from '@polkadot/types/interfaces';
 import { SubmittableExtrinsic } from '@polkadot/api/types';
@@ -13,7 +13,7 @@ import { PalletCapacityCapacityDetails, PalletCapacityEpochInfo } from '@polkado
 import { HexString } from '@polkadot/util/types';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ReconnectionServiceConstants } from '#app/constants';
+import * as ReconnectionServiceConstants from '#app/constants';
 import { Extrinsic } from './extrinsic';
 
 @Injectable()
@@ -27,8 +27,8 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
   private lastCapacityUsed: bigint;
 
   public async onApplicationBootstrap() {
-    const providerUrl = this.configService.frequencyUrl!;
-    let provider: any;
+    const providerUrl = this.configService.frequencyUrl;
+    let provider: WsProvider | HttpProvider;
     if (/^ws/.test(providerUrl.toString())) {
       provider = new WsProvider(providerUrl.toString());
     } else if (/^http/.test(providerUrl.toString())) {
@@ -44,7 +44,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
   }
 
   public async onApplicationShutdown(_signal?: string | undefined) {
-    const promises: Promise<any>[] = [];
+    const promises: Promise<void>[] = [];
     if (this.api) {
       promises.push(this.api.disconnect());
     }
@@ -178,7 +178,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
       let outOfCapacity = remainingCapacity <= 0n;
 
       if (!outOfCapacity) {
-        let capacityLimitThreshold: bigint = BigInt(capacityLimit.value);
+        let capacityLimitThreshold = BigInt(capacityLimit.value);
         if (capacityLimit.type === 'percentage') {
           const capacityLimitPercentage = BigInt(capacityLimit.value);
           capacityLimitThreshold = (capacity.totalCapacityIssued * capacityLimitPercentage) / 100n;

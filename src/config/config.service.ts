@@ -1,6 +1,10 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 /*
 https://docs.nestjs.com/providers#services
 */
+
+// Import this here so it happens first
+import '@frequency-chain/api-augment';
 
 import { ICapacityLimit } from '#app/interfaces/capacity-limit.interface';
 import type { EnvironmentType } from '@dsnp/graph-sdk';

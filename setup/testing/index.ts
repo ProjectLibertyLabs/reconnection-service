@@ -14,9 +14,9 @@ import {
   signPayloadSr25519,
   initialize,
   Sr25519Signature,
-  ItemizedSignaturePayloadV2,
+  ItemizedSignaturePayload,
   EventError,
-} from 'frequency-scenario-template';
+} from '@amplica-labs/frequency-scenario-template';
 import log from 'loglevel';
 import { ProviderGraph, GraphKeyPair as ProviderGraphKeyPair } from 'reconnection-service/src/interfaces/provider-graph.interface';
 import fs from 'node:fs';
@@ -59,12 +59,8 @@ const DEFAULT_SCHEMAS = [5, 7, 8, 9, 10];
 let nonce: number;
 let graph: Graph;
 
-function mapToArray<K, V>(map: Map<K, V>): [Array<K>, Array<V>] {
-  return [Array.from(map.keys()), Array.from(map.values())];
-}
-
 let graphKeyAction: any;
-async function getAddGraphKeyPayload(graph: Graph, user: ChainUser): Promise<{ payload: ItemizedSignaturePayloadV2; proof: Sr25519Signature }> {
+async function getAddGraphKeyPayload(graph: Graph, user: ChainUser): Promise<{ payload: ItemizedSignaturePayload; proof: Sr25519Signature }> {
   if (!graphKeyAction) {
     const actions = [
       {
@@ -147,8 +143,8 @@ async function main() {
   log.setLevel('trace');
   const { apiPromise } = ExtrinsicHelper;
 
-  const provider: ChainUser = { keys: keyring.addFromUri('//Alice') };
-  const famousUser: ChainUser = { uri: '//Bob', keys: keyring.addFromUri('//Bob') };
+  const provider: ChainUser = { keys: keyring.createFromUri('//Alice') };
+  const famousUser: ChainUser = { uri: '//Bob', keys: keyring.createFromUri('//Bob') };
   const followers = new Map<string, ChainUser>();
 
   // Create provider
@@ -168,10 +164,10 @@ async function main() {
   // Create all keypairs
   console.log('Creating keypairs...');
   new Array(7000).fill(0).forEach((_, index) => {
-    const keys = keyring.addFromUri(`//Charlie//${index}`);
+    const keys = keyring.createFromUri(`//Charlie//${index}`);
     followers.set(keys.address, { uri: `//Charlie//${index}`, keys, resetGraph: [] });
   });
-  const [followerAddresses] = mapToArray(followers);
+  const followerAddresses = [...followers.keys()];
   console.log('Created keypairs');
 
   // Create graph keys for all users
@@ -265,7 +261,7 @@ User graphs to clear: ${graphsToClear}
           allBatchesTracker.numberPending -= 1;
           if (allBatchesTracker.numberPending < 1) {
             allBatchesTracker.numberPending = 0;
-            (allBatchesTracker?.resolve ?? (() => {}))();
+            (allBatchesTracker?.resolve ?? (() => { }))();
           }
         } else if (ExtrinsicHelper.api.events.msa.MsaCreated.is(event)) {
           const { msaId, key } = event.data;
@@ -306,11 +302,11 @@ User graphs to clear: ${graphsToClear}
           //   x.events.forEach((e) => console.dir(e.event.toHuman()));
           if (x.dispatchError) {
             unsub();
-            (allBatchesTracker?.reject ?? (() => {}))(new EventError(x.dispatchError));
+            (allBatchesTracker?.reject ?? (() => { }))(new EventError(x.dispatchError));
           } else if (status.isInvalid) {
             unsub();
             console.log(x.toHuman());
-            (allBatchesTracker?.reject ?? (() => {}))(new Error('Extrinsic failed: Invalid'));
+            (allBatchesTracker?.reject ?? (() => { }))(new Error('Extrinsic failed: Invalid'));
           } else if (x.isFinalized) {
             unsub();
           }
@@ -374,7 +370,7 @@ User graphs to clear: ${graphsToClear}
   };
 
   const responses: ProviderResponse[] = [];
-  const [_, allFollowers] = mapToArray(followers);
+  const allFollowers = [...followers.values()]
   while (allFollowers.length > 0) {
     const followerSlice = allFollowers.splice(0, Math.min(allFollowers.length, 50));
     const response = {

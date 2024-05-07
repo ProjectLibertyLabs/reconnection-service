@@ -1,14 +1,14 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { BlockchainService } from '#app/blockchain/blockchain.service';
-import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
+import * as BlockchainConstants from '#app/blockchain/blockchain-constants';
 import { BlockchainScannerService } from '#app/blockchain-scanner.service';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { BlockHash, Event } from '@polkadot/types/interfaces';
 import { HexString } from '@polkadot/util/types';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { ITxStatus } from '#app/interfaces/tx-status.interface';
-import { ReconnectionServiceConstants } from '#app/constants';
+import * as ReconnectionServiceConstants from '#app/constants';
 
 @Injectable()
 export class GraphUpdateCompletionMonitorService extends BlockchainScannerService implements OnApplicationBootstrap, OnApplicationShutdown {

@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 /*
 https://docs.nestjs.com/fundamentals/testing#unit-testing
 */
@@ -12,6 +11,7 @@ import { configModuleOptions } from './env.config';
 const setupConfigService = async (envObj: any): Promise<ConfigService> => {
   jest.resetModules();
   Object.keys(process.env).forEach((key) => {
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete process.env[key];
   });
   process.env = {
@@ -35,7 +35,7 @@ const setupConfigService = async (envObj: any): Promise<ConfigService> => {
 };
 
 describe('ReconnectionConfigService', () => {
-  const ALL_ENV: { [key: string]: string | undefined } = {
+  const ALL_ENV: Record<string, string | undefined> = {
     API_PORT: undefined,
     REDIS_URL: undefined,
     FREQUENCY_URL: undefined,
@@ -174,7 +174,7 @@ describe('ReconnectionConfigService', () => {
       await expect(setupConfigService({ HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS: 'foo', ...env })).rejects.toBeDefined();
     });
 
-    it('invalid health check max retry interval should fail', async () => {
+    it('invalid health check max retries should fail', async () => {
       const { HEALTH_CHECK_MAX_RETRIES: dummy, ...env } = ALL_ENV;
       await expect(setupConfigService({ HEALTH_CHECK_MAX_RETRIES: -1, ...env })).rejects.toBeDefined();
       await expect(setupConfigService({ HEALTH_CHECK_MAX_RETRIES: 'foo', ...env })).rejects.toBeDefined();

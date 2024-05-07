@@ -8,9 +8,9 @@ import { ConfigService } from '#app/config/config.service';
 import { MILLISECONDS_PER_SECOND } from 'time-constants';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { OnEvent } from '@nestjs/event-emitter';
-import { BlockchainConstants } from '#app/blockchain/blockchain-constants';
+import * as BlockchainConstants from '#app/blockchain/blockchain-constants';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
-import { ReconnectionServiceConstants } from '#app/constants';
+import * as ReconnectionServiceConstants from '#app/constants';
 import { CapacityLowError } from './errors';
 
 const CAPACITY_EPOCH_TIMEOUT_NAME = 'capacity_check';

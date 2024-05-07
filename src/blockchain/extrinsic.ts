@@ -34,7 +34,7 @@ import { KeyringPair } from '@polkadot/keyring/types';
 import { timeout } from 'rxjs/operators';
 import { EventError } from './event-error';
 
-export type EventMap = { [key: string]: Event };
+export type EventMap = Record<string, Event>;
 
 function eventKey(event: Event): string {
   return `${event.section}.${event.method}`;

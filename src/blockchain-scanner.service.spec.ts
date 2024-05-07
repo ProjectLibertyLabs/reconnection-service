@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 /*
 https://docs.nestjs.com/fundamentals/testing#unit-testing
 */

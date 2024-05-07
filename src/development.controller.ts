@@ -11,7 +11,7 @@ import { plainToClass } from 'class-transformer';
 import { GraphUpdateJobDto } from './interfaces/graph-update-job.dto';
 import { ReconnectionGraphService } from './processor/reconnection-graph.service';
 import { GraphUpdateScannerService } from './graph-update-scanner.service';
-import { ReconnectionServiceConstants } from './constants';
+import * as ReconnectionServiceConstants from './constants';
 
 @Controller('reconnection-service/dev')
 export class DevelopmentController {
