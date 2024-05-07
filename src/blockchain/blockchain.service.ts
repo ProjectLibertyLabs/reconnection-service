@@ -178,7 +178,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
       let outOfCapacity = remainingCapacity <= 0n;
 
       if (!outOfCapacity) {
-        let capacityLimitThreshold: bigint = BigInt(capacityLimit.value);
+        let capacityLimitThreshold = BigInt(capacityLimit.value);
         if (capacityLimit.type === 'percentage') {
           const capacityLimitPercentage = BigInt(capacityLimit.value);
           capacityLimitThreshold = (capacity.totalCapacityIssued * capacityLimitPercentage) / 100n;

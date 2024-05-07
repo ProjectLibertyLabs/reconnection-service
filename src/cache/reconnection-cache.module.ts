@@ -1,6 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
-import { RedisModule } from '@liaoliaots/nestjs-redis';
+import { RedisModule } from '@songkeys/nestjs-redis';
 import { ConfigModule } from '#app/config/config.module';
 import { ConfigService } from '#app/config/config.service';
 import { ReconnectionCacheMgrService } from './reconnection-cache-mgr.service';

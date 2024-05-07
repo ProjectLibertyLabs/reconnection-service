@@ -1,4 +1,3 @@
-// eslint-disable-next-line import/no-extraneous-dependencies
 import { describe, beforeAll, it, expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Action, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyPair, GraphKeyType, ImportBundle, KeyData, PageData, PrivacyType } from '@dsnp/graph-sdk';

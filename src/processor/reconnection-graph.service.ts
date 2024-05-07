@@ -149,7 +149,7 @@ export class ReconnectionGraphService {
     const keyPairs: GraphKeyPair[] = [];
 
     let hasNextPage = true;
-    let webhookFailures: number = 0;
+    let webhookFailures = 0;
 
     while (hasNextPage) {
       let response: AxiosResponse<any, any>;

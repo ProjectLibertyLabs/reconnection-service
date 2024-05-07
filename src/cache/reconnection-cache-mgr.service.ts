@@ -1,4 +1,4 @@
-import { InjectRedis } from '@liaoliaots/nestjs-redis';
+import { InjectRedis } from '@songkeys/nestjs-redis';
 import { Injectable } from '@nestjs/common';
 import { HexString } from '@polkadot/util/types';
 import { Redis } from 'ioredis';
@@ -26,7 +26,7 @@ export class ReconnectionCacheMgrService {
   }
 
   public async upsertWatchedTxns(txStatus: ITxStatus | ITxStatus[]): Promise<void> {
-    let id: string = '';
+    let id = '';
     const obj = {};
     if (Array.isArray(txStatus)) {
       txStatus.forEach((tx) => {

@@ -1,18 +1,14 @@
 import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import {
-  Action,
   Graph,
   EnvironmentInterface,
   GraphKeyPair,
   GraphKeyType,
-  ImportBundle,
-  Update,
   Config,
   DevEnvironment,
   EnvironmentType,
   DsnpKeys,
   DsnpPublicKey,
-  DsnpGraphEdge,
   ConnectionType,
   PrivacyType,
 } from '@dsnp/graph-sdk';
@@ -22,7 +18,7 @@ import { ConfigService } from '../config/config.service';
 export class GraphStateManager implements OnApplicationBootstrap {
   private environment: EnvironmentInterface; // Environment details
 
-  private schemaIds: { [key: string]: { [key: string]: number } };
+  private schemaIds: Record<string, Record<string, number>>;
 
   private graphKeySchemaId: number;
 

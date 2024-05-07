@@ -2,7 +2,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  setupFiles: ['dotenv/config'],
+  setupFiles: ['dotenv/config', './jest.init.ts'],
   testPathIgnorePatterns: ['<rootDir>/dist'],
   moduleNameMapper: {
     '^#app/(.*)$': '<rootDir>/src/$1',
