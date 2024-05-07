@@ -22,8 +22,7 @@
     "strictPropertyInitialization": false,
     "target": "es2022",
     "typeRoots": ["node_modules/@types"],
-    "noEmit": false,
-    "traceResolution": true
+    "noEmit": false
   },
   "include": ["./**/*.ts"],
   "exclude": ["node_modules/**", "./dist/**", "/tools/**", "./setup/**", "./**/*.spec.ts", "./jest.init.ts"]
