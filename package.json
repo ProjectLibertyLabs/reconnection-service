@@ -19,6 +19,8 @@
     "lint:fix": "prettier --write ./src && eslint \"./src/**/*.ts\" --fix",
     "pretest": "cp env.template .env",
     "test": "jest --coverage --verbose",
+    "create-accounts": "set -a ; . ./setup/testing/.env ; tsx setup/testing/create-accounts.ts",
+    "clear-graphs": "set -a ; . ./setup/testing/.env ; tsx setup/testing/clear-graphs.ts",
     "chain-setup": "tsx setup/testing/index.ts",
     "reset-chain": "setup/testing/reset_chain"
   },
