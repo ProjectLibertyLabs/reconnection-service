@@ -14,6 +14,8 @@ services:
 
   frequency:
     image: dsnp/instant-seal-node-with-deployed-schemas:latest
+    hostname: frequency
+    container_name: frequency
     # We need to specify the platform because it's the only image
     # built by Frequency at the moment, and auto-pull won't work otherwise
     platform: linux/amd64
@@ -36,7 +38,7 @@ services:
     container_name: webhook
     hostname: webhook
     build:
-      context: webhook-specification/mock-webhook-server
+      context: .
       dockerfile: webhook-specification/mock-webhook-server/Dockerfile
     ports:
       - 3001:3001
