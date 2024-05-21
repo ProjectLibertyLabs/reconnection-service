@@ -13,12 +13,12 @@ import * as ReconnectionServiceConstants from '#app/constants';
 @Injectable()
 export class GraphUpdateCompletionMonitorService extends BlockchainScannerService implements OnApplicationBootstrap, OnApplicationShutdown {
   async onApplicationBootstrap() {
-    const pendingTxns = await this.cacheManager.getAllPendingTxns();
+    //const pendingTxns = await this.cacheManager.getAllPendingTxns();
     // If no transactions pending, skip to end of chain at startup
-    if (Object.keys(pendingTxns).length === 0) {
-      const blockNumber = await this.blockchainService.getLatestFinalizedBlockNumber();
-      await this.setLastSeenBlockNumber(blockNumber);
-    }
+    // if (Object.keys(pendingTxns).length === 0) {
+    //   const blockNumber = await this.blockchainService.getLatestFinalizedBlockNumber();
+    //   await this.setLastSeenBlockNumber(blockNumber);
+    // }
     this.schedulerRegistry.addInterval(
       `${this.constructor.name}:blockchainScan`,
       setInterval(() => this.scan(), BlockchainConstants.SECONDS_PER_BLOCK * MILLISECONDS_PER_SECOND),
