@@ -51,7 +51,7 @@
     "@nestjs/schedule": "^4.0.2",
     "@nestjs/testing": "^10.3.8",
     "@nestjs/typeorm": "^10.0.2",
-    "@polkadot/api": "^10.12.4",
+    "@polkadot/api": "^11.1.1",
     "@polkadot/api-base": "^10.12.4",
     "@polkadot/keyring": "^12.6.2",
     "@polkadot/types": "^10.12.4",
