@@ -170,7 +170,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
       const { lastCapacityUsed } = this;
       const capacityLimit = this.configService.getCapacityLimit();
       const capacity = await this.capacityInfo(this.configService.getProviderId());
-      const { remainingCapacity } = capacity;
+      const { remainingCapacity, totalCapacityIssued } = capacity;
       const { currentEpoch } = capacity;
       const epochCapacityKey = `${ReconnectionServiceConstants.EPOCH_CAPACITY_PREFIX}${currentEpoch}`;
       const epochUsedCapacity = BigInt((await this.cacheManager.redis.get(epochCapacityKey)) ?? 0); // Fetch capacity used by the service
@@ -178,21 +178,40 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
       let outOfCapacity = remainingCapacity <= 0n;
 
       if (!outOfCapacity) {
-        let capacityLimitThreshold = BigInt(capacityLimit.value);
-        if (capacityLimit.type === 'percentage') {
-          const capacityLimitPercentage = BigInt(capacityLimit.value);
-          capacityLimitThreshold = (capacity.totalCapacityIssued * capacityLimitPercentage) / 100n;
-          if (epochUsedCapacity >= capacityLimitThreshold) {
+        let serviceLimit = capacityLimit.serviceLimit.value;
+        let serviceRemaining = serviceLimit;
+        if (capacityLimit.serviceLimit.type === 'percentage') {
+          serviceLimit = (capacity.totalCapacityIssued * serviceLimit) / 100n;
+          serviceRemaining = serviceLimit - epochUsedCapacity;
+          if (epochUsedCapacity >= serviceLimit) {
             outOfCapacity = true;
           }
-        } else if (epochUsedCapacity >= capacityLimit.value) {
+        } else if (epochUsedCapacity >= serviceLimit) {
           outOfCapacity = true;
         }
 
         if (outOfCapacity) {
-          this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${capacityLimitThreshold}`);
+          this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${serviceLimit}`);
         } else if (epochUsedCapacity !== lastCapacityUsed) {
-          this.logger.verbose(`Capacity usage: ${epochUsedCapacity} of ${capacityLimitThreshold} (${remainingCapacity} remaining)`);
+          this.logger.verbose(`Capacity usage: ${epochUsedCapacity} of ${serviceLimit} (${serviceRemaining} remaining)`);
+        }
+      }
+
+      // If service limit has not been reached, check total capacity limit (if configured)
+      if (!outOfCapacity && capacityLimit?.totalLimit) {
+        const totalCapacityUsed = totalCapacityIssued - remainingCapacity;
+        let totalLimit = capacityLimit.totalLimit.value;
+        if (capacityLimit.totalLimit.type === 'percentage') {
+          totalLimit = (capacity.totalCapacityIssued * totalLimit) / 100n;
+          if (totalCapacityUsed >= totalLimit) {
+            outOfCapacity = true;
+          }
+        } else if (totalCapacityUsed >= totalLimit) {
+          outOfCapacity = true;
+        }
+
+        if (outOfCapacity) {
+          this.logger.warn(`Total capacity usage limit reached: used ${totalCapacityUsed} of ${totalCapacityIssued}`);
         }
       }
 

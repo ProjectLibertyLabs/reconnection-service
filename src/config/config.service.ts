@@ -6,7 +6,7 @@ https://docs.nestjs.com/providers#services
 // Import this here so it happens first
 import '@frequency-chain/api-augment';
 
-import { ICapacityLimit } from '#app/interfaces/capacity-limit.interface';
+import { ICapacityLimits } from '#app/interfaces/capacity-limit.interface';
 import type { EnvironmentType } from '@dsnp/graph-sdk';
 import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
@@ -28,7 +28,7 @@ export interface ConfigEnvironmentVariables {
   GRAPH_ENVIRONMENT_TYPE: keyof EnvironmentType;
   GRAPH_ENVIRONMENT_DEV_CONFIG: string;
   PROVIDER_ACCOUNT_SEED_PHRASE: string;
-  CAPACITY_LIMIT: ICapacityLimit;
+  CAPACITY_LIMIT: ICapacityLimits;
   FREQUENCY_TX_TIMEOUT_SECONDS: number;
   CONNECTIONS_PER_PROVIDER_RESPONSE_PAGE: number;
 }
@@ -36,10 +36,24 @@ export interface ConfigEnvironmentVariables {
 /// Config service to get global app and provider-specific config values.
 @Injectable()
 export class ConfigService {
-  private capacityLimit: ICapacityLimit;
+  private capacityLimit: ICapacityLimits;
 
   constructor(private nestConfigService: NestConfigService<ConfigEnvironmentVariables>) {
-    this.capacityLimit = JSON.parse(nestConfigService.get('CAPACITY_LIMIT')!);
+    const obj = JSON.parse(nestConfigService.get('CAPACITY_LIMIT') ?? '{}', (key, value) => {
+      if (key === 'value') {
+        return BigInt(value);
+      }
+
+      return value;
+    });
+
+    if (obj?.type) {
+      this.capacityLimit = {
+        serviceLimit: obj,
+      };
+    } else {
+      this.capacityLimit = obj;
+    }
   }
 
   public get apiPort(): number {
@@ -106,7 +120,7 @@ export class ConfigService {
     return this.nestConfigService.get<string>('GRAPH_ENVIRONMENT_DEV_CONFIG')!;
   }
 
-  public getCapacityLimit(): ICapacityLimit {
+  public getCapacityLimit(): ICapacityLimits {
     return this.capacityLimit;
   }
 
