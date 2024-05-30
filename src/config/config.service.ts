@@ -105,7 +105,7 @@ export class ConfigService {
   }
 
   public getProviderId(): string {
-    return this.nestConfigService.get<string>('PROVIDER_ID')!;
+    return this.nestConfigService.get<bigint>('PROVIDER_ID')!.toString();
   }
 
   public getProviderAccountSeedPhrase(): string {
