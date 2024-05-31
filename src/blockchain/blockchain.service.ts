@@ -218,7 +218,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
       if (outOfCapacity) {
         await this.eventEmitter.emitAsync('capacity.exhausted');
       } else {
-        await this.eventEmitter.emitAsync('capacity.refilled');
+        await this.eventEmitter.emitAsync('capacity.available');
       }
     } catch (err: any) {
       this.logger.error('Caught error in checkCapacity', err?.stack);

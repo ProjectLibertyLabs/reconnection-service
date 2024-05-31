@@ -207,10 +207,10 @@ export class GraphUpdateQueueConsumerService extends WorkerHost implements OnApp
     }
   }
 
-  @OnEvent('capacity.refilled', { async: true, promisify: true })
-  private async handleCapacityRefilled() {
+  @OnEvent('capacity.available', { async: true, promisify: true })
+  private async handleCapacityAvailable() {
     if (this.capacityExhausted) {
-      this.logger.debug('Received capacity.refilled event');
+      this.logger.debug('Received capacity.available event');
     }
     this.capacityExhausted = false;
     try {
