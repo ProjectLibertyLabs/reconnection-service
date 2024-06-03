@@ -1,7 +1,3 @@
-/*
-https://docs.nestjs.com/fundamentals/testing#unit-testing
-*/
-
 import { Test } from '@nestjs/testing';
 import { describe, it, expect, beforeAll, jest } from '@jest/globals';
 import { ConfigModule } from '@nestjs/config';
@@ -289,7 +285,15 @@ describe('ReconnectionConfigService', () => {
     });
 
     it('should get capacity limit', () => {
-      expect(reconnectionConfigService.getCapacityLimit()).toStrictEqual(JSON.parse(ALL_ENV.CAPACITY_LIMIT!));
+      expect(reconnectionConfigService.getCapacityLimit()).toStrictEqual(
+        JSON.parse(ALL_ENV.CAPACITY_LIMIT!, (key, value) => {
+          if (key === 'value') {
+            return BigInt(value);
+          }
+
+          return value;
+        }),
+      );
     });
 
     it('should get frequency tx timeout seconds', () => {
