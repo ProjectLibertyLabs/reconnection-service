@@ -1,5 +1,5 @@
 #/bin/bash
 
-docker container stop frequency-interval
+docker container stop reconnection-service-frequency-1
 docker run --rm -v reconnection-service_chainstorage:/data busybox rm -rf /data/chains
-docker container start frequency-interval
+docker container start reconnection-service-frequency-1
