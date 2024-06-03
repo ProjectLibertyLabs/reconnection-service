@@ -23,7 +23,7 @@ interface ICapacityInfo {
   nextEpochStart: number;
   remainingCapacity: bigint;
   totalCapacityIssued: bigint;
-  currentEpoch: bigint;
+  currentEpoch: number;
 }
 
 @Injectable()
@@ -142,10 +142,9 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     }
   }
 
-  // Could be a number instead of a bigint
-  public async getCurrentCapacityEpoch(): Promise<bigint> {
+  public async getCurrentCapacityEpoch(): Promise<number> {
     const currentEpoch: u32 = await this.query('capacity', 'currentEpoch');
-    return typeof currentEpoch === 'number' ? BigInt(currentEpoch) : currentEpoch.toBigInt();
+    return currentEpoch.toNumber();
   }
 
   public async getCurrentEpochLength(): Promise<number> {
