@@ -73,7 +73,7 @@ describe('BlockchainScannerService', () => {
       jest.spyOn(cacheService.redis, 'get').mockResolvedValueOnce('0');
 
       await service.checkCapacity();
-      expect(emitterSpy).toHaveBeenLastCalledWith('capacity.refilled');
+      expect(emitterSpy).toHaveBeenLastCalledWith('capacity.available');
     });
 
     it('exceeding service percentage limit emits exhausted event', async () => {

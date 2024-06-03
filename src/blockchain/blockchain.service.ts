@@ -15,6 +15,16 @@ import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.s
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as ReconnectionServiceConstants from '#app/constants';
 import { Extrinsic } from './extrinsic';
+import { ICapacityLimit } from '#app/interfaces/capacity-limit.interface';
+
+interface ICapacityInfo {
+  providerId: string;
+  currentBlockNumber: number;
+  nextEpochStart: number;
+  remainingCapacity: bigint;
+  totalCapacityIssued: bigint;
+  currentEpoch: number;
+}
 
 @Injectable()
 export class BlockchainService implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -24,7 +34,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
 
   private readonly logger: Logger;
 
-  private lastCapacityUsed: bigint;
+  private lastCapacityUsedCheck: bigint;
 
   public async onApplicationBootstrap() {
     const providerUrl = this.configService.frequencyUrl;
@@ -109,14 +119,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     return newApi.query[pallet][extrinsic](...args);
   }
 
-  public async capacityInfo(providerId: string): Promise<{
-    providerId: string;
-    currentBlockNumber: number;
-    nextEpochStart: number;
-    remainingCapacity: bigint;
-    totalCapacityIssued: bigint;
-    currentEpoch: bigint;
-  }> {
+  public async capacityInfo(providerId: string): Promise<ICapacityInfo> {
     try {
       const providerU64 = this.apiPromise.createType('u64', providerId);
       const { epochStart }: PalletCapacityEpochInfo = await this.query('capacity', 'currentEpochInfo');
@@ -139,9 +142,9 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     }
   }
 
-  public async getCurrentCapacityEpoch(): Promise<bigint> {
+  public async getCurrentCapacityEpoch(): Promise<number> {
     const currentEpoch: u32 = await this.query('capacity', 'currentEpoch');
-    return typeof currentEpoch === 'number' ? BigInt(currentEpoch) : currentEpoch.toBigInt();
+    return currentEpoch.toNumber();
   }
 
   public async getCurrentEpochLength(): Promise<number> {
@@ -165,60 +168,69 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
     return (await this.apiPromise.rpc.chain.getFinalizedHead()) as BlockHash;
   }
 
+  private checkTotalCapacityLimit(capacityInfo: ICapacityInfo, totalLimit: ICapacityLimit): boolean {
+    const { remainingCapacity, totalCapacityIssued } = capacityInfo;
+    const totalCapacityUsed = totalCapacityIssued - remainingCapacity;
+    let outOfCapacity = false;
+
+    let limit = totalLimit.value;
+    if (totalLimit.type === 'percentage') {
+      limit = (totalCapacityIssued * totalLimit.value) / 100n;
+    }
+    outOfCapacity = totalCapacityUsed >= limit;
+
+    if (outOfCapacity) {
+      this.logger.warn(`Total capacity usage limit reached: used ${totalCapacityUsed} of ${totalCapacityIssued}`);
+    }
+
+    return outOfCapacity;
+  }
+
+  private async checkServiceCapacityLimit(capacityInfo: ICapacityInfo, serviceLimit: ICapacityLimit): Promise<boolean> {
+    const { remainingCapacity, totalCapacityIssued, currentEpoch } = capacityInfo;
+    let limit = serviceLimit.value;
+    if (serviceLimit.type === 'percentage') {
+      limit = (totalCapacityIssued * serviceLimit.value) / 100n;
+    }
+
+    const epochCapacityKey = `${ReconnectionServiceConstants.EPOCH_CAPACITY_PREFIX}${currentEpoch}`;
+    const epochUsedCapacity = BigInt((await this.cacheManager.redis.get(epochCapacityKey)) ?? 0); // Fetch capacity used by the service
+
+    const outOfCapacity = epochUsedCapacity >= limit;
+
+    if (outOfCapacity) {
+      this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${serviceLimit}`);
+    } else if (this.lastCapacityUsedCheck !== epochUsedCapacity) {
+      // Minimum with bigints
+      const serviceRemaining = remainingCapacity > limit - epochUsedCapacity ? limit - epochUsedCapacity : remainingCapacity;
+      this.logger.verbose(`Capacity usage: ${epochUsedCapacity} of ${serviceLimit} (${serviceRemaining} remaining)`);
+      this.lastCapacityUsedCheck = epochUsedCapacity;
+    }
+
+    return outOfCapacity;
+  }
+
   public async checkCapacity(): Promise<void> {
     try {
-      const { lastCapacityUsed } = this;
       const capacityLimit = this.configService.getCapacityLimit();
       const capacity = await this.capacityInfo(this.configService.getProviderId());
-      const { remainingCapacity, totalCapacityIssued } = capacity;
-      const { currentEpoch } = capacity;
-      const epochCapacityKey = `${ReconnectionServiceConstants.EPOCH_CAPACITY_PREFIX}${currentEpoch}`;
-      const epochUsedCapacity = BigInt((await this.cacheManager.redis.get(epochCapacityKey)) ?? 0); // Fetch capacity used by the service
-      this.lastCapacityUsed = epochUsedCapacity;
-      let outOfCapacity = remainingCapacity <= 0n;
 
-      if (!outOfCapacity) {
-        let serviceLimit = capacityLimit.serviceLimit.value;
-        let serviceRemaining = serviceLimit;
-        if (capacityLimit.serviceLimit.type === 'percentage') {
-          serviceLimit = (capacity.totalCapacityIssued * serviceLimit) / 100n;
-          serviceRemaining = serviceLimit - epochUsedCapacity;
-          if (epochUsedCapacity >= serviceLimit) {
-            outOfCapacity = true;
-          }
-        } else if (epochUsedCapacity >= serviceLimit) {
-          outOfCapacity = true;
-        }
-
-        if (outOfCapacity) {
-          this.logger.warn(`Capacity threshold reached: used ${epochUsedCapacity} of ${serviceLimit}`);
-        } else if (epochUsedCapacity !== lastCapacityUsed) {
-          this.logger.verbose(`Capacity usage: ${epochUsedCapacity} of ${serviceLimit} (${serviceRemaining} remaining)`);
-        }
+      // This doesn't really pick up on capacity exhaustion, as usage is unlikely to bring capacity to zero
+      // (there will always be some dust). But it will warn in the case where a provider has been completely un-staked
+      // (or they're using the wrong keypair in the config, one with no capacity, etc...)
+      if (capacity.remainingCapacity <= 0n) {
+        this.logger.warn(`No capacity!`);
       }
 
-      // If service limit has not been reached, check total capacity limit (if configured)
-      if (!outOfCapacity && capacityLimit?.totalLimit) {
-        const totalCapacityUsed = totalCapacityIssued - remainingCapacity;
-        let totalLimit = capacityLimit.totalLimit.value;
-        if (capacityLimit.totalLimit.type === 'percentage') {
-          totalLimit = (capacity.totalCapacityIssued * totalLimit) / 100n;
-          if (totalCapacityUsed >= totalLimit) {
-            outOfCapacity = true;
-          }
-        } else if (totalCapacityUsed >= totalLimit) {
-          outOfCapacity = true;
-        }
+      const totalLimitExceeded = capacityLimit.totalLimit ? this.checkTotalCapacityLimit(capacity, capacityLimit.totalLimit) : false;
+      const serviceLimitExceeded = await this.checkServiceCapacityLimit(capacity, capacityLimit.serviceLimit);
 
-        if (outOfCapacity) {
-          this.logger.warn(`Total capacity usage limit reached: used ${totalCapacityUsed} of ${totalCapacityIssued}`);
-        }
-      }
+      const outOfCapacity = capacity.remainingCapacity <= 0n || serviceLimitExceeded || totalLimitExceeded;
 
       if (outOfCapacity) {
         await this.eventEmitter.emitAsync('capacity.exhausted');
       } else {
-        await this.eventEmitter.emitAsync('capacity.refilled');
+        await this.eventEmitter.emitAsync('capacity.available');
       }
     } catch (err: any) {
       this.logger.error('Caught error in checkCapacity', err?.stack);
