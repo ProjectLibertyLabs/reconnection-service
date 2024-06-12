@@ -1,169 +1,331 @@
 # Graph Reconnection Service
 
-A microservice to reconnect graphs in DSNP/Frequency
+<!-- TABLE OF CONTENTS -->
 
-## Overview/Design
+# 📗 Table of Contents
 
-The Graph Reconnection Service is designed to be hosted by a Provider inside their own environment. The service will scan the Frequency chain for new delegations to the Provider delegating Graph schema permissions for a user. The service then requests the user's Provider Graph and keys from the Provider, and updates the user's graph on-chain.
+- [📖 About the Project](#about-project)
+- [🔍 Arch Map](#-arch-maps)
+- [🛠 Built With](#-built-with)
+  - [Tech Stack](#tech-stack)
+  - [Key Features](#key-features)
+- [🚀 Live OpenAPI Docs](#-live-docs)
+- [💻 Getting Started](#-getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Setup](#setup)
+  - [Install](#install)
+  - [Usage](#usage)
+  - [Run tests](#run-tests)
+  - [Deployment](#deployment)
+- [🤝 Contributing](#-contributing)
+- [⭐️ Show your support](#-support)
+- [🙏 Acknowledgements](#-acknowledgements)
+- [❓FAQ](#faq)
+- [📝 License](#-license)
 
-The following diagrams are intended as a guide for providers to understand how to work with DSNP's social graph.
+<!-- PROJECT DESCRIPTION -->
 
-For user relationships to be stored in a DSNP social graph, the users on both ends of the relationship must have DSNP accounts and have granted graph permission to the provider.
+# 📖 [project_name] <a name="about-project"></a>
 
-## Installation and Deployment
+> Describe your project in 2 paragraphs.
 
-For instructions on downloading and installing/deploying the application, see [here](./INSTALLING.md)
+Reconnection Service provides a way for Providers who are _migrating_ their userbase to DSNP/Frequency to easily handle the graph updates as users opt into the migration.
 
-## Provider Flow
+The service scans the Frequency chain for new delegations for the Provider. It then requests, via a Provider's API, the user's Graph keys and the Provider's graph and proceeds to update the migrated user's graph **and** the graph of previously migrated users connected to the newly migrated user.
 
-This flow must be implemented between the Provider and a Wallet. It is outside the purview of the Graph Reconnection Service, but must be completed for a user before that user's graph can be migrated.
+<!-- Mermaid Arch maps -->
 
-```mermaid
-flowchart LR
-    A(Ask wallet to\nauthorize account\ncreation) --> B(Create DSNP\nacccount)
-    B -->|private graph| C(Ask wallet to generate\nsocial graph key and\nstore provider copy) --> E(Announce public key\nto chain) --> D
-    B --->|public graph| D(done)
-```
+## 🔭 Arch Maps
 
-## Reconnection Service
+The Reconnection Service has one main loop that watches the chain for new blocks. Those blocks are then processed to look for new delegations and completed jobs.
 
-### Graph Update Flow to Blockchain
+![Reconnection Service](./docs/reconnection_service_arch.drawio.png)
 
-The following diagram illustrates the differences in what is required to update a user's graph on-chain for different types of graphs: Public vs. Private, and Follow vs. Friendship. As shown, Private graph updates require the user's graph encryption keys, as Private graph data is stored encrypted on-chain. An additional requirement for Private Friendship also requires the counterparty's public graph encryption key. This enables the construction of a shared secret, a PRId, which is used to securely represent the connection in a public way. (The PRId is stored publicly on-chain, but the other side of the connection cannot be derived from it.)
+### Additional Diagrams
 
-```mermaid
-flowchart TD
-pub1["Public Follow"] --- pub2(Create Graph\nData) --> pub3(Compress)
-priFollow1["Private Follows"] --- priFollow2(Create Graph\nData) --> priFollow3(Compress) --> priFollow4(Encrypt)
-priFriend1["Private Friends"] --- priFriend2(Create Graph\nData) --> priFriend3(Compress) --> priFriend4(Encrypt)
-priFriend2 --> priFriend5(Create PRId Data)
-```
+- [Example Sequence Diagram](./docs/example-sequence-diagram.md)
+- [Internal Service Graph Update Flows](./docs/internal-graph-update-flow.md)
 
-### Sequence Diagram
 
-The following sequence diagram illustrates an example event flow where three users (Alice, Bob, and Charlie), who are all mutually friends, onboard to DSNP at different times & have their social graphs migrated to DSNP in stages.
+<p align="right">(<a href="#-table-of-contents">back to top</a>)</p>
 
-```mermaid
-sequenceDiagram;
-Note left of P:Initial state:<br/>Alice <-Provider-> Bob<br/>Alice <-Provider-> Charlie<br/>Bob <-Provider-> Charlie
-  box Provider Environment
-    participant P as Provider;
-    participant S as Provider-hosted Reconnection Service;
-  end
-  box Blockchain
-    participant F as Frequency;
-  end
-  Note over P:Alice delegates Graph permission to Provider<br/>(This may happen during DSNP<br/>migration or subsequently)
-  P->>F: Add Graph schema permission delegation to Provider for Alice
-  F->>S: (Service sees delegation event during chain scan)
-  S->>+P: Request Provider's DSNP graph for Alice;
-  P->>-S: Provide Alice's Graph encryption keypair<br/>and connection list
-  Note over P,S: Returned graph consists of all of Alice's connections<br/>who have migrated & opted in to Graph<br/>(in this case, empty, as neither Bob nor Charlie<br/>have migrated)
-  S->>+F: Request Alice's DSNP Graph
-  F->>-S: Provide Alice's DSNP Graph
-  S->S: Decrypt Alice's Graph
-  S->>F: Update & re-encrypt Alice's Graph as appropriate (no updates)
-  Note over P:Bob delegates Graph permission to Provider
-  P->>F: Add Graph schema permission delegation to Provider for Bob
-  F->>S: (Service sees delegation event during chain scan)
-  S->>+P: Request Provider's DSNP graph for Bob;
-  P->>-S: Provide Bob's Graph encryption keypair<br/>and connection list
-  Note over P,S: Returned graph consists of all of Bob's connections<br/>who have migrated & opted in to Graph<br/>(in this case, [Alice])
-  S->>+F: Request Bob's DSNP Graph
-  F->>-S: Provide Bob's DSNP Graph
-  S->S: Decrypt Bob's Graph
-  S->>F: Update & re-encrypt Bob's Graph as appropriate (Alice added)
-  Note left of P:State:<br/>Alice -Provider> Bob<br/>Bob -DSNP> Alice<br/>Alice <-Provider-> Charlie<br/>Bob <-Provider-> Charlie
-  loop Bob's connections (just Alice here)
-  S->>+P: Request Provider's DSNP graph for Alice
-  P->>-S: Provide Alice's encryption keypair<br/>and connection list
-  S->>+F: Request Alice's DSNP Graph
-  F->>-S: Provide Alice's DSNP Graph
-  S->S: Decrypt Alice's Graph
-  S->>F: Update & re-encrypt Alice's Graph (Bob added)
-  end
-  Note left of P:State:<br/>Alice <-DSNP-> Bob<br/>Alice <-Provider-> Charlie<br/>Bob <-Provider-> Charlie
-  Note over P:Charlie delegates Graph permission to Provider
-  P->>F: Add Graph schema permission delegation to Provider for Charlie
-  F->>S: (Service sees delegation event during chain scan)
-  S->>+P: Request Provider's DSNP graph for Charlie;
-  P->>-S: Provide Charlie's Graph encryption keypair<br/>and connection list
-  Note over P,S: Returned graph consists of all of Charlie's connections<br/>who have migrated & opted in to Graph<br/>(in this case, [Alice, Bob])
-  S->>+F: Request Charlie's DSNP Graph
-  F->>-S: Provide Charlie's DSNP Graph
-  S->S: Decrypt Charlie's Graph
-  S->>F: Update & re-encrypt Charlie's Graph as appropriate (Alice & Bob added)
-  Note left of P:State:<br/>Alice <-DSNP-> Bob<br/>Alice -Provider-> Charlie<br/>Bob -Provider-> Charlie<br/>Charlie -DSNP-> Alice<br/>Charlie -DSNP-> Bob
-  loop Chalie's connections ([Alice, Bob] here)
-  S->>+P: Request Provider's DSNP graph for <connection>
-  P->>-S: Provide <connection>'s encryption keypair<br/>and connection list
-  S->>+F: Request <connection>'s DSNP Graph
-  F->>-S: Provide <connection>'s DSNP Graph
-  S->S: Decrypt <connection>'s Graph
-  S->>F: Update & re-encrypt <connection>'s Graph (Charlie added)
-  end
-  Note left of P:State:<br/>Alice <-DSNP-> Bob<br/>Alice <-DSNP-> Charlie<br/>Bob <-DSNP-> Charlie
-```
+## 🛠 Built With <a name="built-with"></a>
 
-## Other Graph Scenarios
+### Tech Stack <a name="tech-stack"></a>
 
-### Handling External DSNP User Data Changes
+<details>
+  <summary>Framework</summary>
+  <ul>
+    <li><a href="https://nestjs.com/">NestJS</a></li>
+  </ul>
+</details>
 
-Though outside the responsibility of the Graph Reconnection Service, it's relevant to understand how a provider application might incorporate changes made by other actors on the blockchain into their own platform.
+<details>
+  <summary>Language</summary>
+  <ul>
+    <li><a href="https://www.typescriptlang.org/">Typescript</a></li>
+  </ul>
+</details>
 
-When a user's graph is modified (whether by themselves or another provider to whom permission has been delegated), a page updated event is published on the blockchain. By correlating the schema ID contained in this event with the known schema IDs for the social graph, a provider can determine whether a user's graph has been updated, and synchronize the authoritative blockchain version of the graph with their own internal representation.
+<details>
+  <summary>Testing Libraries</summary>
+  <ul>
+    <li><a href="https://jestjs.io/">Jest</a></li>
+  </ul>
+</details>
 
-```mermaid
-flowchart LR
-dspn1(Listen for\nPaginatedPageUpdated\nevents on-chain) --> dsnp2{Is the\nowning\nuser on\nthis\nprovider?}
-dsnp2 -->|yes| dsnp3(Read user's graph\nfrom chain\nand import to GraphSDK)
-dsnp3 --> dsnp4{Is the\ntarget user\non this\nprovider?}
-dsnp4 -->|yes| dsnp5("Apply deltas to\nprovider graph")
-dsnp2 -->|no| dsnp6(No action required)
-dsnp4 -->|no| dsnp7(Show non-provider\nuser as an external\nDSNP user)
-```
+<details>
+  <summary>Linting</summary>
+  <ul>
+    <li><a href="https://eslint.org/">ESLint</a></li>
+    <li><a href="https://prettier.io/">Prettier</a></li>
+  </ul>
+</details>
 
-## Running the application
+<details>
+  <summary>Data Store</summary>
+  <ul>
+    <li><a href="https://github.com/luin/ioredis">ioredis</a></li>
+  </ul>
+</details>
 
-There are three ways to run the application:
+<details>
+  <summary>Request Library</summary>
+  <ul>
+    <li><a href="https://axios-http.com/">Axios</a></li>
+  </ul>
+</details>
 
-1. Manually, starting the application natively in your own Node.js environment
-2. Using the provided Docker image [amplicalabs/reconnection-service:apponly-latest](https://hub.docker.com/r/amplicalabs/reconnection-service/tags) to run the app and configure to access your own external Redis instance
-3. Using the provided Docker image [amplicalabs/reconnection-service:standalone](https://hub.docker.com/r/amplicalabs/reconnection-service/tags) to run the app bundled with its own Redis server inside the same container (useful for dev/testing)
+<details>
+  <summary>Scheduling</summary>
+  <ul>
+    <li><a href="https://docs.nestjs.com/techniques/task-scheduling">NestJS Schedule</a></li>
+  </ul>
+</details>
 
-## Configuring the application
+<details>
+  <summary>Validation</summary>
+  <ul>
+    <li><a href="https://github.com/typestack/class-validator">class-validator</a></li>
+    <li><a href="https://joi.dev/">Joi</a></li>
+  </ul>
+</details>
 
-The application receives its configuration from the environment. Each method of launching the app has its own source for the environment. If you run a container image using Kubernetes, it is likely your environment injection will be configured in a Helm chart. For local Docker-based development, you may specifiy the environment or point to an environment file (see Docker documentation for the preferred way to configure this). If running natively using the script included in `package.json`, the app will use either a local `.env` or `.env.dev` file (depending on the script used to launch the app).
+<details>
+  <summary>Environment Configuration</summary>
+  <ul>
+    <li><a href="https://github.com/motdotla/dotenv">dotenv</a></li>
+  </ul>
+</details>
 
-Environment files are documented [here](./ENVIRONMENT.md), and a sample environment file is provided [here](./env.template).
+<details>
+  <summary>Containerization</summary>
+  <ul>
+    <li><a href="https://www.docker.com/">Docker</a></li>
+    <li><a href="https://docs.docker.com/compose/">Docker Compose</a></li>
+  </ul>
+</details>
 
-## Docker compose development environment
+<details>
+  <summary>API Documentation</summary>
+  <ul>
+    <li><a href="https://swagger.io/">Swagger</a></li>
+  </ul>
+</details>
+
+<!-- Features -->
+
+### Key Features
+
+- **Supports Opt-in DSNP/Frequency Migration**
+- **Updates Newly Migrated User Graph**
+- **Updates Graphs of Connections**
+
+<p align="right">(<a href="#-table-of-contents">back to top</a>)</p>
+
+<!-- LIVE Docs -->
+
+## 🚀 Live Docs
+
+- [Live Docs](https://amplicalabs.github.io/reconnection-service)
+
+<p align="right">(<a href="#-table-of-contents">back to top</a>)</p>
+
+<!-- GETTING STARTED -->
+
+## 💻 Getting Started
+
+To get a local copy up and running, follow these steps.
 
 ### Prerequisites
 
-1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop) for your platform
-2. Clone this repository
+In order to run this project you need:
+
+- [Node.js](https://nodejs.org)
+- [Docker](https://docs.docker.com/get-docker/)
+
+### Setup
+
+Clone this repository to your desired folder:
+
+Example commands:
+
+```sh
+  git clone git@github.com:AmplicaLabs/account-service.git
+  cd account-service
+```
+
+### Environment Variables
+
+Modify any environment variables in the `.env` file as needed. For docker compose env `.env.docker.dev` file is used. The complete set of environment variables is documented [here](./ENVIRONMENT.md), and a sample environment file is provided [here](./env.template).
+
+1. Copy the template values into the .env files.
+   ```sh
+   cp env.template .env
+   cp env.template .env.docker.dev
+   ```
+2. Replace template values with values appropriate to your environment.
+
+### Install
+
+Install NPM Dependencies:
+
+```sh
+  npm install
+```
+
+### Usage
+
+Note: using [docker compose file](docker-compose.yaml) to start the services. This will start the services in development mode.
+
+In order to run the `account-service` in development mode without containers, you can use the following commands:
+
+#### 1. Start the Redis server container, the Frequency container, and the mock webhook server. You can view the logs with your Docker setup.
 
    ```bash
-   git clone https://github.com/AmplicaLabs/reconnection-service.git
+   docker compose up -d redis frequency webhook
    ```
 
-3. Check for values in `.env.docker.dev` file and update as needed
-
-### Running the development environment
-
-Note: Check docker compose file for various services it will start.
-Note: If `graphQueue` is paused, then it means we are out of capacity and need to stake more capacity; in such cases the queue is paused for one epoch and then it will resume automatically.
-
-1. Start the development environment
+#### 2. Once [Frequency](https://polkadot.js.org/apps/?rpc=ws%3A%2F%2F127.0.0.1%3A9944#/explorer) is up, run the chain setup. This will setup 7000 MSAs on the chain with Graph.
 
    ```bash
-   docker compose -f docker-compose.dev.yaml up
+   npm run chain-setup
    ```
 
-2. Run the [graph-migration-setup](https://github.com/AmplicaLabs/frequency-scenario-template/tree/main/graph-migration-setup) scenario to create the necessary accounts and delegations
+#### 3. Start the Api.<br /><br />
 
-3. Go to [Polkadot.js](https://polkadot.js.org) and connect to the local development node.
-4. Fund MSA 1 (Provider) and stake some capacity, in graph migration setup scenario MSA 1 is the provider.
-5. Reconnection service will scan the chain and find delegation for PROVIDER_ID set in `.env.docker.dev` file and will start processing the graph migration.
-6. Make sure websocket data is sending correct response when reconnection service is requesting graph data from provider.
+   **Option 1:** In a new terminal window, start the `reconnection-service` api app. Logs will be displayed in the terminal for easy reference.
+
+   ```sh
+   npm run start:api:debug
+   ```
+
+   -- or -- <br /><br />
+
+   **Option 2:**
+   Run the following command to start the account service api and worker containers. This will start the account service api and worker in development mode.
+
+   ```sh
+   docker compose up -d api worker
+   ```
+
+#### 4. Check the job in [BullUI](http://0.0.0.0:3000/reconnection-service/queue/), to monitor job progress based on defined tests.
+
+## 📋 Testing
+
+### Run the tests.
+
+   ```bash
+   npm run test
+   ```
+
+   This will run the matching `*.spec.ts` files.
+
+#### Check e2e test file for more details on the test.
+
+### Queue Management
+
+You may also view and manage the application's queue at [http://localhost:3000/reconnection-service/queue](http://localhost:3000/reconnection-service/queue).
+
+### Linting
+
+```sh
+  npm run lint
+```
+
+### Auto-format
+
+```sh
+  npm run format
+```
+
+### Debugging
+
+- Docker to stop containers, networks, volumes, and images created by `docker compose up` run...
+  ```sh
+    docker compose down
+  ```
+- You may have to go to your Docker Desktop app and manually remove containers.
+
+### Using the Debugger with VSCode
+
+1. Follow step 1 from the Development Environment section above to set up the redis and frequency containers.
+
+2. Use the debug panel and start the `Debug Api (NestJS via ts-node)` configuration, if you wish to debug the api.
+
+3. Set breakpoints in the code and debug your code.
+
+4. Monitor the service worker jobs in [BullUI](http://0.0.0.0:3000/reconnection-service/queue/).
+
+   Any API functions that require an extrinsic to be submitted to the blockchain will be queued here. The queue will manage the amount of `capacity` this service is allowed to use.
+
+   Reference the [Frequency Docs](https://docs.frequency.xyz/) for more information about extrinsics and capacity.
+
+**Note:** Reference `.vscode/launch.json` for more details on the debug configurations and apply the concepts to your preferred debugger.
+
+<p align="right">(<a href="#-table-of-contents">back to top</a>)</p>
+
+<!-- CONTRIBUTING -->
+
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome!
+
+- [Contributing Guidelines](https://github.com/AmplicaLabs/gateway/blob/main/CONTRIBUTING.md)
+- [Open Issues](https://github.com/AmplicaLabs/reconnection-service/issues)
+
+<p align="right">(<a href="#-table-of-contents">back to top</a>)</p>
+
+<!-- SUPPORT -->
+
+## ⭐️ Show your support
+
+If you would like to explore contributing bug fixes or enhancements, issues with the label `good-first-issue` can be a good place to start.
+
+<p align="right">(<a href="#-table-of-contents">back to top</a>)</p>
+
+<!-- FAQ (optional) -->
+
+## ❓FAQ
+
+- **Do I need this?**
+
+  - Only if you have non-DSNP/Frequency users with existing graph connections that should be recreated on migration.
+
+- **Does it need to run all the time?**
+
+  - No. If the connected node is an archive node, then it can replay the blocks as needed.
+
+- **What if something else already updated the graph?**
+
+  - The Reconnection Service will check and only add the needed connections. If all the connections already exist, then the service will do nothing on chain and continue.
+
+<p align="right">(<a href="#-table-of-contents">back to top</a>)</p>
+
+<!-- LICENSE -->
+
+## 📝 License
+
+This project is [Apache 2.0](./LICENSE) licensed.
+
+<p align="right">(<a href="#-table-of-contents">back to top</a>)</p>
