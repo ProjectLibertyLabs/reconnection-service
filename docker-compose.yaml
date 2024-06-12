@@ -37,11 +37,10 @@ services:
     hostname: webhook
     build:
       context: webhook-specification/mock-webhook-server
-      dockerfile: webhook-specification/mock-webhook-server/Dockerfile
     ports:
       - 3001:3001
-    volumes:
-      - ./webhook-specification/mock-webhook-server:/app
+    environment:
+      NODE_ENV: production
     networks:
       - reconnection-service-network-dev
 
