@@ -15,12 +15,11 @@
     "start:api:debug": "set -a ; . .env ; nest start --debug --watch",
     "docker-build": "docker build -t reconnection-service .",
     "docker-build:dev": "docker compose build",
-    "docker-run": "docker build -t reconnection-service-deploy . ; docker run -p 6379:6379 --env-file .env.dev reconnection-service-deploy",
+    "docker-run": "docker build -t reconnection-service-deploy . ; docker run -p 6379:6379 --env-file .env reconnection-service-deploy",
     "docker-run:dev": "docker compose up -d ; docker compose -f docker compose.dev.yaml logs",
     "docker-stop:dev": "docker compose stop",
     "clean": "rm -Rf dist",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "pretest": "cp env.template .env",
     "test": "jest  --coverage --verbose",
     "chain-setup": "tsx setup/testing/index.ts",
     "reset-chain": "setup/testing/reset_chain"

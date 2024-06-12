@@ -214,7 +214,7 @@ In order to run the `account-service` in development mode without containers, yo
 
 #### 3. Start the Api.<br /><br />
 
-   **Option 1:** In a new terminal window, start the `reconnection-service` api app. Logs will be displayed in the terminal for easy reference.
+   **Option 1:** In a new terminal window, start the `reconnection-service` app. Logs will be displayed in the terminal for easy reference.
 
    ```sh
    npm run start:api:debug
@@ -226,7 +226,7 @@ In order to run the `account-service` in development mode without containers, yo
    Run the following command to start the account service api and worker containers. This will start the account service api and worker in development mode.
 
    ```sh
-   docker compose up -d api worker
+   docker compose up -d reconnection-service
    ```
 
 #### 4. Check the job in [BullUI](http://0.0.0.0:3000/reconnection-service/queue/), to monitor job progress based on defined tests.
