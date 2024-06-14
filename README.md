@@ -203,7 +203,7 @@ In order to run the `account-service` in development mode without containers, yo
 #### 1. Start the Redis server container, the Frequency container, and the mock webhook server. You can view the logs with your Docker setup.
 
    ```bash
-   docker compose up -d redis frequency webhook
+   docker compose up -d redis frequency
    ```
 
 #### 2. Once [Frequency](https://polkadot.js.org/apps/?rpc=ws%3A%2F%2F127.0.0.1%3A9944#/explorer) is up, run the chain setup. This will setup 7000 MSAs on the chain with Graph.
@@ -212,7 +212,13 @@ In order to run the `account-service` in development mode without containers, yo
    npm run chain-setup
    ```
 
-#### 3. Start the Api.<br /><br />
+#### 3. Start the mock webhook server. You can view the logs with your Docker setup.
+
+  ```bash
+  docker compose up -d webhook
+  ```
+
+#### 4. Start the Api.<br /><br />
 
    **Option 1:** In a new terminal window, start the `reconnection-service` app. Logs will be displayed in the terminal for easy reference.
 
@@ -229,7 +235,7 @@ In order to run the `account-service` in development mode without containers, yo
    docker compose up -d reconnection-service
    ```
 
-#### 4. Check the job in [BullUI](http://0.0.0.0:3000/reconnection-service/queue/), to monitor job progress based on defined tests.
+#### 5. Check the job in [BullUI](http://0.0.0.0:3000/reconnection-service/queue/), to monitor job progress based on defined tests.
 
 ## 📋 Testing
 

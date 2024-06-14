@@ -41,6 +41,8 @@ services:
       - 3001:3001
     environment:
       NODE_ENV: production
+    volumes:
+      - ./webhook-specification/mock-webhook-server/responses:/app/responses
     networks:
       - reconnection-service-network-dev
 

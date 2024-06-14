@@ -4,6 +4,8 @@
 # For more help, visit the .dockerignore file reference guide at
 # https://docs.docker.com/go/build-context-dockerignore/
 
+**/.DS_Store
+**/*.js.map
 **/.classpath
 **/.dockerignore
 **/.env
@@ -30,5 +32,6 @@
 **/values.dev.yaml
 **/build
 **/dist
+**/responses
 LICENSE
 README.md

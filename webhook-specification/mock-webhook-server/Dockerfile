@@ -13,7 +13,7 @@ ARG NODE_VERSION=20.12.2
 FROM node:${NODE_VERSION}-alpine as base
 
 # Set working directory for all build stages.
-WORKDIR /usr/src/app
+WORKDIR /app
 
 
 ################################################################################
@@ -58,12 +58,12 @@ USER node
 
 # Copy the production dependencies from the deps stage and also
 # the built application from the build stage into the image.
-COPY --from=deps /usr/src/app/node_modules ./node_modules
-COPY --from=build /usr/src/app/dist ./dist
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./
 
 
 # Expose the port that the application listens on.
 EXPOSE 3001
 
 # Run the application.
-CMD node dist/main.js
+CMD node main.js
