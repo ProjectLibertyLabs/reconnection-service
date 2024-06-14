@@ -212,6 +212,8 @@ In order to run the `account-service` in development mode without containers, yo
    npm run chain-setup
    ```
 
+   Note: If you change the env's `PROVIDER_ACCOUNT_SEED_PHRASE`, you will also need to update `PROVIDER_ACCOUNT_SEED_PHRASE` in `setup/testing/index.ts`.
+
 #### 3. Start the mock webhook server. You can view the logs with your Docker setup.
 
   ```bash
