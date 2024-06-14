@@ -50,7 +50,6 @@ describe('ReconnectionConfigService', () => {
     HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS: undefined,
     HEALTH_CHECK_MAX_RETRIES: undefined,
     GRAPH_ENVIRONMENT_TYPE: undefined,
-    GRAPH_ENVIRONMENT_DEV_CONFIG: undefined,
     CAPACITY_LIMIT: undefined,
     FREQUENCY_TX_TIMEOUT_SECONDS: undefined,
     DEAD_LETTER_JOB_PREFIX: undefined,
@@ -189,16 +188,6 @@ describe('ReconnectionConfigService', () => {
       await expect(setupConfigService({ GRAPH_ENVIRONMENT_TYPE: 'bad', ...env })).rejects.toBeDefined();
     });
 
-    it('missing graph environment dev config should fail', async () => {
-      const { GRAPH_ENVIRONMENT_TYPE: dummy, GRAPH_ENVIRONMENT_DEV_CONFIG: dummy2, ...env } = ALL_ENV;
-      await expect(setupConfigService({ GRAPH_ENVIRONMENT_TYPE: 'Dev', GRAPH_ENVIRONMENT_DEV_CONFIG: undefined, ...env })).rejects.toBeDefined();
-    });
-
-    it('invalid graph environment dev config should fail', async () => {
-      const { GRAPH_ENVIRONMENT_TYPE: dummy, GRAPH_ENVIRONMENT_DEV_CONFIG: dummy2, ...env } = ALL_ENV;
-      await expect(setupConfigService({ GRAPH_ENVIRONMENT_TYPE: 'Dev', GRAPH_ENVIRONMENT_DEV_CONFIG: 'invalid json', ...env })).rejects.toBeDefined();
-    });
-
     it('missing capacity limits should fail', async () => {
       const { CAPACITY_LIMIT: dummy, ...env } = ALL_ENV;
       await expect(setupConfigService({ CAPACITY_LIMIT: undefined, ...env })).rejects.toBeDefined();
@@ -281,10 +270,6 @@ describe('ReconnectionConfigService', () => {
 
     it('should get graph environment type', () => {
       expect(reconnectionConfigService.getGraphEnvironmentType()).toStrictEqual(ALL_ENV.GRAPH_ENVIRONMENT_TYPE);
-    });
-
-    it('should get graph environment dev config', () => {
-      expect(reconnectionConfigService.getGraphEnvironmentConfig()).toStrictEqual(ALL_ENV.GRAPH_ENVIRONMENT_DEV_CONFIG);
     });
 
     it('should get capacity limit', () => {

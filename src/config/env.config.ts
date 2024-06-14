@@ -59,21 +59,7 @@ export const configModuleOptions: ConfigModuleOptions = {
     HEALTH_CHECK_SUCCESS_THRESHOLD: Joi.number().min(1).default(10),
     HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS: Joi.number().min(1).default(64),
     HEALTH_CHECK_MAX_RETRIES: Joi.number().min(0).default(20),
-    GRAPH_ENVIRONMENT_TYPE: Joi.string().required().valid('Mainnet', 'TestnetPaseo', 'Dev'),
-    // GRAPH_ENVIRONMENT_DEV_CONFIG is optional, but if it is set, it must be a valid JSON string
-    GRAPH_ENVIRONMENT_DEV_CONFIG: Joi.string().when('GRAPH_ENVIRONMENT_TYPE', {
-      is: 'Dev',
-      then: Joi.string()
-        .required()
-        .custom((value: string, helpers) => {
-          try {
-            JSON.parse(value);
-          } catch (e) {
-            return helpers.error('any.invalid');
-          }
-          return value;
-        }),
-    }),
+    GRAPH_ENVIRONMENT_TYPE: Joi.string().required().valid('Mainnet', 'TestnetPaseo'),
     CAPACITY_LIMIT: Joi.string()
       .custom((value: string, helpers) => {
         try {
