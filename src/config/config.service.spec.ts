@@ -1,8 +1,11 @@
+import dotenv from 'dotenv';
 import { Test } from '@nestjs/testing';
 import { describe, it, expect, beforeAll, jest } from '@jest/globals';
 import { ConfigModule } from '@nestjs/config';
 import { ConfigService } from './config.service';
 import { configModuleOptions } from './env.config';
+
+dotenv.config({ path: 'env.template', override: true });
 
 const setupConfigService = async (envObj: any): Promise<ConfigService> => {
   jest.resetModules();
