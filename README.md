@@ -25,9 +25,8 @@
 
 <!-- PROJECT DESCRIPTION -->
 
-# 📖 [project_name] <a name="about-project"></a>
+# 📖 Reconnection Service <a name="about-project"></a>
 
-> Describe your project in 2 paragraphs.
 
 Reconnection Service provides a way for Providers who are _migrating_ their userbase to DSNP/Frequency to easily handle the graph updates as users opt into the migration.
 
@@ -198,9 +197,9 @@ Install NPM Dependencies:
 
 Note: using [docker compose file](docker-compose.yaml) to start the services. This will start the services in development mode.
 
-In order to run the `account-service` in development mode without containers, you can use the following commands:
+In order to run the `reconnection-service` in development mode without containers, you can use the following commands:
 
-#### 1. Start the Redis server container, the Frequency container, and the mock webhook server. You can view the logs with your Docker setup.
+#### 1. Start the Redis server container and the Frequency container. You can view the logs with your Docker setup.
 
    ```bash
    docker compose up -d redis frequency
@@ -231,7 +230,7 @@ In order to run the `account-service` in development mode without containers, yo
    -- or -- <br /><br />
 
    **Option 2:**
-   Run the following command to start the account service api and worker containers. This will start the account service api and worker in development mode.
+   Run the following command to start the reconnection service container. This will start the reconnection service in development mode.
 
    ```sh
    docker compose up -d reconnection-service
@@ -269,7 +268,7 @@ You may also view and manage the application's queue at [http://localhost:3000/r
 
 ### Debugging
 
-- Docker to stop containers, networks, volumes, and images created by `docker compose up` run...
+- Docker: to stop containers, networks, volumes, and images created by `docker compose up` run...
   ```sh
     docker compose down
   ```
