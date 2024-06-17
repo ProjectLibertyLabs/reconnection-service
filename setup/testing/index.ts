@@ -27,6 +27,8 @@ import { hexToU8a, u8aToHex } from '@polkadot/util';
 import { AddGraphKeyAction, AddKeyUpdate, ConnectionType, EnvironmentInterface, EnvironmentType, Graph, PrivacyType } from '@dsnp/graph-sdk';
 import { HexString } from '@polkadot/util/types';
 
+const PROVIDER_ACCOUNT_SEED_PHRASE = 'come finish flower cinnamon blame year glad tank domain hunt release fatigue';
+
 type ChainUser = {
   uri?: string;
   keys?: KeyringPair;
@@ -143,21 +145,22 @@ async function main() {
   log.setLevel('trace');
   const { apiPromise } = ExtrinsicHelper;
 
-  const provider: ChainUser = { keys: keyring.createFromUri('//Alice') };
+  const fundingSource: ChainUser = { keys: keyring.createFromUri('//Alice') };
+  const provider: ChainUser = { keys: keyring.createFromUri(PROVIDER_ACCOUNT_SEED_PHRASE) };
   const famousUser: ChainUser = { uri: '//Bob', keys: keyring.createFromUri('//Bob') };
   const followers = new Map<string, ChainUser>();
 
   // Create provider
   console.log('Creating provider...');
   const builder = new UserBuilder();
-  const providerUser = await builder.withKeypair(provider.keys!).asProvider('Alice Provider').withFundingSource(provider.keys).build();
+  const providerUser = await builder.withKeypair(provider.keys!).asProvider('Reconn Provider').withFundingSource(fundingSource.keys).build();
   provider.msaId = providerUser.msaId;
   console.log(`Created provider ${provider.msaId!.toString()}`);
 
   // Ensure provider is staked
   const capacity = await ExtrinsicHelper.apiPromise.query.capacity.capacityLedger(provider.msaId);
   if (capacity.isNone || capacity.unwrap().totalTokensStaked.toBigInt() < CAPACITY_AMOUNT_TO_STAKE) {
-    await ExtrinsicHelper.stake(provider.keys!, provider.msaId, CAPACITY_AMOUNT_TO_STAKE).signAndSend();
+    await ExtrinsicHelper.stake(fundingSource.keys!, provider.msaId, CAPACITY_AMOUNT_TO_STAKE).signAndSend();
     console.log(`Staked to provider`);
   }
 
@@ -261,7 +264,7 @@ User graphs to clear: ${graphsToClear}
           allBatchesTracker.numberPending -= 1;
           if (allBatchesTracker.numberPending < 1) {
             allBatchesTracker.numberPending = 0;
-            (allBatchesTracker?.resolve ?? (() => { }))();
+            (allBatchesTracker?.resolve ?? (() => {}))();
           }
         } else if (ExtrinsicHelper.api.events.msa.MsaCreated.is(event)) {
           const { msaId, key } = event.data;
@@ -302,11 +305,11 @@ User graphs to clear: ${graphsToClear}
           //   x.events.forEach((e) => console.dir(e.event.toHuman()));
           if (x.dispatchError) {
             unsub();
-            (allBatchesTracker?.reject ?? (() => { }))(new EventError(x.dispatchError));
+            (allBatchesTracker?.reject ?? (() => {}))(new EventError(x.dispatchError));
           } else if (status.isInvalid) {
             unsub();
             console.log(x.toHuman());
-            (allBatchesTracker?.reject ?? (() => { }))(new Error('Extrinsic failed: Invalid'));
+            (allBatchesTracker?.reject ?? (() => {}))(new Error('Extrinsic failed: Invalid'));
           } else if (x.isFinalized) {
             unsub();
           }
@@ -370,7 +373,7 @@ User graphs to clear: ${graphsToClear}
   };
 
   const responses: ProviderResponse[] = [];
-  const allFollowers = [...followers.values()]
+  const allFollowers = [...followers.values()];
   while (allFollowers.length > 0) {
     const followerSlice = allFollowers.splice(0, Math.min(allFollowers.length, 50));
     const response = {

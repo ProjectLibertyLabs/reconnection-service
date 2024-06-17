@@ -26,7 +26,6 @@ export interface ConfigEnvironmentVariables {
   HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS: number;
   HEALTH_CHECK_MAX_RETRIES: number;
   GRAPH_ENVIRONMENT_TYPE: keyof EnvironmentType;
-  GRAPH_ENVIRONMENT_DEV_CONFIG: string;
   PROVIDER_ACCOUNT_SEED_PHRASE: string;
   CAPACITY_LIMIT: ICapacityLimits;
   FREQUENCY_TX_TIMEOUT_SECONDS: number;
@@ -114,10 +113,6 @@ export class ConfigService {
 
   public getGraphEnvironmentType(): keyof EnvironmentType {
     return this.nestConfigService.get<keyof EnvironmentType>('GRAPH_ENVIRONMENT_TYPE')!;
-  }
-
-  public getGraphEnvironmentConfig(): string {
-    return this.nestConfigService.get<string>('GRAPH_ENVIRONMENT_DEV_CONFIG')!;
   }
 
   public getCapacityLimit(): ICapacityLimits {

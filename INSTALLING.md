@@ -68,5 +68,4 @@ The following is a list of environment variables that may be set to control the 
 |`REDIS_URL`|**yes**|URL used to connect to Redis instance|_none_<br/>\*preset to the internal Redis URL in the standalone container|
 |`BLOCKCHAIN_SCAN_INTERVAL_MINUTES`|no|# of minutes to wait in between scans of the blockchain|180|
 |`QUEUE_HIGH_WATER`|no|# of pending graph scan queue entries to allow before pausing blockchain scanning until the next scan cycle|1000|
-|`GRAPH_ENVIRONMENT_TYPE`|**yes**|Indicates which blockchain network to connect to.<br/>Possible values:<br/>* `Mainnet`<br/>* `Rococo`<br/>* `Dev`|_none_|
-|`GRAPH_ENVIRONMENT_DEV_CONFIG`|no<br/>*required for 'Dev' Graph Environment|JSON configuration object for GraphSDK configuration. Used to test against a local development Frequency node|_none_|
+|`GRAPH_ENVIRONMENT_TYPE`|**yes**|Indicates which blockchain network to connect to.<br/>Possible values:<br/>* `Mainnet`<br/>* `TestnetPaseo`|_none_|

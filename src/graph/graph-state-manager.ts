@@ -1,17 +1,5 @@
 import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
-import {
-  Graph,
-  EnvironmentInterface,
-  GraphKeyPair,
-  GraphKeyType,
-  Config,
-  DevEnvironment,
-  EnvironmentType,
-  DsnpKeys,
-  DsnpPublicKey,
-  ConnectionType,
-  PrivacyType,
-} from '@dsnp/graph-sdk';
+import { Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, Config, EnvironmentType, DsnpKeys, DsnpPublicKey, ConnectionType, PrivacyType } from '@dsnp/graph-sdk';
 import { ConfigService } from '../config/config.service';
 
 @Injectable()
@@ -45,14 +33,7 @@ export class GraphStateManager implements OnApplicationBootstrap {
 
   constructor(configService: ConfigService) {
     const environmentType = configService.getGraphEnvironmentType();
-    if (environmentType === EnvironmentType.Dev.toString()) {
-      const configJson = configService.getGraphEnvironmentConfig();
-      const config: Config = JSON.parse(configJson);
-      const devEnvironment: DevEnvironment = { environmentType: EnvironmentType.Dev, config };
-      this.environment = devEnvironment;
-    } else {
-      this.environment = { environmentType: EnvironmentType[environmentType] };
-    }
+    this.environment = { environmentType: EnvironmentType[environmentType] };
   }
 
   public createGraphState(): Graph {

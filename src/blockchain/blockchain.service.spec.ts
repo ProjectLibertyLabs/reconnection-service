@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: 'env.template', override: true });
 import { describe, jest } from '@jest/globals';
 import { Test } from '@nestjs/testing';
 import { ConfigService as NestConfigService } from '@nestjs/config';

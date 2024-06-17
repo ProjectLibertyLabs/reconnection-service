@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: 'env.template', override: true });
 import { describe, beforeAll, it, expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Action, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyPair, GraphKeyType, ImportBundle, KeyData, PageData, PrivacyType } from '@dsnp/graph-sdk';
@@ -64,9 +66,11 @@ describe('GraphStateManager', () => {
       keys: [],
     };
 
+    const schemaId = graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Private);
+
     const importBundle1: ImportBundle = {
       dsnpUserId: dsnpUserId1.toString(),
-      schemaId: 1,
+      schemaId,
       keyPairs: keyPairs1,
       dsnpKeys: dsnpKeys1,
       pages: [pageData1],
@@ -89,23 +93,24 @@ describe('GraphStateManager', () => {
   });
 
   it('should apply actions and export graph updates', async () => {
-    // Set up actions
-    const actions = [] as Action[];
-    const action1 = {
-      type: 'Connect',
-      ownerDsnpUserId: '10',
-      connection: {
-        dsnpUserId: '4',
-        schemaId: 1,
-      } as Connection,
-      dsnpKeys: {
-        dsnpUserId: '4',
-        keysHash: 100,
-        keys: [],
-      } as DsnpKeys,
-    } as ConnectAction;
+    const schemaId = graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
 
-    actions.push(action1);
+    // Set up actions
+    const actions: Action[] = [
+      {
+        type: 'Connect',
+        ownerDsnpUserId: '10',
+        connection: {
+          dsnpUserId: '4',
+          schemaId,
+        } as Connection,
+        dsnpKeys: {
+          dsnpUserId: '4',
+          keysHash: 100,
+          keys: [],
+        } as DsnpKeys,
+      } as ConnectAction,
+    ];
 
     const graphState = graphStateManager.createGraphState();
     const applyActionsResult = graphState.applyActions(actions, { ignoreExistingConnections: true });
@@ -149,12 +154,12 @@ describe('GraphStateManager', () => {
       ] as KeyData[],
     } as DsnpKeys;
 
-    const deserializedKeys = await GraphStateManager.deserializeDsnpKeys(dsnpKeys);
+    const deserializedKeys = GraphStateManager.deserializeDsnpKeys(dsnpKeys);
     expect(deserializedKeys).toBeDefined();
   });
 
   it('generateKeyPair should return a key pair', async () => {
-    const keyPair = await GraphStateManager.generateKeyPair(GraphKeyType.X25519);
+    const keyPair = GraphStateManager.generateKeyPair(GraphKeyType.X25519);
     expect(keyPair).toBeDefined();
     expect(keyPair.publicKey).toBeDefined();
     expect(keyPair.secretKey).toBeDefined();
@@ -173,7 +178,7 @@ describe('GraphStateManager', () => {
   });
 
   it('should return schema id for connection type and privacy type', async () => {
-    const schemaId = await graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
+    const schemaId = graphStateManager.getSchemaIdFromConfig(ConnectionType.Follow, PrivacyType.Public);
     expect(schemaId).toBeGreaterThan(0);
   });
 });
