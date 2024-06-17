@@ -36,7 +36,7 @@
   },
   "homepage": "https://github.com/AmplicaLabs/reconnection-service#readme",
   "dependencies": {
-    "@amplica-labs/frequency-scenario-template": "^1.0.0",
+    "@amplica-labs/frequency-scenario-template": "^1.1.4",
     "@bull-board/api": "^5.17.0",
     "@bull-board/express": "^5.17.0",
     "@bull-board/nestjs": "^5.17.0",
