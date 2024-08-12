@@ -70,7 +70,7 @@
     "time-constants": "^1.0.3"
   },
   "devDependencies": {
-    "@eslint/js": "^9.2.0",
+    "@eslint/js": "^9.9.0",
     "@jest/globals": "^29.7.0",
     "@nestjs/cli": "^10.3.2",
     "@types/jest": "^29.5.12",
