@@ -92,7 +92,7 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
   public payWithCapacity(nonce?: number): Promise<ParsedEventResult> {
     return firstValueFrom(
       this.api.tx.frequencyTxPayment
-        .payWithCapacity(this.extrinsicCall)
+        .payWithCapacity(this.extrinsicCall.toHex())
         .signAndSend(this.keys, { nonce })
         .pipe(
           filter(({ status }) => status.isInBlock || status.isFinalized),
@@ -126,7 +126,7 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
             acc.defaultEvent = event;
           }
           if (this.api.events.sudo.Sudid.is(event)) {
-            const { sudoResult } = event.data;
+            const [ sudoResult ] = event.data;
             if (sudoResult.isErr) {
               const err = new EventError(sudoResult.asErr);
               throw err;

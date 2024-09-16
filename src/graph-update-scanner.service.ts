@@ -73,7 +73,10 @@ export class GraphUpdateScannerService extends BlockchainScannerService implemen
     const events = (await this.blockchainService.queryAt(currentBlockHash, 'system', 'events')).toArray();
 
     const filteredEvents = events.filter(
-      ({ event }) => this.blockchainService.api.events.msa.DelegationGranted.is(event) && event.data.providerId.eq(this.configService.getProviderId()),
+      ({ event }) => {
+        const [providerId] = event.data;
+        this.blockchainService.api.events.msa.DelegationGranted.is(event) && providerId.eq(this.configService.getProviderId())
+      },
     );
 
     if (filteredEvents.length > 0) {
