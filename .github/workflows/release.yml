@@ -76,8 +76,9 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
-          username: ${{secrets.DOCKERHUB_USERNAME_FC}}
-          password: ${{secrets.DOCKERHUB_TOKEN_FC}}
+          username: ${{secrets.DOCKERHUB_USERNAME}}
+          password: ${{secrets.DOCKERHUB_TOKEN}}
+
       - name: Build and Push Standalone (Complete) Container Image
         uses: docker/build-push-action@v5
         with:
@@ -87,6 +88,7 @@ jobs:
           file: ./Dockerfile
           target: standalone
           tags: ${{ steps.standalone-tags.outputs.tags }}
+
       - name: Build and Push App-Only Container Image
         uses: docker/build-push-action@v4
         with:
