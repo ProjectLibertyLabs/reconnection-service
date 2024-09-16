@@ -92,7 +92,7 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
   public payWithCapacity(nonce?: number): Promise<ParsedEventResult> {
     return firstValueFrom(
       this.api.tx.frequencyTxPayment
-        .payWithCapacity(this.extrinsicCall.toHex())
+        .payWithCapacity(this.extrinsicCall)
         .signAndSend(this.keys, { nonce })
         .pipe(
           filter(({ status }) => status.isInBlock || status.isFinalized),
