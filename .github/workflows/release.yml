@@ -98,3 +98,12 @@ jobs:
           file: ./Dockerfile
           target: app-only
           tags: ${{ steps.app-only-tags.outputs.tags }}
+
+      - name: Update DockerHub Description
+        if: env.TEST_RUN != 'true'
+        uses: peter-evans/dockerhub-description@e98e4d1628a5f3be2be7c231e50981aee98723ae
+        with:
+          username: ${{secrets.DOCKERHUB_USERNAME}}
+          password: ${{secrets.DOCKERHUB_TOKEN}}
+          repository: ${{env.DOCKER_HUB_PROFILE}}/${{env.IMAGE_NAME}}
+          readme-filepath: docker.md
