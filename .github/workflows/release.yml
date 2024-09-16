@@ -19,7 +19,7 @@ on:
 env:
   NEW_RELEASE_TAG_FROM_UI: ${{github.event.inputs.release-version}}
   TEST_RUN: ${{startsWith(github.event.inputs.release-version || github.ref_name, 'v0.0.1')}}
-  DOCKER_HUB_PROFILE: amplicalabs
+  DOCKER_HUB_PROFILE: projectlibertylabs
   IMAGE_NAME: reconnection-service
 
 jobs:
@@ -76,8 +76,9 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
-          username: ${{secrets.DOCKERHUB_USERNAME_FC}}
-          password: ${{secrets.DOCKERHUB_TOKEN_FC}}
+          username: ${{secrets.DOCKERHUB_USERNAME}}
+          password: ${{secrets.DOCKERHUB_TOKEN}}
+
       - name: Build and Push Standalone (Complete) Container Image
         uses: docker/build-push-action@v5
         with:
@@ -87,6 +88,7 @@ jobs:
           file: ./Dockerfile
           target: standalone
           tags: ${{ steps.standalone-tags.outputs.tags }}
+
       - name: Build and Push App-Only Container Image
         uses: docker/build-push-action@v4
         with:
@@ -96,3 +98,12 @@ jobs:
           file: ./Dockerfile
           target: app-only
           tags: ${{ steps.app-only-tags.outputs.tags }}
+
+      - name: Update DockerHub Description
+        if: env.TEST_RUN != 'true'
+        uses: peter-evans/dockerhub-description@e98e4d1628a5f3be2be7c231e50981aee98723ae
+        with:
+          username: ${{secrets.DOCKERHUB_USERNAME}}
+          password: ${{secrets.DOCKERHUB_TOKEN}}
+          repository: ${{env.DOCKER_HUB_PROFILE}}/${{env.IMAGE_NAME}}
+          readme-filepath: docker.md

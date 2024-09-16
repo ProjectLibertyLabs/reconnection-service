@@ -26,15 +26,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AmplicaLabs/reconnection-service.git"
+    "url": "git+https://github.com/ProjectLibertyLabs/reconnection-service.git"
   },
   "keywords": [],
   "author": "",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/AmplicaLabs/reconnection-service/issues"
+    "url": "https://github.com/ProjectLibertyLabs/reconnection-service/issues"
   },
-  "homepage": "https://github.com/AmplicaLabs/reconnection-service#readme",
+  "homepage": "https://github.com/ProjectLibertyLabs/reconnection-service#readme",
   "dependencies": {
     "@amplica-labs/frequency-scenario-template": "^1.0.0",
     "@bull-board/api": "^5.17.0",

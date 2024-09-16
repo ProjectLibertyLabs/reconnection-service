@@ -146,7 +146,7 @@ The Reconnection Service has one main loop that watches the chain for new blocks
 
 ## 🚀 Live Docs
 
-- [Live Docs](https://amplicalabs.github.io/reconnection-service)
+- [Live Docs](https://ProjectLibertyLabs.github.io/reconnection-service)
 
 <p align="right">(<a href="#-table-of-contents">back to top</a>)</p>
 
@@ -170,7 +170,7 @@ Clone this repository to your desired folder:
 Example commands:
 
 ```sh
-  git clone git@github.com:AmplicaLabs/account-service.git
+  git clone git@github.com:ProjectLibertyLabs/account-service.git
   cd account-service
 ```
 
@@ -298,8 +298,8 @@ You may also view and manage the application's queue at [http://localhost:3000/r
 
 Contributions, issues, and feature requests are welcome!
 
-- [Contributing Guidelines](https://github.com/AmplicaLabs/gateway/blob/main/CONTRIBUTING.md)
-- [Open Issues](https://github.com/AmplicaLabs/reconnection-service/issues)
+- [Contributing Guidelines](https://github.com/ProjectLibertyLabs/gateway/blob/main/CONTRIBUTING.md)
+- [Open Issues](https://github.com/ProjectLibertyLabs/reconnection-service/issues)
 
 <p align="right">(<a href="#-table-of-contents">back to top</a>)</p>
 
