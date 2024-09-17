@@ -50,7 +50,8 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
       if (hasSuccess) {
         this.logger.warn(`Events for tx ${newStatus.txHash} include both success and failure ???`);
       }
-      const { asModule: moduleThatErrored, registry } = failureEvent.data.dispatchError;
+      const [dispatchError] = failureEvent.data;
+      const { asModule: moduleThatErrored, registry } = dispatchError;
       const moduleError = registry.findMetaError(moduleThatErrored);
       newStatus.error = moduleError.method;
       newStatus.status = 'failed';

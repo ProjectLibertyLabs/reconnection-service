@@ -2,7 +2,6 @@
 import { ConfigService } from '#app/config/config.service';
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { options } from '@frequency-chain/api-augment';
-import { ApiPromise, ApiRx, HttpProvider, WsProvider } from '@polkadot/api';
 import { firstValueFrom } from 'rxjs';
 import { KeyringPair } from '@polkadot/keyring/types';
 import { BlockHash, BlockNumber, Index, SignedBlock } from '@polkadot/types/interfaces';
@@ -16,6 +15,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as ReconnectionServiceConstants from '#app/constants';
 import { Extrinsic } from './extrinsic';
 import { ICapacityLimit } from '#app/interfaces/capacity-limit.interface';
+import { ApiPromise, ApiRx, HttpProvider, WsProvider } from '@polkadot/api';
 
 interface ICapacityInfo {
   providerId: string;
@@ -124,14 +124,14 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
       const providerU64 = this.apiPromise.createType('u64', providerId);
       const { epochStart }: PalletCapacityEpochInfo = await this.query('capacity', 'currentEpochInfo');
       const epochBlockLength: u32 = await this.query('capacity', 'epochLength');
-      const capacityDetailsOption: Option<PalletCapacityCapacityDetails> = await this.query('capacity', 'capacityLedger', providerU64);
+      const capacityDetailsOption = await this.query('capacity', 'capacityLedger', providerU64);
       const { remainingCapacity, totalCapacityIssued } = capacityDetailsOption.unwrapOr({ remainingCapacity: 0, totalCapacityIssued: 0 });
       const currentBlock: u32 = await this.query('system', 'number');
       const currentEpoch = await this.getCurrentCapacityEpoch();
       return {
         currentEpoch,
         providerId,
-        currentBlockNumber: currentBlock.toNumber(),
+        currentBlockNumber: currentBlock.toPrimitive() as number,
         nextEpochStart: epochStart.add(epochBlockLength).toNumber(),
         remainingCapacity: typeof remainingCapacity === 'number' ? BigInt(remainingCapacity) : remainingCapacity.toBigInt(),
         totalCapacityIssued: typeof totalCapacityIssued === 'number' ? BigInt(totalCapacityIssued) : totalCapacityIssued.toBigInt(),
@@ -144,12 +144,12 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
 
   public async getCurrentCapacityEpoch(): Promise<number> {
     const currentEpoch: u32 = await this.query('capacity', 'currentEpoch');
-    return currentEpoch.toNumber();
+    return currentEpoch.toPrimitive() as number;
   }
 
   public async getCurrentEpochLength(): Promise<number> {
     const epochLength: u32 = await this.query('capacity', 'epochLength');
-    return typeof epochLength === 'number' ? epochLength : epochLength.toNumber();
+    return typeof epochLength === 'number' ? epochLength : epochLength.toPrimitive() as number;
   }
 
   public async getNonce(account: Uint8Array): Promise<Index> {

@@ -13,7 +13,7 @@ services:
       - redis_data:/data
 
   frequency:
-    image: dsnp/instant-seal-node-with-deployed-schemas:latest
+    image: frequencychain/standalone-node:latest
     # We need to specify the platform because it's the only image
     # built by Frequency at the moment, and auto-pull won't work otherwise
     platform: linux/amd64

@@ -304,7 +304,7 @@ export class ReconnectionGraphService {
   ): Promise<ConnectAction[]> {
     const dsnpKeys: DsnpKeys = await this.formDsnpKeys(dsnpUserId);
     const actions: ConnectAction[] = [];
-    const delegationResult: Option<Vec<SchemaGrantResponse>> = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
+    const delegationResult = await this.blockchainService.rpc('msa', 'grantedSchemaIdsByMsaId', dsnpUserId, providerId);
     if (delegationResult.isNone) {
       this.logger.log(`User ${dsnpUserId} has no delegations to provider ${providerId}`);
       return actions;
