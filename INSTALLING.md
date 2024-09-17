@@ -10,6 +10,7 @@ The application requires a Redis server that is configured with `Append-only fil
 ### Standalone (complete) image
 
 The standalone container image is meant to be a complete solution for a provider. It contains a single instance of the main application, plus a pre-configured Redis server. Simply download the latest [container image](https://hub.docker.com/r/amplicalabs/reconnection-service/) and deploy using your favorite container management system.
+
 ```
     docker pull amplicalabs/reconnection-service:standalone-latest
 ```
@@ -23,10 +24,13 @@ Follow the instructions below for [configuration](#configuration), with the exce
 ### App-only image
 
 The app-only image is meant to be used for providers who would rather utilize a Redis instance in their own (or their cloud infrastructure provider's) external Redis instance or service. To download the latest [container image](https://hub.docker.com/r/amplicalabs/reconnection-service/), simply:
+
 ```
     docker pull amplicalabs/reconnection-service:apponly-latest
 ```
+
 In this case, you need to ensure that the following settings are configured in your Redis instance:
+
 ```
 appendonly true
 dir <base directory for Redis storage>
@@ -38,16 +42,19 @@ You must also minimally map `appendonlydir` (or the entire `dir`) to a persisten
 ## Building and Deploying the Application
 
 If you choose to build & deploy the application yourself, simply install the prerequisites:
+
 * NodeJS 18
 
-Note that, at present, due to limitaions in the `@dsnp/graph-sdk` module, the applcation can only be run on a `linux/amd64` platform. Support for other platforms is contingent on building & installing the `@dsnp/graph-sdk` module from source, which is outside the scope of this document.
+Note that, at present, due to limitaions in the `@projectlibertylabs/graph-sdk` module, the applcation can only be run on a `linux/amd64` platform. Support for other platforms is contingent on building & installing the `@projectlibertylabs/graph-sdk` module from source, which is outside the scope of this document.
 
 To build the application:
+
 ```
     npm run build
 ```
 
 To run the application:
+
 ```
     npm start
 ```

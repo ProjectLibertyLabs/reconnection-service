@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: 'env.template', override: true });
 import { describe, beforeAll, it, expect } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
-import { Action, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyPair, GraphKeyType, ImportBundle, KeyData, PageData, PrivacyType } from '@dsnp/graph-sdk';
+import { Action, ConnectAction, Connection, ConnectionType, DsnpKeys, GraphKeyPair, GraphKeyType, ImportBundle, KeyData, PageData, PrivacyType } from '@projectlibertylabs/graph-sdk';
 import { ConfigModule } from '@nestjs/config';
 import { GraphStateManager } from './graph-state-manager';
 import { ConfigService } from '../config/config.service';

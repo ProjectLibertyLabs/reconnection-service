@@ -7,7 +7,7 @@ https://docs.nestjs.com/providers#services
 import '@frequency-chain/api-augment';
 
 import { ICapacityLimits } from '#app/interfaces/capacity-limit.interface';
-import type { EnvironmentType } from '@dsnp/graph-sdk';
+import type { EnvironmentType } from '@projectlibertylabs/graph-sdk';
 import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
 

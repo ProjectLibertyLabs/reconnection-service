@@ -24,7 +24,7 @@ import { SubmittableExtrinsic } from '@polkadot/api-base/types';
 import { ISubmittableResult } from '@polkadot/types/types';
 import { FrameSystemEventRecord } from '@polkadot/types/lookup';
 import { hexToU8a, u8aToHex } from '@polkadot/util';
-import { AddGraphKeyAction, AddKeyUpdate, ConnectionType, EnvironmentInterface, EnvironmentType, Graph, PrivacyType } from '@dsnp/graph-sdk';
+import { AddGraphKeyAction, AddKeyUpdate, ConnectionType, EnvironmentInterface, EnvironmentType, Graph, PrivacyType } from '@projectlibertylabs/graph-sdk';
 import { HexString } from '@polkadot/util/types';
 
 const PROVIDER_ACCOUNT_SEED_PHRASE = 'come finish flower cinnamon blame year glad tank domain hunt release fatigue';
