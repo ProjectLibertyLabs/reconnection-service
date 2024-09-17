@@ -1,20 +1,33 @@
 {
     "dsnpId": "2",
     "connections": {
-        "data": [
-            {
-                "dsnpId": "12",
-                "privacyType": "Private",
-                "direction": "connectionTo",
-                "connectionType": "Follow"
-            }
-        ]
-    },
-    "graphKeyPairs": [
+      "data": [
         {
-            "keyType": "X25519",
-            "publicKey": "0x0514f63edc89d414061bf451cc99b1f2b43fac920c351be60774559a31523c75",
-            "privateKey": "0x1c15b6d1af4716615a4eb83a2dfba3284e1c0a199603572e7b95c164f7ad90e3"
+          "dsnpId": "3",
+          "privacyType": "Public",
+          "direction": "connectionTo",
+          "connectionType": "Follow"
+        },
+        {
+          "dsnpId": "4",
+          "privacyType": "Public",
+          "direction": "connectionTo",
+          "connectionType": "Follow"
+        },
+        {
+          "dsnpId": "5",
+          "privacyType": "Public",
+          "direction": "connectionTo",
+          "connectionType": "Follow"
+        },
+        {
+          "dsnpId": "6",
+          "privacyType": "Public",
+          "direction": "connectionTo",
+          "connectionType": "Follow"
         }
-    ]
-}
+      ]
+    },
+
+    "graphKeyPairs": []
+  }
