@@ -1,5 +1,5 @@
 import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
-import { Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, Config, EnvironmentType, DsnpKeys, DsnpPublicKey, ConnectionType, PrivacyType } from '@dsnp/graph-sdk';
+import { Graph, EnvironmentInterface, GraphKeyPair, GraphKeyType, Config, EnvironmentType, DsnpKeys, DsnpPublicKey, ConnectionType, PrivacyType } from '@projectlibertylabs/graph-sdk';
 import { ConfigService } from '../config/config.service';
 
 @Injectable()

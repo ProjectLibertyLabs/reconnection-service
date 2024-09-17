@@ -3,7 +3,7 @@
 import { AxiosError, AxiosResponse } from 'axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { ItemizedStoragePageResponse, MessageSourceId, PaginatedStorageResponse, ProviderId, SchemaGrantResponse } from '@frequency-chain/api-augment/interfaces';
-import { ImportBundleBuilder, ConnectAction, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, GraphKeyPair, Graph } from '@dsnp/graph-sdk';
+import { ImportBundleBuilder, ConnectAction, ConnectionType, DsnpKeys, GraphKeyType, ImportBundle, KeyData, PrivacyType, GraphKeyPair, Graph } from '@projectlibertylabs/graph-sdk';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
