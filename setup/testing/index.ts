@@ -16,7 +16,7 @@ import {
   Sr25519Signature,
   ItemizedSignaturePayload,
   EventError,
-} from '@amplica-labs/frequency-scenario-template';
+} from '@projectlibertylabs/frequency-scenario-template';
 import log from 'loglevel';
 import { ProviderGraph, GraphKeyPair as ProviderGraphKeyPair } from 'reconnection-service/src/interfaces/provider-graph.interface';
 import fs from 'node:fs';
