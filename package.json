@@ -37,7 +37,7 @@
   "homepage": "https://github.com/ProjectLibertyLabs/reconnection-service#readme",
   "dependencies": {
     "@bull-board/api": "^5.17.0",
-    "@bull-board/express": "^5.17.0",
+    "@bull-board/express": "^5.23.0",
     "@bull-board/nestjs": "^5.17.0",
     "@bull-board/ui": "^5.17.0",
     "@projectlibertylabs/graph-sdk": "^2.0.1",
