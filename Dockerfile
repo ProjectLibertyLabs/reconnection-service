@@ -14,7 +14,7 @@ FROM build as app-only
 
 EXPOSE 3000
 
-ENTRYPOINT npm start
+ENTRYPOINT npm run start:api:prod
 
 FROM build as standalone
 
@@ -29,4 +29,4 @@ ENV REDIS_URL=redis://localhost:6379
 VOLUME [ "/var/lib/redis" ]
 
 # Start the application
-ENTRYPOINT service redis-server start && npm start
+ENTRYPOINT service redis-server start && npm run start:api:prod

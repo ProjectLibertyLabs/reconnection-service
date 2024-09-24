@@ -10,7 +10,7 @@
     "format": "prettier --write \"apps/**/*.ts\" \"libs/**/*.ts\"",
     "start:api": "nest start",
     "start:api:watch": "nest start --watch",
-    "start:api:prod": "node dist/main.js",
+    "start:api:prod": "node dist/src/main.js",
     "start:api:dev": "set -a ; . .env ; nest start",
     "start:api:debug": "set -a ; . .env ; nest start --debug --watch",
     "docker-build": "docker build -t reconnection-service .",
