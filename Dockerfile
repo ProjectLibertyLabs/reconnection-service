@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 node:20 as build
+FROM node:20 AS build
 
 # TODO: The deployment docker image should install the reconnection
 #       service from NPM rather than building from source
@@ -10,13 +10,13 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM build as app-only
+FROM build AS app-only
 
 EXPOSE 3000
 
-ENTRYPOINT npm start
+ENTRYPOINT npm run start:api:prod
 
-FROM build as standalone
+FROM build AS standalone
 
 # Install Redis on top of the base image
 RUN apt-get -y update
@@ -29,4 +29,4 @@ ENV REDIS_URL=redis://localhost:6379
 VOLUME [ "/var/lib/redis" ]
 
 # Start the application
-ENTRYPOINT service redis-server start && npm start
+ENTRYPOINT service redis-server start && npm run start:api:prod
