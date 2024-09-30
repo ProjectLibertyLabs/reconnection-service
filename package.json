@@ -41,7 +41,7 @@
     "@bull-board/nestjs": "^5.17.0",
     "@bull-board/ui": "^5.17.0",
     "@projectlibertylabs/graph-sdk": "^2.0.1",
-    "@frequency-chain/api-augment": "1.13.1",
+    "@frequency-chain/api-augment": "1.13.2",
     "@nestjs/axios": "^3.0.2",
     "@nestjs/bullmq": "^10.1.1",
     "@nestjs/common": "^10.3.8",
