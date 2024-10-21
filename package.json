@@ -50,7 +50,7 @@
     "@nestjs/event-emitter": "^2.0.4",
     "@nestjs/platform-express": "^10.3.8",
     "@nestjs/schedule": "^4.0.2",
-    "@nestjs/testing": "^10.3.8",
+    "@nestjs/testing": "^10.4.5",
     "@nestjs/typeorm": "^10.0.2",
     "@polkadot/api": "^13.0.1",
     "@polkadot/api-base": "^13.0.1",
