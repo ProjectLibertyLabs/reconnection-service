@@ -8,3 +8,4 @@ coverage
 webhook-specification/mock-webhook-server/responses
 docs/*.html
 *.bkp
+/.idea/

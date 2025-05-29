@@ -8,7 +8,7 @@ import { BlockHash, BlockNumber, Index, SignedBlock } from '@polkadot/types/inte
 import { SubmittableExtrinsic } from '@polkadot/api/types';
 import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
 import { u32, Option } from '@polkadot/types';
-import { PalletCapacityCapacityDetails, PalletCapacityEpochInfo } from '@polkadot/types/lookup';
+import { PalletCapacityEpochInfo } from '@polkadot/types/lookup';
 import { HexString } from '@polkadot/util/types';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
