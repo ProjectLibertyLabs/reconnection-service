@@ -25,6 +25,7 @@ import { ProviderWebhookService } from './provider-webhook.service';
 
 import * as errors from './errors';
 import { NonceService } from './nonce.service';
+import { getKeyringPairFromSecp256k1PrivateKey } from '@frequency-chain/ethereum-utils';
 
 @Injectable()
 export class ReconnectionGraphService {
@@ -45,6 +46,14 @@ export class ReconnectionGraphService {
 
   public get capacityBatchLimit(): number {
     return this.blockchainService.api.consts.frequencyTxPayment.maximumCapacityBatchLength.toNumber();
+  }
+
+  get preferredProviderKeys(): KeyringPair {
+    const ethereumKeySecret = this.configService.getEthereumProviderAccountPrivateKey();
+    if (ethereumKeySecret?.length) {
+      return getKeyringPairFromSecp256k1PrivateKey(hexToU8a(ethereumKeySecret));
+    }
+    return createKeys(this.configService.getProviderAccountSeedPhrase());
   }
 
   public async updateUserGraph(jobId: string, dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<boolean> {
@@ -92,7 +101,7 @@ export class ReconnectionGraphService {
       );
       const exportedUpdates = graphState.exportUserGraphUpdates(dsnpUserId.toString());
 
-      const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
+      const providerKeys = this.preferredProviderKeys;
       let batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
       // eslint-disable-next-line no-restricted-syntax
       for (const bundle of exportedUpdates) {

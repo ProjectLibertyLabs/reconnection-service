@@ -44,6 +44,7 @@ describe('ReconnectionConfigService', () => {
     BLOCKCHAIN_SCAN_INTERVAL_MINUTES: undefined,
     QUEUE_HIGH_WATER: undefined,
     PROVIDER_ACCOUNT_SEED_PHRASE: undefined,
+    ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY: undefined,
     WEBHOOK_FAILURE_THRESHOLD: undefined,
     HEALTH_CHECK_SUCCESS_THRESHOLD: undefined,
     WEBHOOK_RETRY_INTERVAL_SECONDS: undefined,
@@ -142,6 +143,11 @@ describe('ReconnectionConfigService', () => {
     it('invalid provider account seed phrase should fail', async () => {
       const { PROVIDER_ACCOUNT_SEED_PHRASE: dummy, ...env } = ALL_ENV;
       await expect(setupConfigService({ PROVIDER_ACCOUNT_SEED_PHRASE: 'hello, world', ...env })).rejects.toBeDefined();
+    });
+
+    it('invalid ethereum provider private key should fail', async () => {
+      const { ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY: dummy, ...env } = ALL_ENV;
+      await expect(setupConfigService({ ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY: 'hello, world', ...env })).rejects.toBeDefined();
     });
 
     it('invalid webhook failure threshold should fail', async () => {
@@ -266,6 +272,10 @@ describe('ReconnectionConfigService', () => {
 
     it('should get provider seed phrase', () => {
       expect(reconnectionConfigService.getProviderAccountSeedPhrase()).toStrictEqual(ALL_ENV.PROVIDER_ACCOUNT_SEED_PHRASE);
+    });
+
+    it('should get ethereum provider private key', () => {
+      expect(reconnectionConfigService.getEthereumProviderAccountPrivateKey()).toStrictEqual(ALL_ENV.ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY);
     });
 
     it('should get graph environment type', () => {

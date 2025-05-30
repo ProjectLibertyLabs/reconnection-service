@@ -54,6 +54,9 @@ export const configModuleOptions: ConfigModuleOptions = {
         }
         return value;
       }),
+    ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY: Joi.string()
+      .pattern(/^0[xX]([0-9a-fA-F]{2})+$/)
+      .message('Not a valid hex'),
     WEBHOOK_FAILURE_THRESHOLD: Joi.number().min(1).default(3),
     WEBHOOK_RETRY_INTERVAL_SECONDS: Joi.number().min(1).default(10),
     HEALTH_CHECK_SUCCESS_THRESHOLD: Joi.number().min(1).default(10),
