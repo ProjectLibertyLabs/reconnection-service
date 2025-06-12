@@ -13,7 +13,7 @@ services:
       - redis_data:/data
 
   frequency:
-    image: frequencychain/standalone-node:v1.17.0-rc4
+    image: frequencychain/standalone-node:v1.17.0-rc5
     # We need to specify the platform because it's the only image
     # built by Frequency at the moment, and auto-pull won't work otherwise
     platform: linux/amd64

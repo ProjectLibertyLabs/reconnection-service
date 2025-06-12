@@ -41,7 +41,7 @@
     "@bull-board/nestjs": "^6.9.6",
     "@bull-board/ui": "^6.9.6",
     "@frequency-chain/api-augment": "1.16.2",
-    "@frequency-chain/ethereum-utils": "1.17.0-rc4",
+    "@frequency-chain/ethereum-utils": "1.17.0-rc5",
     "@nestjs/axios": "^3.0.2",
     "@nestjs/bullmq": "^10.1.1",
     "@nestjs/common": "^10.3.8",
