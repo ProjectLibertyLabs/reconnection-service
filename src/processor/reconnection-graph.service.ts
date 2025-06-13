@@ -48,14 +48,6 @@ export class ReconnectionGraphService {
     return this.blockchainService.api.consts.frequencyTxPayment.maximumCapacityBatchLength.toNumber();
   }
 
-  get preferredProviderKeys(): KeyringPair {
-    const ethereumKeySecret = this.configService.getEthereumProviderAccountPrivateKey();
-    if (ethereumKeySecret?.length) {
-      return getKeyringPairFromSecp256k1PrivateKey(hexToU8a(ethereumKeySecret));
-    }
-    return createKeys(this.configService.getProviderAccountSeedPhrase());
-  }
-
   public async updateUserGraph(jobId: string, dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<boolean> {
     let doTrack = false;
     this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
@@ -101,7 +93,7 @@ export class ReconnectionGraphService {
       );
       const exportedUpdates = graphState.exportUserGraphUpdates(dsnpUserId.toString());
 
-      const providerKeys = this.preferredProviderKeys;
+      const providerKeys = this.configService.getPreferredProviderKeyringPair();
       let batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
       // eslint-disable-next-line no-restricted-syntax
       for (const bundle of exportedUpdates) {

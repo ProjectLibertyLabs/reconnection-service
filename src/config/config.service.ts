@@ -10,6 +10,10 @@ import { ICapacityLimits } from '#app/interfaces/capacity-limit.interface';
 import type { EnvironmentType } from '@projectlibertylabs/graph-sdk';
 import { Injectable } from '@nestjs/common';
 import { ConfigService as NestConfigService } from '@nestjs/config';
+import { getKeyringPairFromSecp256k1PrivateKey, getUnifiedPublicKey } from '@frequency-chain/ethereum-utils';
+import { hexToU8a } from '@polkadot/util';
+import { createKeys } from '#app/blockchain/create-keys';
+import { KeyringPair } from "@polkadot/keyring/types";
 
 export interface ConfigEnvironmentVariables {
   API_PORT: number;
@@ -130,5 +134,17 @@ export class ConfigService {
 
   public getPageSize(): number {
     return this.nestConfigService.get<number>('CONNECTIONS_PER_PROVIDER_RESPONSE_PAGE')!;
+  }
+
+  // tries to use the ethereum key first and uses the legacy account as a backup
+  public getPreferredProviderKeyringPair(): KeyringPair {
+    if (this.getEthereumProviderAccountPrivateKey()?.length) {
+      return getKeyringPairFromSecp256k1PrivateKey(hexToU8a(this.getEthereumProviderAccountPrivateKey()));
+    }
+    return createKeys(this.getProviderAccountSeedPhrase());
+  }
+
+  public getPreferredProviderAccountId(): Uint8Array {
+      return getUnifiedPublicKey(this.getPreferredProviderKeyringPair());
   }
 }

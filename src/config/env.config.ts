@@ -44,7 +44,6 @@ export const configModuleOptions: ConfigModuleOptions = {
       .default(3 * 60),
     QUEUE_HIGH_WATER: Joi.number().min(100).default(1000),
     PROVIDER_ACCOUNT_SEED_PHRASE: Joi.string()
-      .required()
       .custom((value: string, helpers) => {
         if (process.env?.ENVIRONMENT === 'dev' && devUriRegEx.test(value)) {
           return value;
@@ -95,5 +94,7 @@ export const configModuleOptions: ConfigModuleOptions = {
       .required(),
     FREQUENCY_TX_TIMEOUT_SECONDS: Joi.number().min(12).default(60),
     CONNECTIONS_PER_PROVIDER_RESPONSE_PAGE: Joi.number().min(1).default(100),
-  }),
+  })
+      // make these two fields mutually exclusive using
+      .xor('PROVIDER_ACCOUNT_SEED_PHRASE', 'ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY'),
 };
