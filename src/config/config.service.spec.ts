@@ -135,6 +135,16 @@ describe('ReconnectionConfigService', () => {
       await expect(setupConfigService({ QUEUE_HIGH_WATER: 'foo', ...env })).rejects.toBeDefined();
     });
 
+    it('having none account seed and ethereum private key should fail', async () => {
+      const { PROVIDER_ACCOUNT_SEED_PHRASE: dummy,ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY: dummy2, ...env } = ALL_ENV;
+      await expect(setupConfigService({ PROVIDER_ACCOUNT_SEED_PHRASE: undefined, ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY: undefined, ...env })).rejects.toBeDefined();
+    });
+
+    it('having both of account seed and ethereum private key should fail', async () => {
+      const { PROVIDER_ACCOUNT_SEED_PHRASE: dummy,ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY: dummy2 , ...env } = ALL_ENV;
+      await expect(setupConfigService({ PROVIDER_ACCOUNT_SEED_PHRASE: "hello world", ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY: '0x1234567890', ...env })).rejects.toBeDefined();
+    });
+
     it('invalid provider account seed phrase should fail', async () => {
       const { PROVIDER_ACCOUNT_SEED_PHRASE: dummy, ...env } = ALL_ENV;
       await expect(setupConfigService({ PROVIDER_ACCOUNT_SEED_PHRASE: 'hello, world', ...env })).rejects.toBeDefined();
