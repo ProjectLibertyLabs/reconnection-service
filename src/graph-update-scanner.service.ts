@@ -71,14 +71,12 @@ export class GraphUpdateScannerService extends BlockchainScannerService implemen
 
   protected async processCurrentBlock(currentBlockHash: BlockHash, currentBlockNumber: number): Promise<void> {
     const events = (await this.blockchainService.queryAt(currentBlockHash, 'system', 'events')).toArray();
-    const filteredEvents = events.filter(
-      ({ event }) => {
-        if (this.blockchainService.api.events.msa.DelegationGranted.is(event)) {
-          const [providerId] = event.data;
-          return providerId.eq(this.configService.getProviderId());
-        }
-      },
-    );
+    const filteredEvents = events.filter(({ event }) => {
+      if (this.blockchainService.api.events.msa.DelegationGranted.is(event)) {
+        const [providerId] = event.data;
+        return providerId.eq(this.configService.getProviderId());
+      }
+    });
     if (filteredEvents.length > 0) {
       this.logger.debug(`Found ${filteredEvents.length} delegations at block #${currentBlockNumber}`);
     }

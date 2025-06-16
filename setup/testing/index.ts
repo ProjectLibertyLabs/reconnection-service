@@ -5,30 +5,53 @@ import '@frequency-chain/api-augment';
 import { MessageSourceId } from '@frequency-chain/api-augment/interfaces';
 import { Keyring } from '@polkadot/keyring';
 import { KeyringPair } from '@polkadot/keyring/types';
-import { Vec } from '@polkadot/types';
-import { cryptoWaitReady } from '@polkadot/util-crypto';
+import { u64, Vec } from '@polkadot/types';
+import { cryptoWaitReady, secp256k1PairFromSeed } from '@polkadot/util-crypto';
 import {
   AddProviderPayload,
-  ExtrinsicHelper,
-  UserBuilder,
-  signPayloadSr25519,
-  initialize,
-  Sr25519Signature,
-  ItemizedSignaturePayload,
   EventError,
+  ExtrinsicHelper,
+  initialize,
+  ItemizedSignaturePayload,
+  signPayloadSr25519,
+  Sr25519Signature,
+  UserBuilder,
 } from '@projectlibertylabs/frequency-scenario-template';
 import log from 'loglevel';
-import { ProviderGraph, GraphKeyPair as ProviderGraphKeyPair } from 'reconnection-service/src/interfaces/provider-graph.interface';
+import {
+  GraphKeyPair as ProviderGraphKeyPair,
+  ProviderGraph
+} from 'reconnection-service/src/interfaces/provider-graph.interface';
 import fs from 'node:fs';
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
 import { ISubmittableResult } from '@polkadot/types/types';
 import { FrameSystemEventRecord } from '@polkadot/types/lookup';
 import { hexToU8a, u8aToHex } from '@polkadot/util';
-import { AddGraphKeyAction, AddKeyUpdate, ConnectionType, EnvironmentInterface, EnvironmentType, Graph, PrivacyType } from '@projectlibertylabs/graph-sdk';
-import { HexString } from '@polkadot/util/types';
+import {
+  AddGraphKeyAction,
+  AddKeyUpdate,
+  ConnectionType,
+  EnvironmentInterface,
+  EnvironmentType,
+  Graph,
+  PrivacyType
+} from '@projectlibertylabs/graph-sdk';
+import {HexString} from '@polkadot/util/types';
+import {
+  createAddProvider,
+  createItemizedAddAction,
+  createItemizedSignaturePayloadV2,
+  getUnifiedAddress,
+  getUnifiedPublicKey,
+  signEip712,
+  getEthereumRegularSigner, getKeyringPairFromSecp256k1PrivateKey,
+} from '@frequency-chain/ethereum-utils';
+import {Keypair} from "@polkadot/util-crypto/types";
+import {keccak256} from '@polkadot/wasm-crypto';
+import {filter, firstValueFrom, map, tap} from "rxjs";
 
 const PROVIDER_ACCOUNT_SEED_PHRASE = 'come finish flower cinnamon blame year glad tank domain hunt release fatigue';
-
+const ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY = '0x5fb92d6e98884f76de468fa3f6278f8807c48bebc13595d45af5bdc4da702133';
 type ChainUser = {
   uri?: string;
   keys?: KeyringPair;
@@ -37,6 +60,11 @@ type ChainUser = {
   addGraphKey?: () => SubmittableExtrinsic<'promise', ISubmittableResult>;
   resetGraph?: (() => SubmittableExtrinsic<'promise', ISubmittableResult>)[];
 };
+const ethereumKeys = new Map<string, Keypair>();
+
+export interface EcdsaSignature {
+  Ecdsa: HexString;
+}
 
 type ProviderResponse = {
   dsnpId: string;
@@ -57,12 +85,14 @@ let privateFollowSchemaId: number;
 const CAPACITY_AMOUNT_TO_STAKE = 1_000_000_000_000_000n;
 
 const keyring = new Keyring({ type: 'sr25519' });
+const ethereumKeyring = new Keyring({ type: 'ethereum' });
 const DEFAULT_SCHEMAS = [5, 7, 8, 9, 10];
 let nonce: number;
 let graph: Graph;
 
 let graphKeyAction: any;
-async function getAddGraphKeyPayload(graph: Graph, user: ChainUser): Promise<{ payload: ItemizedSignaturePayload; proof: Sr25519Signature }> {
+let graphKeyActionBundle: AddKeyUpdate;
+async function getAddGraphKeyPayload(graph: Graph, user: ChainUser): Promise<{ payload: ItemizedSignaturePayload; proof: Sr25519Signature | EcdsaSignature }> {
   if (!graphKeyAction) {
     const actions = [
       {
@@ -75,6 +105,7 @@ async function getAddGraphKeyPayload(graph: Graph, user: ChainUser): Promise<{ p
     const keyExport = graph.exportUserGraphUpdates('1');
 
     const bundle = keyExport[0] as AddKeyUpdate;
+    graphKeyActionBundle = bundle;
 
     const addAction = [
       {
@@ -92,12 +123,21 @@ async function getAddGraphKeyPayload(graph: Graph, user: ChainUser): Promise<{ p
 
   const currentBlockNumber = (await ExtrinsicHelper.apiPromise.rpc.chain.getBlock()).block.header.number.toNumber();
   graphKeyAction.expiration = currentBlockNumber + ExtrinsicHelper.apiPromise.consts.msa.mortalityWindowSize.toNumber();
-  const payloadBytes = ExtrinsicHelper.api.registry.createType('PalletStatefulStorageItemizedSignaturePayloadV2', graphKeyAction);
-  const proof = signPayloadSr25519(user.keys!, payloadBytes);
+  let proof;
+  if (user.keys!.type !== 'ethereum') {
+    const payloadBytes = ExtrinsicHelper.api.registry.createType('PalletStatefulStorageItemizedSignaturePayloadV2', graphKeyAction);
+    proof = signPayloadSr25519(user.keys!, payloadBytes);
+  } else {
+    const ethPayload = createItemizedSignaturePayloadV2(graphKeyAction.schemaId, 0, graphKeyAction.expiration, [createItemizedAddAction(graphKeyActionBundle.payload)]);
+    proof = await signEip712(
+        u8aToHex(getEthereumKeyPairFromUnifiedAddress(getUnifiedAddress(user.keys!)).secretKey),
+        ethPayload
+    );
+  }
   return { payload: { ...graphKeyAction }, proof };
 }
 
-async function getAddProviderPayload(user: ChainUser, provider: ChainUser): Promise<{ payload: AddProviderPayload; proof: Sr25519Signature }> {
+async function getAddProviderPayload(user: ChainUser, provider: ChainUser): Promise<{ payload: AddProviderPayload; proof: Sr25519Signature | EcdsaSignature }> {
   const block = await ExtrinsicHelper.apiPromise.rpc.chain.getBlock();
   const blockNumber = block.block.header.number.toNumber();
   const mortalityWindowSize = ExtrinsicHelper.apiPromise.consts.msa.mortalityWindowSize.toNumber();
@@ -106,10 +146,44 @@ async function getAddProviderPayload(user: ChainUser, provider: ChainUser): Prom
     schemaIds: DEFAULT_SCHEMAS,
     expiration: blockNumber + mortalityWindowSize,
   };
-  const payload = ExtrinsicHelper.apiPromise.registry.createType('PalletMsaAddProvider', addProvider);
-  const proof = signPayloadSr25519(user.keys!, payload);
+  let proof;
+  if (user.keys!.type !== 'ethereum') {
+    const payload = ExtrinsicHelper.apiPromise.registry.createType('PalletMsaAddProvider', addProvider);
+    proof = signPayloadSr25519(user.keys!, payload);
+  } else {
+    const ethPayload= createAddProvider(addProvider.authorizedMsaId.toString(), DEFAULT_SCHEMAS, addProvider.expiration);
+    console.log(user.uri);
+    proof = await signEip712(
+        u8aToHex(getEthereumKeyPairFromUnifiedAddress(getUnifiedAddress(user.keys!)).secretKey),
+        ethPayload
+    );
+  }
 
   return { payload: addProvider, proof };
+}
+
+async function createEthereumProvider(providerUser :ChainUser, fundingSource: ChainUser, providerName: string): Promise<number> {
+    const { apiPromise } = ExtrinsicHelper;
+    const fundingLevel = 1_000_000_000n;
+    const unifiedAddress = getUnifiedAddress(providerUser.keys!);
+    await ExtrinsicHelper.transferFunds(fundingSource.keys, providerUser.keys!, fundingLevel).signAndSend();
+    await firstValueFrom(ExtrinsicHelper.api.tx.msa.create().signAndSend(unifiedAddress, { signer: getEthereumRegularSigner(providerUser.keys!)}));
+    let nonce = (await apiPromise.query.system.account(unifiedAddress)).nonce.toNumber() + 1;
+    let providerId;
+    await firstValueFrom( ExtrinsicHelper.api.tx.msa.createProvider(providerName)
+        .signAndSend(unifiedAddress, {nonce,  signer: getEthereumRegularSigner(providerUser.keys!)}).pipe(
+            filter(({ status }) => (status.isInBlock) || status.isFinalized),
+            tap((result: ISubmittableResult) => {
+              const providerEvent = result.events.find((e) => e.event.method === "ProviderCreated");
+              providerId = providerEvent.event.data[0].toPrimitive();
+            }),
+        )
+    );
+    return providerId;
+}
+
+function getEthereumKeyPairFromUnifiedAddress(unifiedAddress: string): Keypair {
+  return ethereumKeys.get(unifiedAddress) as Keypair;
 }
 
 async function populateExtrinsics(follower: ChainUser, provider: ChainUser): Promise<void> {
@@ -132,30 +206,41 @@ async function populateExtrinsics(follower: ChainUser, provider: ChainUser): Pro
     return;
   }
   const { payload: addProviderPayload, proof } = await getAddProviderPayload(follower, provider);
-  follower.create = () => ExtrinsicHelper.apiPromise.tx.msa.createSponsoredAccountWithDelegation(follower.keys!.publicKey, proof, addProviderPayload);
+  follower.create = () => ExtrinsicHelper.apiPromise.tx.msa.createSponsoredAccountWithDelegation(getUnifiedPublicKey(follower.keys!), proof, addProviderPayload);
 
   const { payload: addGraphKeyPayload, proof: addGraphKeyProof } = await getAddGraphKeyPayload(graph, follower);
-  follower.addGraphKey = () => ExtrinsicHelper.apiPromise.tx.statefulStorage.applyItemActionsWithSignatureV2(follower.keys!.publicKey, addGraphKeyProof, addGraphKeyPayload);
+  follower.addGraphKey = () => ExtrinsicHelper.apiPromise.tx.statefulStorage.applyItemActionsWithSignatureV2(getUnifiedPublicKey(follower.keys!), addGraphKeyProof, addGraphKeyPayload);
 }
 
 async function main() {
   await cryptoWaitReady();
+  // if you want to use legacy (sr25519) provider set the following to false
+  const useEthereumProvider = true;
   console.log('Connecting...');
   await initialize('ws://127.0.0.1:9944');
   log.setLevel('trace');
   const { apiPromise } = ExtrinsicHelper;
 
   const fundingSource: ChainUser = { keys: keyring.createFromUri('//Alice') };
-  const provider: ChainUser = { keys: keyring.createFromUri(PROVIDER_ACCOUNT_SEED_PHRASE) };
   const famousUser: ChainUser = { uri: '//Bob', keys: keyring.createFromUri('//Bob') };
   const followers = new Map<string, ChainUser>();
 
   // Create provider
-  console.log('Creating provider...');
-  const builder = new UserBuilder();
-  const providerUser = await builder.withKeypair(provider.keys!).asProvider('Reconn Provider').withFundingSource(fundingSource.keys).build();
-  provider.msaId = providerUser.msaId;
-  console.log(`Created provider ${provider.msaId!.toString()}`);
+  let provider: ChainUser;
+  if (useEthereumProvider) {
+    console.log('Creating ethereum provider...');
+    provider = { keys: getKeyringPairFromSecp256k1PrivateKey(hexToU8a(ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY))};
+    provider.msaId = await createEthereumProvider(provider, fundingSource, "ethProvider") as MessageSourceId;
+    console.log(`Created ethererum provider ${provider.msaId!.toString()}`);
+  } else {
+    console.log('Creating provider...');
+    provider = { keys: keyring.createFromUri(PROVIDER_ACCOUNT_SEED_PHRASE) };
+    const builder = new UserBuilder();
+    const providerUser = await builder.withKeypair(provider.keys!).asProvider('Reconn Provider').withFundingSource(fundingSource.keys).build();
+    provider.msaId = providerUser.msaId;
+    console.log(`Created provider ${provider.msaId!.toString()}`);
+  }
+
 
   // Ensure provider is staked
   const capacity = await ExtrinsicHelper.apiPromise.query.capacity.capacityLedger(provider.msaId);
@@ -166,9 +251,15 @@ async function main() {
 
   // Create all keypairs
   console.log('Creating keypairs...');
-  new Array(7000).fill(0).forEach((_, index) => {
-    const keys = keyring.createFromUri(`//Charlie//${index}`);
-    followers.set(keys.address, { uri: `//Charlie//${index}`, keys, resetGraph: [] });
+  new Array(100).fill(0).forEach((_, index) => {
+    // legacy Sr25519 key creation
+    // const keys = keyring.createFromUri(`//Charlie//${index}`);
+    // followers.set(keys.address, { uri: `//Charlie//${index}`, keys, resetGraph: [] });
+
+    const keypair = secp256k1PairFromSeed(keccak256(Buffer.from(`//Charlie//${index}`, 'utf8')));
+    const keys = ethereumKeyring.addFromPair(keypair, {}, 'ethereum');
+    ethereumKeys.set(getUnifiedAddress(keys), keypair);
+    followers.set(getUnifiedAddress(keys), { uri: `//Charlie//${index}`, keys, resetGraph: [] });
   });
   const followerAddresses = [...followers.keys()];
   console.log('Created keypairs');
@@ -186,7 +277,7 @@ async function main() {
       followers.get(address)!.msaId = allMsas[index].unwrap();
     }
   });
-  const famouseMsa = await ExtrinsicHelper.apiPromise.query.msa.publicKeyToMsaId(famousUser.keys!.address);
+  const famouseMsa = await ExtrinsicHelper.apiPromise.query.msa.publicKeyToMsaId(getUnifiedAddress(famousUser.keys!));
   if (famouseMsa.isSome) {
     famousUser.msaId = famouseMsa.unwrap();
     console.log(`Found famous user ${famousUser.msaId.toString()}`);
@@ -273,7 +364,7 @@ User graphs to clear: ${graphsToClear}
           if (follower) {
             follower.msaId = msaId;
             followers.set(address, follower);
-          } else if (address === famousUser.keys!.address) {
+          } else if (address === getUnifiedAddress(famousUser.keys!)) {
             famousUser.msaId = msaId;
             famousUserCreatedBlockHash = events.createdAtHash?.toHex();
           } else {
@@ -291,7 +382,7 @@ User graphs to clear: ${graphsToClear}
       }
     });
 
-    nonce = (await apiPromise.query.system.account(provider.keys!.publicKey)).nonce.toNumber();
+    nonce = (await apiPromise.query.system.account(getUnifiedPublicKey(provider.keys!))).nonce.toNumber();
 
     while (extrinsics.length > 0) {
       if (allBatchesTracker.numberPending < 100) {

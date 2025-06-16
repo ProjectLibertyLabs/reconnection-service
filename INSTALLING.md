@@ -65,14 +65,15 @@ For the application to start & run correctly, it is necessary to configure the e
 
 The following is a list of environment variables that may be set to control the application's behavior and environment. The complete list can always be referenced [here](./env.template)
 
-|Variable|required?|Description|Default|
-|-|-|-|-|
-|`FREQUENCY_URL`|**yes**|Blockchain URL|_none_|
-|`PROVIDER_ID`|**yes**|MSA ID of provider|_none_|
-|`PROVIDER_BASE_URL`|**yes**|URL of provider graph query endpoint|_none_|
-|`PROVIDER_ACCESS_TOKEN`|no|Optional access token to be used with requests to provider graph query endpoint|_none_|
-|`PROVIDER_ACCOUNT_SEED_PHRASE`|**yes**|Seed phrase for provider control keypair|_none_|
-|`REDIS_URL`|**yes**|URL used to connect to Redis instance|_none_<br/>\*preset to the internal Redis URL in the standalone container|
-|`BLOCKCHAIN_SCAN_INTERVAL_MINUTES`|no|# of minutes to wait in between scans of the blockchain|180|
-|`QUEUE_HIGH_WATER`|no|# of pending graph scan queue entries to allow before pausing blockchain scanning until the next scan cycle|1000|
-|`GRAPH_ENVIRONMENT_TYPE`|**yes**|Indicates which blockchain network to connect to.<br/>Possible values:<br/>* `Mainnet`<br/>* `TestnetPaseo`|_none_|
+|Variable| required? | Description                                                                                                                                                             |Default|
+|-|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-|
+|`FREQUENCY_URL`| **yes**   | Blockchain URL                                                                                                                                                          |_none_|
+|`PROVIDER_ID`| **yes**   | MSA ID of provider                                                                                                                                                      |_none_|
+|`PROVIDER_BASE_URL`| **yes**   | URL of provider graph query endpoint                                                                                                                                    |_none_|
+|`PROVIDER_ACCESS_TOKEN`| no        | Optional access token to be used with requests to provider graph query endpoint                                                                                         |_none_|
+|`PROVIDER_ACCOUNT_SEED_PHRASE`| **yes***  | Seed phrase for provider control keypair (this is mutually exclusive with `ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY`). This is for backwards compatibility for Sr25519 keys. |_none_|
+|`ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY`| **yes***  | Private key for provider control ethereum keypair (this is mutually exclusive with `PROVIDER_ACCOUNT_SEED_PHRASE`).                       |_none_|
+|`REDIS_URL`| **yes**   | URL used to connect to Redis instance                                                                                                                                   |_none_<br/>\*preset to the internal Redis URL in the standalone container|
+|`BLOCKCHAIN_SCAN_INTERVAL_MINUTES`| no        | # of minutes to wait in between scans of the blockchain                                                                                                                 |180|
+|`QUEUE_HIGH_WATER`| no        | # of pending graph scan queue entries to allow before pausing blockchain scanning until the next scan cycle                                                             |1000|
+|`GRAPH_ENVIRONMENT_TYPE`| **yes**   | Indicates which blockchain network to connect to.<br/>Possible values:<br/>* `Mainnet`<br/>* `TestnetPaseo`                                                             |_none_|

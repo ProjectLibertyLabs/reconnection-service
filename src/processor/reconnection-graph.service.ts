@@ -25,6 +25,7 @@ import { ProviderWebhookService } from './provider-webhook.service';
 
 import * as errors from './errors';
 import { NonceService } from './nonce.service';
+import { getKeyringPairFromSecp256k1PrivateKey } from '@frequency-chain/ethereum-utils';
 
 @Injectable()
 export class ReconnectionGraphService {
@@ -92,7 +93,7 @@ export class ReconnectionGraphService {
       );
       const exportedUpdates = graphState.exportUserGraphUpdates(dsnpUserId.toString());
 
-      const providerKeys = createKeys(this.configService.getProviderAccountSeedPhrase());
+      const providerKeys = this.configService.getPreferredProviderKeyringPair();
       let batch: SubmittableExtrinsic<'rxjs', ISubmittableResult>[] = [];
       // eslint-disable-next-line no-restricted-syntax
       for (const bundle of exportedUpdates) {

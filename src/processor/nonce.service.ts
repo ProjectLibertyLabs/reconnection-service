@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import fs from 'fs';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
-import { createKeys } from '#app/blockchain/create-keys';
 import * as CacheUtils from '#app/cache/cache-utils';
 import { BlockchainService } from '#app/blockchain/blockchain.service';
 import { ConfigService } from '#app/config/config.service';
@@ -29,7 +28,7 @@ export class NonceService implements OnApplicationBootstrap {
   }
 
   async onApplicationBootstrap() {
-    this.accountId = createKeys(this.configService.getProviderAccountSeedPhrase()).publicKey;
+    this.accountId = this.configService.getPreferredProviderAccountId();
     const nextNonce = await this.peekNextNonce();
     this.logger.log(`Initialized nonce to ${nextNonce}`);
   }
