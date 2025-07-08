@@ -13,7 +13,7 @@ import { ConfigService as NestConfigService } from '@nestjs/config';
 import { getKeyringPairFromSecp256k1PrivateKey, getUnifiedPublicKey } from '@frequency-chain/ethereum-utils';
 import { hexToU8a } from '@polkadot/util';
 import { createKeys } from '#app/blockchain/create-keys';
-import { KeyringPair } from "@polkadot/keyring/types";
+import { KeyringPair } from '@polkadot/keyring/types';
 
 export interface ConfigEnvironmentVariables {
   API_PORT: number;
@@ -145,6 +145,6 @@ export class ConfigService {
   }
 
   public getPreferredProviderAccountId(): Uint8Array {
-      return getUnifiedPublicKey(this.getPreferredProviderKeyringPair());
+    return getUnifiedPublicKey(this.getPreferredProviderKeyringPair());
   }
 }

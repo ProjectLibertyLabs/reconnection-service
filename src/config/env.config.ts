@@ -43,16 +43,15 @@ export const configModuleOptions: ConfigModuleOptions = {
       .min(1)
       .default(3 * 60),
     QUEUE_HIGH_WATER: Joi.number().min(100).default(1000),
-    PROVIDER_ACCOUNT_SEED_PHRASE: Joi.string()
-      .custom((value: string, helpers) => {
-        if (process.env?.ENVIRONMENT === 'dev' && devUriRegEx.test(value)) {
-          return value;
-        }
-        if (!mnemonicValidate(value)) {
-          return helpers.error('any.invalid');
-        }
+    PROVIDER_ACCOUNT_SEED_PHRASE: Joi.string().custom((value: string, helpers) => {
+      if (process.env?.ENVIRONMENT === 'dev' && devUriRegEx.test(value)) {
         return value;
-      }),
+      }
+      if (!mnemonicValidate(value)) {
+        return helpers.error('any.invalid');
+      }
+      return value;
+    }),
     ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY: Joi.string()
       .pattern(/^0[xX]([0-9a-fA-F]{2})+$/)
       .message('Not a valid hex'),
@@ -95,6 +94,6 @@ export const configModuleOptions: ConfigModuleOptions = {
     FREQUENCY_TX_TIMEOUT_SECONDS: Joi.number().min(12).default(60),
     CONNECTIONS_PER_PROVIDER_RESPONSE_PAGE: Joi.number().min(1).default(100),
   })
-      // make these two fields mutually exclusive using
-      .xor('PROVIDER_ACCOUNT_SEED_PHRASE', 'ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY'),
+    // make these two fields mutually exclusive using
+    .xor('PROVIDER_ACCOUNT_SEED_PHRASE', 'ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY'),
 };
