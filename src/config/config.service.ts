@@ -81,31 +81,31 @@ export class ConfigService {
   }
 
   public getBlockchainScanIntervalMinutes(): number {
-    return this.nestConfigService.get<number>('BLOCKCHAIN_SCAN_INTERVAL_MINUTES') ?? 1;
+    return parseInt(this.nestConfigService.get('BLOCKCHAIN_SCAN_INTERVAL_MINUTES') ?? '1', 10);
   }
 
   public getQueueHighWater(): number {
-    return this.nestConfigService.get<number>('QUEUE_HIGH_WATER')!;
+    return parseInt(this.nestConfigService.get('QUEUE_HIGH_WATER') ?? '1', 10);
   }
 
   public getWebhookFailureThreshold(): number {
-    return this.nestConfigService.get<number>('WEBHOOK_FAILURE_THRESHOLD')!;
+    return parseInt(this.nestConfigService.get('WEBHOOK_FAILURE_THRESHOLD') ?? '1', 10);
   }
 
   public getHealthCheckSuccessThreshold(): number {
-    return this.nestConfigService.get<number>('HEALTH_CHECK_SUCCESS_THRESHOLD')!;
+    return parseInt(this.nestConfigService.get('HEALTH_CHECK_SUCCESS_THRESHOLD') ?? '1', 10);
   }
 
   public getWebhookRetryIntervalSeconds(): number {
-    return this.nestConfigService.get<number>('WEBHOOK_RETRY_INTERVAL_SECONDS')!;
+    return parseInt(this.nestConfigService.get('WEBHOOK_RETRY_INTERVAL_SECONDS') ?? '1', 10);
   }
 
   public getHealthCheckMaxRetryIntervalSeconds(): number {
-    return this.nestConfigService.get<number>('HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS')!;
+    return parseInt(this.nestConfigService.get('HEALTH_CHECK_MAX_RETRY_INTERVAL_SECONDS') ?? '1', 10);
   }
 
   public getHealthCheckMaxRetries(): number {
-    return this.nestConfigService.get<number>('HEALTH_CHECK_MAX_RETRIES')!;
+    return parseInt(this.nestConfigService.get('HEALTH_CHECK_MAX_RETRIES') ?? '1', 10);
   }
 
   public getProviderId(): string {
@@ -129,11 +129,11 @@ export class ConfigService {
   }
 
   public getFrequencyTxTimeoutSeconds(): number {
-    return this.nestConfigService.get<number>('FREQUENCY_TX_TIMEOUT_SECONDS')!;
+    return parseInt(this.nestConfigService.get('FREQUENCY_TX_TIMEOUT_SECONDS') ?? '1', 10);
   }
 
   public getPageSize(): number {
-    return this.nestConfigService.get<number>('CONNECTIONS_PER_PROVIDER_RESPONSE_PAGE')!;
+    return parseInt(this.nestConfigService.get('CONNECTIONS_PER_PROVIDER_RESPONSE_PAGE') ?? '1', 10);
   }
 
   // tries to use the ethereum key first and uses the legacy account as a backup

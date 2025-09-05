@@ -149,7 +149,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
 
   public async getCurrentEpochLength(): Promise<number> {
     const epochLength: u32 = await this.query('capacity', 'epochLength');
-    return typeof epochLength === 'number' ? epochLength : epochLength.toPrimitive() as number;
+    return typeof epochLength === 'number' ? epochLength : (epochLength.toPrimitive() as number);
   }
 
   public async getNonce(account: Uint8Array): Promise<Index> {
