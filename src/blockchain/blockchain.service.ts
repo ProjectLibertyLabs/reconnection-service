@@ -1,4 +1,5 @@
 /* eslint-disable no-underscore-dangle */
+import '@frequency-chain/api-augment';
 import { ConfigService } from '#app/config/config.service';
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { options } from '@frequency-chain/api-augment';
@@ -7,8 +8,7 @@ import { KeyringPair } from '@polkadot/keyring/types';
 import { BlockHash, BlockNumber, Index, SignedBlock } from '@polkadot/types/interfaces';
 import { SubmittableExtrinsic } from '@polkadot/api/types';
 import { AnyNumber, ISubmittableResult } from '@polkadot/types/types';
-import { u32, Option } from '@polkadot/types';
-import { PalletCapacityEpochInfo } from '@polkadot/types/lookup';
+import { u32 } from '@polkadot/types';
 import { HexString } from '@polkadot/util/types';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -122,7 +122,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
   public async capacityInfo(providerId: string): Promise<ICapacityInfo> {
     try {
       const providerU64 = this.apiPromise.createType('u64', providerId);
-      const { epochStart }: PalletCapacityEpochInfo = await this.query('capacity', 'currentEpochInfo');
+      const { epochStart } = await this.query('capacity', 'currentEpochInfo');
       const epochBlockLength: u32 = await this.query('capacity', 'epochLength');
       const capacityDetailsOption = await this.query('capacity', 'capacityLedger', providerU64);
       const { remainingCapacity, totalCapacityIssued } = capacityDetailsOption.unwrapOr({ remainingCapacity: 0, totalCapacityIssued: 0 });
@@ -132,7 +132,7 @@ export class BlockchainService implements OnApplicationBootstrap, OnApplicationS
         currentEpoch,
         providerId,
         currentBlockNumber: currentBlock.toPrimitive() as number,
-        nextEpochStart: epochStart.add(epochBlockLength).toNumber(),
+        nextEpochStart: (epochStart as unknown as u32).add(epochBlockLength).toNumber(),
         remainingCapacity: typeof remainingCapacity === 'number' ? BigInt(remainingCapacity) : remainingCapacity.toBigInt(),
         totalCapacityIssued: typeof totalCapacityIssued === 'number' ? BigInt(totalCapacityIssued) : totalCapacityIssued.toBigInt(),
       };

@@ -4,7 +4,8 @@ import { BlockchainService } from '#app/blockchain/blockchain.service';
 import * as BlockchainConstants from '#app/blockchain/blockchain-constants';
 import { BlockchainScannerService } from '#app/blockchain-scanner.service';
 import { SchedulerRegistry } from '@nestjs/schedule';
-import { BlockHash, Event } from '@polkadot/types/interfaces';
+import { BlockHash, Event, DispatchError, EventRecord } from '@polkadot/types/interfaces';
+import { u32, Vec } from '@polkadot/types';
 import { HexString } from '@polkadot/util/types';
 import { ReconnectionCacheMgrService } from '#app/cache/reconnection-cache-mgr.service';
 import { ITxStatus } from '#app/interfaces/tx-status.interface';
@@ -51,7 +52,7 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
         this.logger.warn(`Events for tx ${newStatus.txHash} include both success and failure ???`);
       }
       const [dispatchError] = failureEvent.data;
-      const { asModule: moduleThatErrored, registry } = dispatchError;
+      const { asModule: moduleThatErrored, registry } = dispatchError as unknown as DispatchError;
       const moduleError = registry.findMetaError(moduleThatErrored);
       newStatus.error = moduleError.method;
       newStatus.status = 'failed';
@@ -79,8 +80,10 @@ export class GraphUpdateCompletionMonitorService extends BlockchainScannerServic
 
     if (extrinsicIndices.length > 0) {
       const at = await this.blockchainService.apiPromise.at(currentBlockHash);
-      const epoch = (await at.query.capacity.currentEpoch()).toNumber();
-      const events = (await at.query.system.events()).filter(({ phase }) => phase.isApplyExtrinsic && extrinsicIndices.some((index) => phase.asApplyExtrinsic.eq(index)));
+      const epoch = ((await at.query.capacity.currentEpoch()) as unknown as u32).toNumber();
+      const events = ((await at.query.system.events()) as unknown as Vec<EventRecord>).filter(
+        ({ phase }) => phase.isApplyExtrinsic && extrinsicIndices.some((index) => phase.asApplyExtrinsic.eq(index)),
+      );
 
       const totalCapacityWithdrawn: bigint = events
         .filter(({ event }) => at.events.capacity.CapacityWithdrawn.is(event))

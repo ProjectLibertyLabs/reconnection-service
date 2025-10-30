@@ -127,8 +127,8 @@ export class Extrinsic<T extends ISubmittableResult = ISubmittableResult, C exte
           }
           if (this.api.events.sudo.Sudid.is(event)) {
             const [sudoResult] = event.data;
-            if (sudoResult.isErr) {
-              const err = new EventError(sudoResult.asErr);
+            if ((sudoResult as any).isErr) {
+              const err = new EventError((sudoResult as any).asErr);
               throw err;
             }
           }

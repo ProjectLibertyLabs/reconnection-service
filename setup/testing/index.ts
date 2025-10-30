@@ -25,7 +25,7 @@ import {
 import fs from 'node:fs';
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
 import { ISubmittableResult } from '@polkadot/types/types';
-import { FrameSystemEventRecord } from '@polkadot/types/lookup';
+import { EventRecord } from '@polkadot/types/interfaces';
 import { hexToU8a, u8aToHex } from '@polkadot/util';
 import {
   AddGraphKeyAction,
@@ -348,7 +348,7 @@ User graphs to clear: ${graphsToClear}
     });
 
     // Subscribe to events on-chain and update accounts as MSAs are created
-    const unsubscribeEvents = await ExtrinsicHelper.apiPromise.query.system.events((events: Vec<FrameSystemEventRecord>) => {
+    const unsubscribeEvents = await ExtrinsicHelper.apiPromise.query.system.events((events: Vec<EventRecord>) => {
       events.forEach((eventRecord) => {
         const { event } = eventRecord;
         if (ExtrinsicHelper.api.events.utility.BatchCompleted.is(event)) {
