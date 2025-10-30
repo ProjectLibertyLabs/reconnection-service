@@ -43,7 +43,7 @@ import {
   createItemizedSignaturePayloadV2,
   getUnifiedAddress,
   getUnifiedPublicKey,
-  signEip712,
+  sign,
   getEthereumRegularSigner, getKeyringPairFromSecp256k1PrivateKey,
 } from '@frequency-chain/ethereum-utils';
 import {Keypair} from "@polkadot/util-crypto/types";
@@ -129,9 +129,10 @@ async function getAddGraphKeyPayload(graph: Graph, user: ChainUser): Promise<{ p
     proof = signPayloadSr25519(user.keys!, payloadBytes);
   } else {
     const ethPayload = createItemizedSignaturePayloadV2(graphKeyAction.schemaId, 0, graphKeyAction.expiration, [createItemizedAddAction(graphKeyActionBundle.payload)]);
-    proof = await signEip712(
+    proof = await sign(
         u8aToHex(getEthereumKeyPairFromUnifiedAddress(getUnifiedAddress(user.keys!)).secretKey),
-        ethPayload
+        ethPayload,
+        'Dev'
     );
   }
   return { payload: { ...graphKeyAction }, proof };
@@ -153,9 +154,10 @@ async function getAddProviderPayload(user: ChainUser, provider: ChainUser): Prom
   } else {
     const ethPayload= createAddProvider(addProvider.authorizedMsaId.toString(), DEFAULT_SCHEMAS, addProvider.expiration);
     console.log(user.uri);
-    proof = await signEip712(
+    proof = await sign(
         u8aToHex(getEthereumKeyPairFromUnifiedAddress(getUnifiedAddress(user.keys!)).secretKey),
-        ethPayload
+        ethPayload,
+        'Dev'
     );
   }
 
@@ -175,10 +177,15 @@ async function createEthereumProvider(providerUser :ChainUser, fundingSource: Ch
             filter(({ status }) => (status.isInBlock) || status.isFinalized),
             tap((result: ISubmittableResult) => {
               const providerEvent = result.events.find((e) => e.event.method === "ProviderCreated");
-              providerId = providerEvent.event.data[0].toPrimitive();
+              if (providerEvent) {
+                providerId = providerEvent.event.data[0].toPrimitive();
+              }
             }),
         )
     );
+    if (!providerId) {
+      throw new Error("Failed to create provider - no ProviderCreated event found");
+    }
     return providerId;
 }
 
@@ -244,7 +251,7 @@ async function main() {
 
   // Ensure provider is staked
   const capacity = await ExtrinsicHelper.apiPromise.query.capacity.capacityLedger(provider.msaId);
-  if (capacity.isNone || capacity.unwrap().totalTokensStaked.toBigInt() < CAPACITY_AMOUNT_TO_STAKE) {
+  if ((capacity as any).isNone || (capacity as any).unwrap().totalTokensStaked.toBigInt() < CAPACITY_AMOUNT_TO_STAKE) {
     await ExtrinsicHelper.stake(fundingSource.keys!, provider.msaId, CAPACITY_AMOUNT_TO_STAKE).signAndSend();
     console.log(`Staked to provider`);
   }
