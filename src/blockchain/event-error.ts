@@ -10,7 +10,7 @@ export class EventError extends Error {
 
   section?: string = '';
 
-  rawError: DispatchError;
+  rawError: DispatchError | SpRuntimeDispatchError;
 
   constructor(source: DispatchError | SpRuntimeDispatchError) {
     super();
@@ -25,7 +25,7 @@ export class EventError extends Error {
       this.message = source.type;
       this.section = '';
     }
-    this.rawError = source as DispatchError;
+    this.rawError = source;
   }
 
   public toString() {
