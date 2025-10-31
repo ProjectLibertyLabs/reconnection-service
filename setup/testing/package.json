@@ -8,18 +8,18 @@
   },
   "dependencies": {
     "@projectlibertylabs/graph-sdk": "^2.0.1",
-    "@frequency-chain/api-augment": "^1.16.2",
-    "@polkadot/api-base": "^15.10.2",
-    "@polkadot/keyring": "^13.4.4",
-    "@polkadot/types": "^15.10.2",
-    "@polkadot/util": "^13.4.4",
-    "@polkadot/util-crypto": "^13.4.4",
-    "@projectlibertylabs/frequency-scenario-template": "^1.1.11",
+    "@frequency-chain/api-augment": "^1.17.6",
+    "@polkadot/api-base": "16.4.8",
+    "@polkadot/keyring": "13.5.7",
+    "@polkadot/types": "16.4.8",
+    "@polkadot/util": "13.5.7",
+    "@polkadot/util-crypto": "13.5.7",
+    "@projectlibertylabs/frequency-scenario-template": "1.1.14",
     "loglevel": "^1.9.2",
     "reconnection-service": "file:../..",
-    "tsx": "^4.19.4"
+    "tsx": "^4.20.6"
   },
   "devDependencies": {
-    "prettier": "^3.5.3"
+    "prettier": "^3.6.2"
   }
 }

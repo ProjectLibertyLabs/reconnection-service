@@ -36,19 +36,19 @@ import {
   Graph,
   PrivacyType
 } from '@projectlibertylabs/graph-sdk';
-import {HexString} from '@polkadot/util/types';
+import { HexString } from '@polkadot/util/types';
 import {
   createAddProvider,
   createItemizedAddAction,
   createItemizedSignaturePayloadV2,
   getUnifiedAddress,
   getUnifiedPublicKey,
-  signEip712,
+  sign,
   getEthereumRegularSigner, getKeyringPairFromSecp256k1PrivateKey,
 } from '@frequency-chain/ethereum-utils';
-import {Keypair} from "@polkadot/util-crypto/types";
-import {keccak256} from '@polkadot/wasm-crypto';
-import {filter, firstValueFrom, map, tap} from "rxjs";
+import { Keypair } from "@polkadot/util-crypto/types";
+import { keccak256 } from '@polkadot/wasm-crypto';
+import { filter, firstValueFrom, map, tap } from "rxjs";
 
 const PROVIDER_ACCOUNT_SEED_PHRASE = 'come finish flower cinnamon blame year glad tank domain hunt release fatigue';
 const ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY = '0x5fb92d6e98884f76de468fa3f6278f8807c48bebc13595d45af5bdc4da702133';
@@ -129,9 +129,10 @@ async function getAddGraphKeyPayload(graph: Graph, user: ChainUser): Promise<{ p
     proof = signPayloadSr25519(user.keys!, payloadBytes);
   } else {
     const ethPayload = createItemizedSignaturePayloadV2(graphKeyAction.schemaId, 0, graphKeyAction.expiration, [createItemizedAddAction(graphKeyActionBundle.payload)]);
-    proof = await signEip712(
-        u8aToHex(getEthereumKeyPairFromUnifiedAddress(getUnifiedAddress(user.keys!)).secretKey),
-        ethPayload
+    proof = await sign(
+      u8aToHex(getEthereumKeyPairFromUnifiedAddress(getUnifiedAddress(user.keys!)).secretKey),
+      ethPayload,
+      'Dev'
     );
   }
   return { payload: { ...graphKeyAction }, proof };
@@ -151,35 +152,41 @@ async function getAddProviderPayload(user: ChainUser, provider: ChainUser): Prom
     const payload = ExtrinsicHelper.apiPromise.registry.createType('PalletMsaAddProvider', addProvider);
     proof = signPayloadSr25519(user.keys!, payload);
   } else {
-    const ethPayload= createAddProvider(addProvider.authorizedMsaId.toString(), DEFAULT_SCHEMAS, addProvider.expiration);
+    const ethPayload = createAddProvider(addProvider.authorizedMsaId.toString(), DEFAULT_SCHEMAS, addProvider.expiration);
     console.log(user.uri);
-    proof = await signEip712(
-        u8aToHex(getEthereumKeyPairFromUnifiedAddress(getUnifiedAddress(user.keys!)).secretKey),
-        ethPayload
+    proof = await sign(
+      u8aToHex(getEthereumKeyPairFromUnifiedAddress(getUnifiedAddress(user.keys!)).secretKey),
+      ethPayload,
+      'Dev'
     );
   }
 
   return { payload: addProvider, proof };
 }
 
-async function createEthereumProvider(providerUser :ChainUser, fundingSource: ChainUser, providerName: string): Promise<number> {
-    const { apiPromise } = ExtrinsicHelper;
-    const fundingLevel = 1_000_000_000n;
-    const unifiedAddress = getUnifiedAddress(providerUser.keys!);
-    await ExtrinsicHelper.transferFunds(fundingSource.keys, providerUser.keys!, fundingLevel).signAndSend();
-    await firstValueFrom(ExtrinsicHelper.api.tx.msa.create().signAndSend(unifiedAddress, { signer: getEthereumRegularSigner(providerUser.keys!)}));
-    let nonce = (await apiPromise.query.system.account(unifiedAddress)).nonce.toNumber() + 1;
-    let providerId;
-    await firstValueFrom( ExtrinsicHelper.api.tx.msa.createProvider(providerName)
-        .signAndSend(unifiedAddress, {nonce,  signer: getEthereumRegularSigner(providerUser.keys!)}).pipe(
-            filter(({ status }) => (status.isInBlock) || status.isFinalized),
-            tap((result: ISubmittableResult) => {
-              const providerEvent = result.events.find((e) => e.event.method === "ProviderCreated");
-              providerId = providerEvent.event.data[0].toPrimitive();
-            }),
-        )
-    );
-    return providerId;
+async function createEthereumProvider(providerUser: ChainUser, fundingSource: ChainUser, providerName: string): Promise<number> {
+  const { apiPromise } = ExtrinsicHelper;
+  const fundingLevel = 1_000_000_000n;
+  const unifiedAddress = getUnifiedAddress(providerUser.keys!);
+  await ExtrinsicHelper.transferFunds(fundingSource.keys, providerUser.keys!, fundingLevel).signAndSend();
+  await firstValueFrom(ExtrinsicHelper.api.tx.msa.create().signAndSend(unifiedAddress, { signer: getEthereumRegularSigner(providerUser.keys!) }));
+  let nonce = (await apiPromise.query.system.account(unifiedAddress)).nonce.toNumber() + 1;
+  let providerId;
+  await firstValueFrom(ExtrinsicHelper.api.tx.msa.createProvider(providerName)
+    .signAndSend(unifiedAddress, { nonce, signer: getEthereumRegularSigner(providerUser.keys!) }).pipe(
+      filter(({ status }) => (status.isInBlock) || status.isFinalized),
+      tap((result: ISubmittableResult) => {
+        const providerEvent = result.events.find((e) => e.event.method === "ProviderCreated");
+        if (providerEvent) {
+          providerId = providerEvent.event.data[0].toPrimitive();
+        }
+      }),
+    )
+  );
+  if (!providerId) {
+    throw new Error("Failed to create provider - no ProviderCreated event found");
+  }
+  return providerId;
 }
 
 function getEthereumKeyPairFromUnifiedAddress(unifiedAddress: string): Keypair {

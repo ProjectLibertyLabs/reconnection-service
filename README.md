@@ -236,7 +236,7 @@ In order to run the `reconnection-service` in development mode without container
    docker compose up -d reconnection-service
    ```
 
-#### 5. Check the job in [BullUI](http://0.0.0.0:3000/reconnection-service/queue/), to monitor job progress based on defined tests.
+#### 5. Check the job in [BullUI](http://0.0.0.0:3000/queues/), to monitor job progress based on defined tests.
 
 ## 📋 Testing
 
