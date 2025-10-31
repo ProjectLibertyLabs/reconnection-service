@@ -236,7 +236,7 @@ async function main() {
   let provider: ChainUser;
   if (useEthereumProvider) {
     console.log('Creating ethereum provider...');
-    provider = { keys: getKeyringPairFromSecp256k1PrivateKey(hexToU8a(ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY)) };
+    provider = { keys: getKeyringPairFromSecp256k1PrivateKey(hexToU8a(ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY))};
     provider.msaId = await createEthereumProvider(provider, fundingSource, "ethProvider") as MessageSourceId;
     console.log(`Created ethererum provider ${provider.msaId!.toString()}`);
   } else {
@@ -362,7 +362,7 @@ User graphs to clear: ${graphsToClear}
           allBatchesTracker.numberPending -= 1;
           if (allBatchesTracker.numberPending < 1) {
             allBatchesTracker.numberPending = 0;
-            (allBatchesTracker?.resolve ?? (() => { }))();
+            (allBatchesTracker?.resolve ?? (() => {}))();
           }
         } else if (ExtrinsicHelper.api.events.msa.MsaCreated.is(event)) {
           const { msaId, key } = event.data;
@@ -403,11 +403,11 @@ User graphs to clear: ${graphsToClear}
           //   x.events.forEach((e) => console.dir(e.event.toHuman()));
           if (x.dispatchError) {
             unsub();
-            (allBatchesTracker?.reject ?? (() => { }))(new EventError(x.dispatchError));
+            (allBatchesTracker?.reject ?? (() => {}))(new EventError(x.dispatchError));
           } else if (status.isInvalid) {
             unsub();
             console.log(x.toHuman());
-            (allBatchesTracker?.reject ?? (() => { }))(new Error('Extrinsic failed: Invalid'));
+            (allBatchesTracker?.reject ?? (() => {}))(new Error('Extrinsic failed: Invalid'));
           } else if (x.isFinalized) {
             unsub();
           }
