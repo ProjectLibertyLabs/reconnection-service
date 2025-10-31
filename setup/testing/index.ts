@@ -25,7 +25,7 @@ import {
 import fs from 'node:fs';
 import { SubmittableExtrinsic } from '@polkadot/api-base/types';
 import { ISubmittableResult } from '@polkadot/types/types';
-import { EventRecord } from '@polkadot/types/interfaces';
+import { FrameSystemEventRecord } from '@polkadot/types/lookup';
 import { hexToU8a, u8aToHex } from '@polkadot/util';
 import {
   AddGraphKeyAction,
@@ -36,7 +36,7 @@ import {
   Graph,
   PrivacyType
 } from '@projectlibertylabs/graph-sdk';
-import {HexString} from '@polkadot/util/types';
+import { HexString } from '@polkadot/util/types';
 import {
   createAddProvider,
   createItemizedAddAction,
@@ -46,9 +46,9 @@ import {
   sign,
   getEthereumRegularSigner, getKeyringPairFromSecp256k1PrivateKey,
 } from '@frequency-chain/ethereum-utils';
-import {Keypair} from "@polkadot/util-crypto/types";
-import {keccak256} from '@polkadot/wasm-crypto';
-import {filter, firstValueFrom, map, tap} from "rxjs";
+import { Keypair } from "@polkadot/util-crypto/types";
+import { keccak256 } from '@polkadot/wasm-crypto';
+import { filter, firstValueFrom, map, tap } from "rxjs";
 
 const PROVIDER_ACCOUNT_SEED_PHRASE = 'come finish flower cinnamon blame year glad tank domain hunt release fatigue';
 const ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY = '0x5fb92d6e98884f76de468fa3f6278f8807c48bebc13595d45af5bdc4da702133';
@@ -130,9 +130,9 @@ async function getAddGraphKeyPayload(graph: Graph, user: ChainUser): Promise<{ p
   } else {
     const ethPayload = createItemizedSignaturePayloadV2(graphKeyAction.schemaId, 0, graphKeyAction.expiration, [createItemizedAddAction(graphKeyActionBundle.payload)]);
     proof = await sign(
-        u8aToHex(getEthereumKeyPairFromUnifiedAddress(getUnifiedAddress(user.keys!)).secretKey),
-        ethPayload,
-        'Dev'
+      u8aToHex(getEthereumKeyPairFromUnifiedAddress(getUnifiedAddress(user.keys!)).secretKey),
+      ethPayload,
+      'Dev'
     );
   }
   return { payload: { ...graphKeyAction }, proof };
@@ -152,41 +152,41 @@ async function getAddProviderPayload(user: ChainUser, provider: ChainUser): Prom
     const payload = ExtrinsicHelper.apiPromise.registry.createType('PalletMsaAddProvider', addProvider);
     proof = signPayloadSr25519(user.keys!, payload);
   } else {
-    const ethPayload= createAddProvider(addProvider.authorizedMsaId.toString(), DEFAULT_SCHEMAS, addProvider.expiration);
+    const ethPayload = createAddProvider(addProvider.authorizedMsaId.toString(), DEFAULT_SCHEMAS, addProvider.expiration);
     console.log(user.uri);
     proof = await sign(
-        u8aToHex(getEthereumKeyPairFromUnifiedAddress(getUnifiedAddress(user.keys!)).secretKey),
-        ethPayload,
-        'Dev'
+      u8aToHex(getEthereumKeyPairFromUnifiedAddress(getUnifiedAddress(user.keys!)).secretKey),
+      ethPayload,
+      'Dev'
     );
   }
 
   return { payload: addProvider, proof };
 }
 
-async function createEthereumProvider(providerUser :ChainUser, fundingSource: ChainUser, providerName: string): Promise<number> {
-    const { apiPromise } = ExtrinsicHelper;
-    const fundingLevel = 1_000_000_000n;
-    const unifiedAddress = getUnifiedAddress(providerUser.keys!);
-    await ExtrinsicHelper.transferFunds(fundingSource.keys, providerUser.keys!, fundingLevel).signAndSend();
-    await firstValueFrom(ExtrinsicHelper.api.tx.msa.create().signAndSend(unifiedAddress, { signer: getEthereumRegularSigner(providerUser.keys!)}));
-    let nonce = (await apiPromise.query.system.account(unifiedAddress)).nonce.toNumber() + 1;
-    let providerId;
-    await firstValueFrom( ExtrinsicHelper.api.tx.msa.createProvider(providerName)
-        .signAndSend(unifiedAddress, {nonce,  signer: getEthereumRegularSigner(providerUser.keys!)}).pipe(
-            filter(({ status }) => (status.isInBlock) || status.isFinalized),
-            tap((result: ISubmittableResult) => {
-              const providerEvent = result.events.find((e) => e.event.method === "ProviderCreated");
-              if (providerEvent) {
-                providerId = providerEvent.event.data[0].toPrimitive();
-              }
-            }),
-        )
-    );
-    if (!providerId) {
-      throw new Error("Failed to create provider - no ProviderCreated event found");
-    }
-    return providerId;
+async function createEthereumProvider(providerUser: ChainUser, fundingSource: ChainUser, providerName: string): Promise<number> {
+  const { apiPromise } = ExtrinsicHelper;
+  const fundingLevel = 1_000_000_000n;
+  const unifiedAddress = getUnifiedAddress(providerUser.keys!);
+  await ExtrinsicHelper.transferFunds(fundingSource.keys, providerUser.keys!, fundingLevel).signAndSend();
+  await firstValueFrom(ExtrinsicHelper.api.tx.msa.create().signAndSend(unifiedAddress, { signer: getEthereumRegularSigner(providerUser.keys!) }));
+  let nonce = (await apiPromise.query.system.account(unifiedAddress)).nonce.toNumber() + 1;
+  let providerId;
+  await firstValueFrom(ExtrinsicHelper.api.tx.msa.createProvider(providerName)
+    .signAndSend(unifiedAddress, { nonce, signer: getEthereumRegularSigner(providerUser.keys!) }).pipe(
+      filter(({ status }) => (status.isInBlock) || status.isFinalized),
+      tap((result: ISubmittableResult) => {
+        const providerEvent = result.events.find((e) => e.event.method === "ProviderCreated");
+        if (providerEvent) {
+          providerId = providerEvent.event.data[0].toPrimitive();
+        }
+      }),
+    )
+  );
+  if (!providerId) {
+    throw new Error("Failed to create provider - no ProviderCreated event found");
+  }
+  return providerId;
 }
 
 function getEthereumKeyPairFromUnifiedAddress(unifiedAddress: string): Keypair {
@@ -236,7 +236,7 @@ async function main() {
   let provider: ChainUser;
   if (useEthereumProvider) {
     console.log('Creating ethereum provider...');
-    provider = { keys: getKeyringPairFromSecp256k1PrivateKey(hexToU8a(ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY))};
+    provider = { keys: getKeyringPairFromSecp256k1PrivateKey(hexToU8a(ETHEREUM_PROVIDER_ACCOUNT_PRIVATE_KEY)) };
     provider.msaId = await createEthereumProvider(provider, fundingSource, "ethProvider") as MessageSourceId;
     console.log(`Created ethererum provider ${provider.msaId!.toString()}`);
   } else {
@@ -251,7 +251,7 @@ async function main() {
 
   // Ensure provider is staked
   const capacity = await ExtrinsicHelper.apiPromise.query.capacity.capacityLedger(provider.msaId);
-  if ((capacity as any).isNone || (capacity as any).unwrap().totalTokensStaked.toBigInt() < CAPACITY_AMOUNT_TO_STAKE) {
+  if (capacity.isNone || capacity.unwrap().totalTokensStaked.toBigInt() < CAPACITY_AMOUNT_TO_STAKE) {
     await ExtrinsicHelper.stake(fundingSource.keys!, provider.msaId, CAPACITY_AMOUNT_TO_STAKE).signAndSend();
     console.log(`Staked to provider`);
   }
@@ -355,14 +355,14 @@ User graphs to clear: ${graphsToClear}
     });
 
     // Subscribe to events on-chain and update accounts as MSAs are created
-    const unsubscribeEvents = await ExtrinsicHelper.apiPromise.query.system.events((events: Vec<EventRecord>) => {
+    const unsubscribeEvents = await ExtrinsicHelper.apiPromise.query.system.events((events: Vec<FrameSystemEventRecord>) => {
       events.forEach((eventRecord) => {
         const { event } = eventRecord;
         if (ExtrinsicHelper.api.events.utility.BatchCompleted.is(event)) {
           allBatchesTracker.numberPending -= 1;
           if (allBatchesTracker.numberPending < 1) {
             allBatchesTracker.numberPending = 0;
-            (allBatchesTracker?.resolve ?? (() => {}))();
+            (allBatchesTracker?.resolve ?? (() => { }))();
           }
         } else if (ExtrinsicHelper.api.events.msa.MsaCreated.is(event)) {
           const { msaId, key } = event.data;
@@ -403,11 +403,11 @@ User graphs to clear: ${graphsToClear}
           //   x.events.forEach((e) => console.dir(e.event.toHuman()));
           if (x.dispatchError) {
             unsub();
-            (allBatchesTracker?.reject ?? (() => {}))(new EventError(x.dispatchError));
+            (allBatchesTracker?.reject ?? (() => { }))(new EventError(x.dispatchError));
           } else if (status.isInvalid) {
             unsub();
             console.log(x.toHuman());
-            (allBatchesTracker?.reject ?? (() => {}))(new Error('Extrinsic failed: Invalid'));
+            (allBatchesTracker?.reject ?? (() => { }))(new Error('Extrinsic failed: Invalid'));
           } else if (x.isFinalized) {
             unsub();
           }

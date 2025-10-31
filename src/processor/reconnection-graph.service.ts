@@ -45,7 +45,7 @@ export class ReconnectionGraphService {
   }
 
   public get capacityBatchLimit(): number {
-    return (this.blockchainService.api.consts.frequencyTxPayment.maximumCapacityBatchLength as unknown as { toNumber: () => number }).toNumber();
+    return this.blockchainService.api.consts.frequencyTxPayment.maximumCapacityBatchLength.toNumber();
   }
 
   public async updateUserGraph(jobId: string, dsnpUserStr: string, providerStr: string, updateConnections: boolean): Promise<boolean> {
@@ -53,8 +53,8 @@ export class ReconnectionGraphService {
     this.logger.debug(`Updating graph for user ${dsnpUserStr}, provider ${providerStr}`);
     // Acquire a graph state for the job
     const graphState = this.graphStateManager.createGraphState();
-    const dsnpUserId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', dsnpUserStr) as unknown as MessageSourceId;
-    const providerId: ProviderId = this.blockchainService.api.registry.createType('ProviderId', providerStr) as unknown as ProviderId;
+    const dsnpUserId: MessageSourceId = this.blockchainService.api.registry.createType('MessageSourceId', dsnpUserStr);
+    const providerId: ProviderId = this.blockchainService.api.registry.createType('ProviderId', providerStr);
 
     let graphConnections: ProviderGraph[] = [];
     let graphKeyPairs: ProviderKeyPair[] = [];
